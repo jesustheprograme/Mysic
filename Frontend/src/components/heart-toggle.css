@@ -1,0 +1,81 @@
+.heart-container {
+  --heart-color: #4bd27b;
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--heart-color);
+  background: transparent;
+  cursor: pointer;
+  transition: color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.heart-container:hover {
+  color: #79e89c;
+  background: rgba(75, 210, 123, 0.1);
+}
+
+.heart-container:active {
+  transform: scale(0.94);
+}
+
+.heart-container:focus-visible {
+  outline: 2px solid rgba(75, 210, 123, 0.8);
+  outline-offset: 2px;
+}
+
+.heart-container--song-row {
+  width: 29px;
+  height: 29px;
+  flex-basis: 29px;
+  color: #87918e;
+}
+
+.heart-container--song-row[aria-pressed='true'] {
+  color: var(--heart-color);
+}
+
+.heart-container--song-row:hover {
+  color: #79e89c;
+}
+
+.heart-icon {
+  position: relative;
+  z-index: 1;
+}
+
+.heart-container .svg-celebrate {
+  position: absolute;
+  display: none;
+  fill: var(--heart-color);
+  stroke: var(--heart-color);
+  stroke-width: 2px;
+  pointer-events: none;
+}
+
+.heart-container--celebrating .svg-celebrate {
+  display: block;
+  animation: heart-toggle-svg-celebrate 500ms ease-out forwards;
+}
+
+@keyframes heart-toggle-svg-celebrate {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+
+  50% {
+    opacity: 1;
+    filter: brightness(1.5);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
