@@ -4,6 +4,10 @@ require('dotenv').config({
   quiet: true,
 })
 require('dotenv').config({
+  path: path.join(__dirname, '.env.cloudinary'),
+  quiet: true,
+})
+require('dotenv').config({
   path: path.join(__dirname, '.env'),
   override: true,
   quiet: true,
@@ -15,8 +19,12 @@ const rateLimit = require('express-rate-limit')
 const helmet = require('helmet')
 const morgan = require('morgan')
 const { createAuthHandlers } = require('./src/auth')
+const { createCatalogRouter } = require('./src/catalog')
+const { createFavoritesRouter } = require('./src/favorites')
+const { createPlaylistsRouter } = require('./src/playlists')
 const { getConfig } = require('./src/config')
 const { closeDatabase, connectDatabase } = require('./src/database')
+const { closePrisma, connectPrisma } = require('./src/prisma')
 
 const app = express()
 let server
@@ -61,7 +69,7 @@ async function start() {
   const config = getConfig()
   const auth = createAuthHandlers(config)
 
-  await connectDatabase(config)
+  await Promise.all([connectDatabase(config), connectPrisma()])
 
   app.disable('x-powered-by')
   app.use(helmet())
@@ -95,6 +103,10 @@ async function start() {
     res.json(tracks)
   })
 
+  app.use('/api/catalog', createCatalogRouter(config))
+  app.use('/api/favorites', createFavoritesRouter(config))
+  app.use('/api/playlists', createPlaylistsRouter(config))
+
   app.post('/api/auth/register', authLimiter, auth.register)
   app.post('/api/auth/login', authLimiter, auth.login)
   app.post('/api/auth/google', authLimiter, auth.google)
@@ -125,6 +137,7 @@ async function shutdown() {
   }
 
   await closeDatabase()
+  await closePrisma()
 }
 
 if (require.main === module) {

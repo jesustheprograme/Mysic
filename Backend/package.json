@@ -4,16 +4,26 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "node --check server.js && node --check src/auth.js && node --check src/config.js && node --check src/database.js",
+    "test": "node --test scripts/import-music.test.js",
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "music:scan": "node scripts/import-music.js",
+    "music:import": "node scripts/import-music.js --apply",
+    "music:filezilla": "node scripts/sync-filezilla.js",
+    "music:filezilla:apply": "node scripts/sync-filezilla.js --apply",
+    "music:cloudinary": "node scripts/sync-cloudinary-images.js",
+    "music:cloudinary:apply": "node scripts/sync-cloudinary-images.js --apply",
+    "music:links": "node scripts/link-album-tracks.js",
+    "music:links:apply": "node scripts/link-album-tracks.js --apply"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
+    "cloudinary": "^2.11.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -26,6 +36,7 @@
     "morgan": "^1.11.0",
     "multer": "^2.2.0",
     "music-metadata": "^11.14.0",
+    "prisma": "^6.19.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {

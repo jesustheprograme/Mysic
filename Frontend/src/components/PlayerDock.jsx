@@ -20,6 +20,19 @@ function formatTime(seconds) {
   return `${minutes}:${String(safeSeconds % 60).padStart(2, '0')}`
 }
 
+function createWaveformPeaks(seed, count = 96) {
+  let hash = Array.from(String(seed ?? 'track')).reduce((value, character) => (
+    ((value * 31) + character.charCodeAt(0)) >>> 0
+  ), 7)
+
+  return Array.from({ length: count }, (_, index) => {
+    hash = (hash * 1664525 + 1013904223) >>> 0
+    const noise = hash / 0xffffffff
+    const envelope = 0.55 + Math.sin((index / count) * Math.PI) * 0.45
+    return Math.min(1, Math.max(0.12, (0.35 + noise * 0.65) * envelope))
+  })
+}
+
 function VolumeControl({ expanded, onExpandedChange, onVolumeChange, volume }) {
   const Icon = volume === 0 ? VolumeX : Volume2
   const closeTimerRef = useRef(null)
@@ -80,7 +93,7 @@ function PlayerDiscoveryLoader() {
   )
 }
 
-function PlayerDock({ animationNonce, isLoading = false, onClose, onNext, onOpenMiniPlayer, onPlaybackChange, onPlaybackStateChange, onPrevious, onQueueSelect, playbackToggleNonce, queue, track }) {
+function PlayerDock({ animationNonce, isLoading = false, liked = false, onClose, onNext, onOpenMiniPlayer, onPlaybackChange, onPlaybackStateChange, onPrevious, onQueueSelect, onToggleFavorite, playbackToggleNonce, queue, track }) {
   const PAUSE_FADE_DURATION_MS = 400
   const waveformRef = useRef(null)
   const waveSurferRef = useRef(null)
@@ -216,7 +229,7 @@ function PlayerDock({ animationNonce, isLoading = false, onClose, onNext, onOpen
 
   useEffect(() => {
     const container = waveformRef.current
-    if (!container || !hasAudio || isLoading) return undefined
+    if (!container || !hasAudio) return undefined
 
     const media = new Audio(track.audioUrl)
     media.preload = 'auto'
@@ -224,6 +237,10 @@ function PlayerDock({ animationNonce, isLoading = false, onClose, onNext, onOpen
     media.muted = false
     media.setAttribute('aria-hidden', 'true')
     container.appendChild(media)
+
+    const mediaDuration = Number.isFinite(track.durationSeconds) && track.durationSeconds > 0
+      ? track.durationSeconds
+      : 1
 
     const waveSurfer = WaveSurfer.create({
       barGap: 1,
@@ -236,8 +253,11 @@ function PlayerDock({ animationNonce, isLoading = false, onClose, onNext, onOpen
       height: 18,
       media,
       normalize: true,
+      peaks: [createWaveformPeaks(track.id)],
       progressColor: '#e7e9e5',
+      duration: mediaDuration,
       waveColor: '#414846',
+      url: track.audioUrl,
     })
 
     waveSurferRef.current = waveSurfer
@@ -279,7 +299,7 @@ function PlayerDock({ animationNonce, isLoading = false, onClose, onNext, onOpen
       media.remove()
       if (waveSurferRef.current === waveSurfer) waveSurferRef.current = null
     }
-  }, [hasAudio, isLoading, notifyPlaybackState, setOutputVolume, stopPauseFade, track.audioUrl, updatePlaybackState])
+  }, [hasAudio, isLoading, notifyPlaybackState, setOutputVolume, stopPauseFade, track.audioUrl, track.durationSeconds, track.id, updatePlaybackState])
 
   useEffect(() => {
     const previousTrack = previousTrackRef.current
@@ -423,7 +443,14 @@ function PlayerDock({ animationNonce, isLoading = false, onClose, onNext, onOpen
               aria-label="Añadir a favoritos"
               title="Añadir a favoritos"
             >
-              <HeartToggle key={track.id} className="heart-container--player" />
+              <HeartToggle
+                key={track.id}
+                className="heart-container--player"
+                label={`Me gusta ${track.title}`}
+                liked={liked}
+                onToggle={onToggleFavorite}
+                removeLabel={`Quitar ${track.title} de favoritas`}
+              />
             </div>
           </div>
 

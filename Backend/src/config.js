@@ -46,8 +46,20 @@ function getConfig() {
     mongoUri: getMongoUri(),
     databaseName: process.env.MONGODB_DB_NAME?.trim() || 'Mysic',
     usersCollection: process.env.MONGODB_USERS_COLLECTION?.trim() || 'Mysic_usuarios',
+    musicLibraryPath: process.env.MUSIC_LIBRARY_PATH?.trim() || '',
+    navidromeUrl: process.env.NAVIDROME_URL?.trim() || '',
+    navidromeUser: process.env.NAVIDROME_USER?.trim() || '',
+    navidromePassword: process.env.NAVIDROME_PASSWORD || '',
+    cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME?.trim() || '',
+    cloudinaryApiKey: process.env.CLOUDINARY_API_KEY?.trim() || '',
+    cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET?.trim() || '',
+    cloudinaryFolderMode: process.env.CLOUDINARY_FOLDER_MODE?.trim() || 'dynamic',
     jwtSecret,
     googleClientId: process.env.GOOGLE_CLIENT_ID?.trim() || '',
+    googleClientIds: (process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLIENT_ID || '')
+      .split(',')
+      .map((clientId) => clientId.trim())
+      .filter(Boolean),
     frontendOrigins: parseOrigins(
       process.env.FRONTEND_ORIGINS
         || 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174',

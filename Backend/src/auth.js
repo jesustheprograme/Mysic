@@ -73,6 +73,41 @@ function validationMessage(error) {
   return error.issues?.[0]?.message || 'Revisa los datos enviados.'
 }
 
+async function getAuthenticatedUser(req, res, config) {
+  const token = req.cookies[SESSION_COOKIE]
+
+  if (!token) {
+    res.status(401).json({ message: 'No hay una sesion activa.' })
+    return null
+  }
+
+  let payload
+
+  try {
+    payload = jwt.verify(token, config.jwtSecret)
+  } catch {
+    clearSession(res, config)
+    res.status(401).json({ message: 'La sesion vencio.' })
+    return null
+  }
+
+  if (!ObjectId.isValid(payload.sub)) {
+    clearSession(res, config)
+    res.status(401).json({ message: 'La sesion no es valida.' })
+    return null
+  }
+
+  const user = await getUsersCollection().findOne({ _id: new ObjectId(payload.sub) })
+
+  if (!user) {
+    clearSession(res, config)
+    res.status(401).json({ message: 'La cuenta ya no existe.' })
+    return null
+  }
+
+  return user
+}
+
 function createAuthHandlers(config) {
   const googleClient = new OAuth2Client()
 
@@ -158,7 +193,7 @@ function createAuthHandlers(config) {
       try {
         ticket = await googleClient.verifyIdToken({
           idToken: parsed.data.credential,
-          audience: config.googleClientId,
+          audience: config.googleClientIds?.length ? config.googleClientIds : config.googleClientId,
         })
       } catch {
         return res.status(401).json({ message: 'La credencial de Google vencio o no pertenece a Mysic.' })
@@ -211,32 +246,8 @@ function createAuthHandlers(config) {
 
   async function me(req, res, next) {
     try {
-      const token = req.cookies[SESSION_COOKIE]
-
-      if (!token) {
-        return res.status(401).json({ message: 'No hay una sesion activa.' })
-      }
-
-      let payload
-
-      try {
-        payload = jwt.verify(token, config.jwtSecret)
-      } catch {
-        clearSession(res, config)
-        return res.status(401).json({ message: 'La sesion vencio.' })
-      }
-
-      if (!ObjectId.isValid(payload.sub)) {
-        clearSession(res, config)
-        return res.status(401).json({ message: 'La sesion no es valida.' })
-      }
-
-      const user = await getUsersCollection().findOne({ _id: new ObjectId(payload.sub) })
-
-      if (!user) {
-        clearSession(res, config)
-        return res.status(401).json({ message: 'La cuenta ya no existe.' })
-      }
+      const user = await getAuthenticatedUser(req, res, config)
+      if (!user) return undefined
 
       return res.json({ user: publicUser(user) })
     } catch (error) {
@@ -252,4 +263,4 @@ function createAuthHandlers(config) {
   return { google, login, logout, me, register }
 }
 
-module.exports = { createAuthHandlers }
+module.exports = { createAuthHandlers, getAuthenticatedUser }

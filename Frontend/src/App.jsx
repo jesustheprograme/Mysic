@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { songs } from './data/music.js'
-import { loadPlaylists, savePlaylists } from './data/playlists.js'
-import { createNavidromeClient } from './lib/navidrome.js'
+import { clearPlaylists, loadPlaylists } from './data/playlists.js'
+import { catalogApi, favoritesApi, playlistsApi } from './lib/api.js'
 import AuthView from './features/auth/AuthView.jsx'
 import useAuth from './features/auth/useAuth.js'
 import DiscoveryView from './features/discovery/DiscoveryView.jsx'
@@ -9,60 +9,52 @@ import MiniPlayer from './features/mini-player/MiniPlayer.tsx'
 import './styles/app.css'
 import './styles/home.css'
 
-function mapNavidromeSong(song, index, client) {
-  return {
-    id: song.id,
-    title: song.title || 'Sin título',
-    artist: song.artist || 'Artista desconocido',
-    plays: song.playCount ? `${song.playCount} reproducciones` : 'Navidrome',
-    artwork: songs[index % songs.length]?.artwork ?? null,
-    albumId: song.albumId || song.album || `album-${song.id}`,
-    durationSeconds: song.duration || 0,
-    audioUrl: client.getStreamUrl(song.id),
-  }
-}
-
 function MainApp() {
   const auth = useAuth()
-  const [librarySongs, setLibrarySongs] = useState(songs)
+  const [librarySongs, setLibrarySongs] = useState([])
+  const [libraryLoading, setLibraryLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedSongId, setSelectedSongId] = useState(null)
   const [likedSongIds, setLikedSongIds] = useState(() => new Set())
-  const [playlists, setPlaylists] = useState(() => loadPlaylists(songs))
-  const [remoteLibrarySongs, setRemoteLibrarySongs] = useState([])
+  const [likedAlbumIds, setLikedAlbumIds] = useState(() => new Set())
+  const [likedArtistIds, setLikedArtistIds] = useState(() => new Set())
+  const [favoritesLoading, setFavoritesLoading] = useState(true)
+  const [favoritesError, setFavoritesError] = useState('')
+  const [playlists, setPlaylists] = useState([])
+  const [playlistsLoading, setPlaylistsLoading] = useState(true)
+  const [playlistsError, setPlaylistsError] = useState('')
   const [navidromeError, setNavidromeError] = useState(null)
-  const clientRef = useRef(null)
 
   useEffect(() => {
-    const password = import.meta.env.VITE_NAVIDROME_PASSWORD
-    if (!password) {
-      console.warn('VITE_NAVIDROME_PASSWORD no está configurada; se usarán canciones demo.')
-      return undefined
+    let cancelled = false
+
+    async function loadLibrary() {
+      try {
+        const catalogSongs = await catalogApi.listSongs()
+        if (cancelled) return
+        if (catalogSongs.length > 0) {
+          const songsWithArtwork = catalogSongs.map((song, index) => ({
+            ...song,
+            artwork: song.artwork ?? songs[index % songs.length]?.artwork ?? null,
+          }))
+          setLibrarySongs(songsWithArtwork)
+          setNavidromeError(null)
+          setLibraryLoading(false)
+          return
+        }
+      } catch (error) {
+        console.warn('El catálogo PostgreSQL todavía no está disponible:', error)
+      }
+
+      if (!cancelled) {
+        setLibrarySongs([])
+        setNavidromeError({ kind: 'empty', message: 'El catálogo PostgreSQL todavía no contiene canciones.' })
+      }
+
+      if (!cancelled) setLibraryLoading(false)
     }
 
-    const client = createNavidromeClient({
-      baseUrl: import.meta.env.VITE_NAVIDROME_URL || 'http://155.181.37.222:4533',
-      username: import.meta.env.VITE_NAVIDROME_USER || 'RAWR',
-      password,
-    })
-    clientRef.current = client
-
-    let cancelled = false
-    client.getRandomSongs({ count: 500 }).then((response) => {
-      if (cancelled) return
-      const remoteSongs = (response.randomSongs?.song ?? []).map((song, index) => mapNavidromeSong(song, index, client))
-
-      if (remoteSongs.length > 0) {
-        setRemoteLibrarySongs(remoteSongs)
-        setLibrarySongs(remoteSongs)
-        setNavidromeError(null)
-      } else {
-        setNavidromeError({ kind: 'empty', message: 'Navidrome respondió, pero no devolvió canciones.' })
-      }
-    }).catch((error) => {
-      console.error('No se pudo cargar la biblioteca de Navidrome:', error)
-      setNavidromeError(error)
-    })
+    loadLibrary()
 
     return () => {
       cancelled = true
@@ -70,77 +62,183 @@ function MainApp() {
   }, [])
 
   useEffect(() => {
-    const query = searchQuery.trim()
-    if (!query || !clientRef.current) {
-      if (!query && remoteLibrarySongs.length > 0) setLibrarySongs(remoteLibrarySongs)
+    let cancelled = false
+
+    if (!auth.user) {
+      setLikedSongIds(new Set())
+      setLikedAlbumIds(new Set())
+      setLikedArtistIds(new Set())
+      setFavoritesLoading(false)
       return undefined
     }
 
-    let cancelled = false
-    const timer = setTimeout(() => {
-      clientRef.current.searchSongs(query).then((response) => {
+    setFavoritesLoading(true)
+    favoritesApi.getAll()
+      .then((favorites) => {
         if (cancelled) return
-        const remoteSongs = (response.searchResult3?.song ?? []).map((song, index) => mapNavidromeSong(song, index, clientRef.current))
-        setLibrarySongs(remoteSongs)
-        setNavidromeError(remoteSongs.length ? null : { kind: 'empty', message: 'No se encontraron canciones para esa búsqueda.' })
-      }).catch((error) => {
-        if (!cancelled) setNavidromeError(error)
+        setLikedSongIds(new Set(favorites.songs ?? []))
+        setLikedAlbumIds(new Set(favorites.albums ?? []))
+        setLikedArtistIds(new Set(favorites.artists ?? []))
+        setFavoritesError('')
       })
-    }, 250)
+      .catch((error) => {
+        if (!cancelled) setFavoritesError(error.message || 'No se pudieron cargar tus favoritos.')
+      })
+      .finally(() => {
+        if (!cancelled) setFavoritesLoading(false)
+      })
 
     return () => {
       cancelled = true
-      clearTimeout(timer)
     }
-  }, [remoteLibrarySongs, searchQuery])
+  }, [auth.user])
 
   useEffect(() => {
-    savePlaylists(playlists)
-  }, [playlists])
+    let cancelled = false
 
-  function createPlaylist(details) {
-    const playlist = {
-      id: `playlist-${Date.now()}`,
-      title: details.title.trim() || 'Playlist sin t\u00edtulo',
-      description: details.description.trim(),
-      artwork: details.artwork ?? songs[0]?.artwork ?? null,
-      pinned: Boolean(details.pinned),
-      songIds: [],
+    if (!auth.user) {
+      setPlaylists([])
+      setPlaylistsLoading(false)
+      return undefined
+    }
+    if (libraryLoading) {
+      setPlaylistsLoading(true)
+      return undefined
     }
 
-    setPlaylists((currentPlaylists) => [playlist, ...currentPlaylists])
-    return playlist.id
+    setPlaylistsLoading(true)
+    async function loadUserPlaylists() {
+      try {
+        let storedPlaylists = await playlistsApi.list()
+        if (!storedPlaylists.length) {
+          const localPlaylists = loadPlaylists(librarySongs)
+          if (localPlaylists.length) {
+            storedPlaylists = await Promise.all(localPlaylists.map(({ id: _id, ...playlist }) => (
+              playlistsApi.create(playlist)
+            )))
+          }
+        }
+        clearPlaylists()
+        if (!cancelled) {
+          setPlaylists(storedPlaylists)
+          setPlaylistsError('')
+        }
+      } catch (error) {
+        if (!cancelled) setPlaylistsError(error.message || 'No se pudieron cargar tus playlists.')
+      } finally {
+        if (!cancelled) setPlaylistsLoading(false)
+      }
+    }
+
+    loadUserPlaylists()
+    return () => {
+      cancelled = true
+    }
+  }, [auth.user, libraryLoading])
+
+  function replacePlaylist(savedPlaylist) {
+    setPlaylists((currentPlaylists) => currentPlaylists.map((playlist) => (
+      playlist.id === savedPlaylist.id ? savedPlaylist : playlist
+    )))
   }
 
-  function updatePlaylist(playlistId, changes) {
-    setPlaylists((currentPlaylists) => currentPlaylists.map((playlist) => (
-      playlist.id === playlistId ? { ...playlist, ...changes } : playlist
-    )))
+  async function createPlaylist(details) {
+    try {
+      const playlist = await playlistsApi.create({
+        title: details.title.trim() || 'Playlist sin t\u00edtulo',
+        description: details.description.trim(),
+        artwork: details.artwork ?? librarySongs[0]?.artwork ?? null,
+        artworkPublicId: details.artworkPublicId ?? null,
+        pinned: Boolean(details.pinned),
+        songIds: [],
+      })
+      setPlaylists((currentPlaylists) => [playlist, ...currentPlaylists])
+      setPlaylistsError('')
+      return playlist.id
+    } catch (error) {
+      setPlaylistsError(error.message || 'No se pudo crear la playlist.')
+      return null
+    }
+  }
+
+  async function updatePlaylist(playlistId, changes) {
+    try {
+      const playlist = await playlistsApi.update(playlistId, changes)
+      replacePlaylist(playlist)
+      setPlaylistsError('')
+      return true
+    } catch (error) {
+      setPlaylistsError(error.message || 'No se pudo actualizar la playlist.')
+      return false
+    }
+  }
+
+  async function deletePlaylist(playlistId) {
+    try {
+      await playlistsApi.remove(playlistId)
+      setPlaylists((currentPlaylists) => currentPlaylists.filter((playlist) => playlist.id !== playlistId))
+      setPlaylistsError('')
+      return true
+    } catch (error) {
+      setPlaylistsError(error.message || 'No se pudo eliminar la playlist.')
+      return false
+    }
+  }
+
+  async function setSongInPlaylist(playlistId, songId, included) {
+    const playlist = playlists.find((item) => item.id === playlistId)
+    if (!playlist) return false
+    const alreadyIncluded = playlist.songIds.includes(songId)
+    if (included === alreadyIncluded) return true
+    const songIds = included
+      ? [...playlist.songIds, songId]
+      : playlist.songIds.filter((currentSongId) => currentSongId !== songId)
+    return updatePlaylist(playlistId, { songIds })
   }
 
   function addSongToPlaylist(playlistId, songId) {
-    setPlaylists((currentPlaylists) => currentPlaylists.map((playlist) => {
-      if (playlist.id !== playlistId || playlist.songIds.includes(songId)) return playlist
-      return { ...playlist, songIds: [...playlist.songIds, songId] }
-    }))
-  }
-
-  function reorderPlaylist(playlistId, songIds) {
-    setPlaylists((currentPlaylists) => currentPlaylists.map((playlist) => (
-      playlist.id === playlistId ? { ...playlist, songIds } : playlist
-    )))
-  }
-
-  function toggleFavorite(songId) {
-    setLikedSongIds((currentIds) => {
-      const nextIds = new Set(currentIds)
-      if (nextIds.has(songId)) nextIds.delete(songId)
-      else nextIds.add(songId)
-      return nextIds
+    const playlist = playlists.find((item) => item.id === playlistId)
+    if (playlist?.songIds.includes(songId)) return true
+    return updatePlaylist(playlistId, {
+      songIds: playlist ? [...playlist.songIds, songId] : [songId],
     })
   }
 
-  if (auth.isLoading) {
+  function reorderPlaylist(playlistId, songIds) {
+    return updatePlaylist(playlistId, { songIds })
+  }
+
+  async function setFavorite(type, itemId, liked) {
+    const setters = {
+      song: setLikedSongIds,
+      album: setLikedAlbumIds,
+      artist: setLikedArtistIds,
+    }
+    const setIds = setters[type]
+    if (!setIds) return
+
+    setIds((currentIds) => {
+      const nextIds = new Set(currentIds)
+      if (liked) nextIds.add(itemId)
+      else nextIds.delete(itemId)
+      return nextIds
+    })
+    setFavoritesError('')
+
+    try {
+      await favoritesApi.set(type, itemId, liked)
+    } catch (error) {
+      setIds((currentIds) => {
+        const nextIds = new Set(currentIds)
+        if (liked) nextIds.delete(itemId)
+        else nextIds.add(itemId)
+        return nextIds
+      })
+      setFavoritesError(error.message || 'No se pudo actualizar el favorito.')
+    }
+  }
+
+  if (auth.isLoading || libraryLoading || (auth.user && (favoritesLoading || playlistsLoading))) {
     return (
       <main className="session-loading" aria-label="Cargando sesion">
         <span className="session-loading__disc" aria-hidden="true" />
@@ -165,19 +263,35 @@ function MainApp() {
     <>
       {navidromeError && (
         <div role="alert" style={{ background: '#3b1717', color: '#ffd6d6', padding: '10px 16px', textAlign: 'center' }}>
-          Navidrome: {navidromeError.message}
+          Catálogo: {navidromeError.message}
+        </div>
+      )}
+      {favoritesError && (
+        <div role="alert" style={{ background: '#3b1717', color: '#ffd6d6', padding: '10px 16px', textAlign: 'center' }}>
+          Favoritos: {favoritesError}
+        </div>
+      )}
+      {playlistsError && (
+        <div role="alert" style={{ background: '#3b1717', color: '#ffd6d6', padding: '10px 16px', textAlign: 'center' }}>
+          Playlists: {playlistsError}
         </div>
       )}
       <DiscoveryView
       onLogout={auth.logout}
+      onDeletePlaylist={deletePlaylist}
       onSearchChange={setSearchQuery}
       onSongSelect={setSelectedSongId}
       addSongToPlaylist={addSongToPlaylist}
       createPlaylist={createPlaylist}
       likedSongIds={likedSongIds}
-      onToggleFavorite={toggleFavorite}
+      likedAlbumIds={likedAlbumIds}
+      likedArtistIds={likedArtistIds}
+      onToggleAlbumFavorite={(albumId, liked) => setFavorite('album', albumId, liked)}
+      onToggleArtistFavorite={(artistId, liked) => setFavorite('artist', artistId, liked)}
+      onToggleFavorite={(songId, liked) => setFavorite('song', songId, liked)}
       onUpdatePlaylist={updatePlaylist}
       onReorderPlaylist={reorderPlaylist}
+      onSetSongInPlaylist={setSongInPlaylist}
       playlists={playlists}
       searchQuery={searchQuery}
       selectedSongId={selectedSongId}

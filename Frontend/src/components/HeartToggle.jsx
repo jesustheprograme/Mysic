@@ -10,7 +10,7 @@ function HeartToggle({
   removeLabel = 'Quitar de favoritos',
   size = 20,
 }) {
-  const [internalLiked, setInternalLiked] = useState(true)
+  const [internalLiked, setInternalLiked] = useState(false)
   const [celebrating, setCelebrating] = useState(false)
   const timeoutRef = useRef(null)
   const liked = controlledLiked ?? internalLiked

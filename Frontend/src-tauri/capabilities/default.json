@@ -11,6 +11,9 @@
     "core:window:allow-set-always-on-top",
     "core:window:allow-set-position",
     "core:window:allow-set-size",
-    "core:window:allow-start-dragging"
+    "core:window:allow-start-dragging",
+    "oauth:allow-start",
+    "oauth:allow-cancel",
+    "opener:default"
   ]
 }

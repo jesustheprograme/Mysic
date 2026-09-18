@@ -1,7 +1,7 @@
-import { Check, Search, X } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 import { useState } from 'react'
 
-function PlaylistPickerModal({ onAdd, onClose, onCreate, onManage, playlists, song }) {
+function PlaylistPickerModal({ onClose, onCreate, onManage, onToggle, playlists, song }) {
   const [query, setQuery] = useState('')
   const normalizedQuery = query.trim().toLocaleLowerCase('es')
   const visiblePlaylists = normalizedQuery
@@ -43,30 +43,23 @@ function PlaylistPickerModal({ onAdd, onClose, onCreate, onManage, playlists, so
             {visiblePlaylists.map((playlist) => {
               const isAdded = playlist.songIds.includes(song.id)
               return (
-                <button
+                <label
                   className="playlist-picker__item"
                   key={playlist.id}
-                  type="button"
-                  disabled={isAdded}
-                  aria-label={
-                    isAdded
-                      ? `${playlist.title} ya contiene ${song.title}`
-                      : `Añadir ${song.title} a ${playlist.title}`
-                  }
-                  onClick={() => onAdd(playlist.id)}
                 >
                   {playlist.artwork ? <img src={playlist.artwork} alt="" /> : <span className="playlist-picker__empty-art" />}
                   <span className="playlist-picker__item-copy">
                     <strong>{playlist.title}</strong>
                     <small>{playlist.songIds.length} canciones</small>
                   </span>
-                  <span
-                    className={`playlist-picker__add${isAdded ? ' playlist-picker__add--added' : ''}`}
-                  >
-                    {isAdded && <Check size={18} strokeWidth={1.8} aria-hidden="true" />}
-                    <span>{isAdded ? 'A\u00f1adida' : 'A\u00f1adir'}</span>
-                  </span>
-                </button>
+                  <input
+                    className="playlist-picker__checkbox"
+                    type="checkbox"
+                    checked={isAdded}
+                    aria-label={`${isAdded ? 'Quitar' : 'Añadir'} ${song.title} ${isAdded ? 'de' : 'a'} ${playlist.title}`}
+                    onChange={(event) => onToggle(playlist.id, event.target.checked)}
+                  />
+                </label>
               )
             })}
             {visiblePlaylists.length === 0 && (

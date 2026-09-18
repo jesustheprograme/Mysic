@@ -27,10 +27,11 @@ import {
   PinOff,
   Play,
   Share2,
+  Trash2,
 } from 'lucide-react'
-import { useState } from 'react'
 import HeartToggle from '../../components/HeartToggle.jsx'
 import PreviewIndicator from '../../components/PreviewIndicator.jsx'
+import { groupTracksByDisc } from '../../lib/tracks.js'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,9 +54,17 @@ function formatCollectionLength(seconds) {
   return `${hours} h${remainingMinutes ? ` ${remainingMinutes} min` : ''}`
 }
 
+function formatTrackNumber(song, index, displayTrackNumber) {
+  if (displayTrackNumber) return String(displayTrackNumber)
+  return String(song.trackNumber ?? song.trackNo ?? index + 1).padStart(2, '0')
+}
+
 function SortableTrack({
+  displayTrackNumber,
   index,
   onAddToPlaylist,
+  onAlbumSelect,
+  onArtistSelect,
   onPlaybackToggle,
   onSongSelect,
   onToggleFavorite,
@@ -147,22 +156,31 @@ function SortableTrack({
           title={playbackLabel}
           onClick={toggleTrackPlayback}
         >
-          <span className="collection-detail__track-number" aria-hidden="true">{index + 1}</span>
+          <span className="collection-detail__track-number" aria-hidden="true">{formatTrackNumber(song, index, displayTrackNumber)}</span>
           <span className="collection-detail__track-playback-status" aria-hidden="true">
             <PreviewIndicator status={isPlaying ? 'playing' : null} />
           </span>
         </button>
       )}
-      <button className="collection-detail__track-main" type="button" onClick={() => onSongSelect(song.id)}>
-        <strong>{song.title}</strong>
-        <small>{song.artist} · {song.plays}</small>
-      </button>
+      <div className="collection-detail__track-main">
+        <button className="collection-detail__track-title" type="button" onClick={() => onSongSelect(song.id)}>{song.title}</button>
+        {variant !== 'album' && <small>
+          <button className="collection-detail__catalog-link" type="button" disabled={!song.artistId} onClick={() => onArtistSelect?.(song.artistId)}>{song.artist}</button>
+          {song.albumId && (
+            <>
+              {' · '}
+              <button className="collection-detail__catalog-link" type="button" onClick={() => onAlbumSelect?.(song.albumId)}>{song.albumTitle}</button>
+            </>
+          )}
+          {' · '}{song.plays}
+        </small>}
+      </div>
       <span className="collection-detail__track-actions">
         <HeartToggle
           className="heart-container--song-row"
           label={`Me gusta ${song.title}`}
           liked={isLiked}
-          onToggle={() => onToggleFavorite?.(song.id)}
+          onToggle={(liked) => onToggleFavorite?.(song.id, liked)}
           removeLabel={`Quitar ${song.title} de favoritas`}
           size={17}
         />
@@ -177,20 +195,25 @@ function SortableTrack({
 
 function CollectionDetailView({
   collection,
+  collectionFavorite = false,
   likedSongIds,
   onAddToPlaylist,
+  onAlbumSelect,
+  onArtistSelect,
   onBack,
+  onDelete,
   onEdit,
   onMoveSong,
   onPlaybackToggle,
   onSongSelect,
   onToggleFavorite,
+  onToggleCollectionFavorite,
   onTogglePinned,
   selectedSongId,
+  selectedSongAlbumId,
   selectedSongPlaying,
   songs,
 }) {
-  const [albumSaved, setAlbumSaved] = useState(false)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -198,9 +221,18 @@ function CollectionDetailView({
   const totalSeconds = songs.reduce((total, song) => total + song.durationSeconds, 0)
   const pageStyle = collection.artwork ? { '--collection-artwork': `url("${collection.artwork}")` } : undefined
   const showsTrackArtwork = collection.kind === 'Playlist'
-  const selectedSongBelongsToCollection = songs.some((song) => song.id === selectedSongId)
+  const selectedSongBelongsToCollection = songs.some((song) => (
+    song.id === selectedSongId && (!selectedSongAlbumId || song.albumId === selectedSongAlbumId)
+  ))
   const collectionIsPlaying = selectedSongBelongsToCollection && selectedSongPlaying
-  const collectionIsSaved = onTogglePinned ? Boolean(collection.pinned) : albumSaved
+  const collectionIsSaved = onTogglePinned ? Boolean(collection.pinned) : collectionFavorite
+  const trackGroups = collection.kind === 'Álbum'
+    ? groupTracksByDisc(songs)
+    : [{ discNumber: 1, tracks: songs }]
+  const showsDiscHeadings = collection.kind === 'Álbum' && trackGroups.length > 1
+  const albumTrackNumbers = new Map(
+    trackGroups.flatMap((group) => group.tracks).map((song, index) => [song.id, index + 1]),
+  )
 
   function toggleCollectionPlayback() {
     if (!songs.length) return
@@ -208,7 +240,7 @@ function CollectionDetailView({
       onPlaybackToggle?.()
       return
     }
-    onSongSelect(songs[0].id)
+    onSongSelect(songs[0].id, { contextSong: songs[0], contextSongs: songs })
   }
 
   function toggleSaved() {
@@ -216,7 +248,7 @@ function CollectionDetailView({
       onTogglePinned()
       return
     }
-    setAlbumSaved((saved) => !saved)
+    onToggleCollectionFavorite?.(!collectionIsSaved)
   }
 
   function downloadCollection() {
@@ -264,6 +296,33 @@ function CollectionDetailView({
     if (over && active.id !== over.id) onMoveSong?.(active.id, over.id)
   }
 
+  function renderTrack(song, index) {
+    const isSelected = selectedSongId === song.id
+      && (!selectedSongAlbumId || selectedSongAlbumId === song.albumId)
+
+    return (
+      <SortableTrack
+        displayTrackNumber={showsDiscHeadings ? albumTrackNumbers.get(song.id) : null}
+        index={index}
+        key={song.id}
+        onAddToPlaylist={onAddToPlaylist}
+        onAlbumSelect={onAlbumSelect}
+        onArtistSelect={onArtistSelect}
+        onPlaybackToggle={onPlaybackToggle}
+        onSongSelect={(songId) => onSongSelect(songId, { contextSong: song, contextSongs: songs })}
+        onToggleFavorite={onToggleFavorite}
+        reorderable={Boolean(onMoveSong)}
+        song={song}
+        status={{
+          isLiked: likedSongIds?.has(song.id),
+          isPlaying: isSelected && selectedSongPlaying,
+          isSelected,
+        }}
+        variant={showsTrackArtwork ? 'playlist' : 'album'}
+      />
+    )
+  }
+
   return (
     <section className={`collection-detail${showsTrackArtwork ? ' collection-detail--playlist' : ''}`} style={pageStyle} aria-labelledby="collection-detail-title">
       <div className="collection-detail__ambient" aria-hidden="true" />
@@ -292,16 +351,27 @@ function CollectionDetailView({
           <button className="collection-detail__control" type="button" disabled={!songs.some((song) => song.audioUrl)} aria-label={`Descargar ${collection.title}`} title="Descargar" onClick={downloadCollection}>
             <Download size={22} strokeWidth={1.8} aria-hidden="true" />
           </button>
-          <button
-            className={`collection-detail__control${collectionIsSaved ? ' collection-detail__control--active' : ''}`}
-            type="button"
-            aria-label={collectionIsSaved ? `Quitar ${collection.title} de tu biblioteca` : `Guardar ${collection.title}`}
-            aria-pressed={collectionIsSaved}
-            title={collectionIsSaved ? 'Quitar de tu biblioteca' : 'Guardar'}
-            onClick={toggleSaved}
-          >
-            <Bookmark size={20} fill={collectionIsSaved ? 'currentColor' : 'none'} strokeWidth={1.8} aria-hidden="true" />
-          </button>
+          {onTogglePinned ? (
+            <button
+              className={`collection-detail__control${collectionIsSaved ? ' collection-detail__control--active' : ''}`}
+              type="button"
+              aria-label={collectionIsSaved ? `Quitar ${collection.title} de tu biblioteca` : `Guardar ${collection.title}`}
+              aria-pressed={collectionIsSaved}
+              title={collectionIsSaved ? 'Quitar de tu biblioteca' : 'Guardar'}
+              onClick={toggleSaved}
+            >
+              <Bookmark size={20} fill={collectionIsSaved ? 'currentColor' : 'none'} strokeWidth={1.8} aria-hidden="true" />
+            </button>
+          ) : (
+            <HeartToggle
+              className={`collection-detail__control${collectionIsSaved ? ' collection-detail__control--active' : ''}`}
+              label={`Añadir ${collection.title} a álbumes favoritos`}
+              liked={collectionIsSaved}
+              onToggle={onToggleCollectionFavorite}
+              removeLabel={`Quitar ${collection.title} de álbumes favoritos`}
+              size={20}
+            />
+          )}
           <button className="collection-detail__play" type="button" disabled={!songs.length} aria-label={collectionIsPlaying ? `Pausar ${collection.title}` : `Reproducir ${collection.title}`} title={collectionIsPlaying ? 'Pausar' : 'Reproducir'} onClick={toggleCollectionPlayback}>
             {collectionIsPlaying ? <Pause size={31} fill="currentColor" strokeWidth={1.8} aria-hidden="true" /> : <Play size={31} fill="currentColor" strokeWidth={1.8} aria-hidden="true" />}
           </button>
@@ -331,6 +401,12 @@ function CollectionDetailView({
                 <Share2 aria-hidden="true" />
                 <span>Compartir</span>
               </DropdownMenuItem>
+              {onDelete && (
+                <DropdownMenuItem className="collection-detail__menu-item collection-detail__menu-item--danger" onSelect={onDelete}>
+                  <Trash2 aria-hidden="true" />
+                  <span>Eliminar playlist</span>
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -346,28 +422,16 @@ function CollectionDetailView({
           >
             <SortableContext items={songs.map((song) => song.id)} strategy={verticalListSortingStrategy}>
               <ol className="collection-detail__track-list">
-                {songs.map((song, index) => {
-                  const isSelected = selectedSongId === song.id
-
-                  return (
-                    <SortableTrack
-                      index={index}
-                      key={song.id}
-                      onAddToPlaylist={onAddToPlaylist}
-                      onPlaybackToggle={onPlaybackToggle}
-                      onSongSelect={onSongSelect}
-                      onToggleFavorite={onToggleFavorite}
-                      reorderable={Boolean(onMoveSong)}
-                      song={song}
-                      status={{
-                        isLiked: likedSongIds?.has(song.id),
-                        isPlaying: isSelected && selectedSongPlaying,
-                        isSelected,
-                      }}
-                      variant={showsTrackArtwork ? 'playlist' : 'album'}
-                    />
-                  )
-                })}
+                {collection.kind === 'Álbum'
+                  ? trackGroups.map((group) => (
+                      <li className="collection-detail__disc" key={group.discNumber}>
+                        {showsDiscHeadings && <h2>Disco {group.discNumber}</h2>}
+                        <ol className="collection-detail__disc-tracks">
+                          {group.tracks.map(renderTrack)}
+                        </ol>
+                      </li>
+                    ))
+                  : songs.map(renderTrack)}
               </ol>
             </SortableContext>
           </DndContext>

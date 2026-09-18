@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Artist {
+  id          String        @id @default(cuid())
+  name        String
+  slug        String        @unique
+  biography   String?
+  image       Image?
+  profileImages ArtistProfileImage[]
+  songs       SongArtist[]
+  albums      AlbumArtist[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model ArtistProfileImage {
+  id        String   @id @default(cuid())
+  artistId  String
+  url       String
+  position  Int
+  artist    Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([artistId, position])
+  @@index([artistId])
+}
+
+model Album {
+  id          String        @id @default(cuid())
+  title       String
+  slug        String        @unique
+  releaseDate DateTime?
+  coverImage  Image?
+  artists     AlbumArtist[]
+  tracks      AlbumTrack[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Song {
+  id          String        @id @default(cuid())
+  title       String
+  slug        String        @unique
+  durationSec Int?
+  artists     SongArtist[]
+  albums      AlbumTrack[]
+  mediaAssets MediaAsset[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model SongArtist {
+  songId   String
+  artistId String
+  song     Song   @relation(fields: [songId], references: [id], onDelete: Cascade)
+  artist   Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@id([songId, artistId])
+}
+
+model AlbumArtist {
+  albumId  String
+  artistId String
+  album    Album  @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  artist   Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@id([albumId, artistId])
+}
+
+model AlbumTrack {
+  albumId   String
+  songId    String
+  discNo    Int    @default(1)
+  trackNo   Int
+  isPrimary Boolean @default(false)
+  album     Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  song      Song  @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@id([albumId, songId])
+  @@unique([albumId, discNo, trackNo])
+}
+
+model MediaAsset {
+  id        String   @id @default(cuid())
+  songId    String
+  type      String
+  url       String
+  mimeType  String?
+  song      Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model Image {
+  id        String   @id @default(cuid())
+  url       String
+  altText   String?
+  artistId  String?  @unique
+  albumId   String?  @unique
+  artist    Artist?  @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  album     Album?   @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}

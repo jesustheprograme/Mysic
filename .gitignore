@@ -9,6 +9,7 @@
 **/dist-ssr/
 **/target/
 **/build/
+Backend/storage/catalog-images/
 
 # Environment variables and private credentials
 **/.env

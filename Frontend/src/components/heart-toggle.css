@@ -44,6 +44,20 @@
   color: #79e89c;
 }
 
+.heart-container--artist {
+  width: 48px;
+  height: 48px;
+  flex-basis: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #e4e9e6;
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(12px);
+}
+
+.heart-container--artist[aria-pressed='true'] {
+  color: var(--heart-color);
+}
+
 .heart-icon {
   position: relative;
   z-index: 1;

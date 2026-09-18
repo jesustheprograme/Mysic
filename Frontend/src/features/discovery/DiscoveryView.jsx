@@ -3,6 +3,7 @@ import AppHeader from '../../components/AppHeader.jsx'
 import AppSidebar from '../../components/AppSidebar.jsx'
 import PlayerDock from '../../components/PlayerDock.jsx'
 import AlbumView from '../collections/AlbumView.jsx'
+import ArtistView from '../collections/ArtistView.jsx'
 import PlaylistEditorModal from '../playlists/PlaylistEditorModal.jsx'
 import PlaylistPickerModal from '../playlists/PlaylistPickerModal.jsx'
 import PlaylistView from '../playlists/PlaylistView.jsx'
@@ -47,9 +48,14 @@ function getAlbumIdFromHash() {
   return window.location.hash.startsWith('#album-') ? window.location.hash.slice(1) : null
 }
 
+function getArtistIdFromHash() {
+  return window.location.hash.startsWith('#artist-') ? window.location.hash.slice('#artist-'.length) : null
+}
+
 function getSectionFromHash() {
   if (getPlaylistIdFromHash()) return 'playlist'
   if (getAlbumIdFromHash()) return 'album'
+  if (getArtistIdFromHash()) return 'artist'
   return hashSections[window.location.hash] ?? 'home'
 }
 
@@ -62,11 +68,12 @@ function createAlbumItems(songs) {
     albums.set(song.albumId, {
       id: `album-${song.albumId}`,
       albumId: song.albumId,
-      title: albumTitles[song.albumId] ?? song.albumId,
+      title: song.albumTitle ?? albumTitles[song.albumId] ?? song.albumId,
       artist: song.artist,
+      artistId: song.artistId,
       artwork: song.artwork,
       audioUrl: song.audioUrl,
-      year: 2024,
+      year: song.releaseDate ? new Date(song.releaseDate).getUTCFullYear() : null,
     })
   })
 
@@ -77,19 +84,27 @@ function createArtistItems(songs) {
   const artists = new Map()
 
   songs.forEach((song) => {
-    const artist = artists.get(song.artist)
+    const songArtists = song.artists?.length
+      ? song.artists
+      : [{ id: song.artistId ?? song.artist, name: song.artist }]
 
-    if (artist) {
-      artist.count += 1
-      return
-    }
+    songArtists.forEach((songArtist) => {
+      const artist = artists.get(songArtist.id)
 
-    artists.set(song.artist, {
-      id: `artist-${song.artist}`,
-      title: song.artist,
-      meta: '1 cancion',
-      artwork: song.artwork,
-      count: 1,
+      if (artist) {
+        artist.count += 1
+        return
+      }
+
+      artists.set(songArtist.id, {
+        id: `artist-${songArtist.id}`,
+        artistId: songArtist.id,
+        title: songArtist.name,
+        meta: '1 cancion',
+        artwork: songArtist.image ?? song.artwork,
+        images: songArtist.images ?? [],
+        count: 1,
+      })
     })
   })
 
@@ -125,11 +140,17 @@ function shuffleSongs(songs) {
 function DiscoveryView({
   addSongToPlaylist,
   createPlaylist,
+  likedAlbumIds,
+  likedArtistIds,
   likedSongIds,
   onLogout,
+  onDeletePlaylist,
   onReorderPlaylist,
   onSearchChange,
+  onSetSongInPlaylist,
   onSongSelect,
+  onToggleAlbumFavorite,
+  onToggleArtistFavorite,
   onToggleFavorite,
   onUpdatePlaylist,
   playlists,
@@ -140,11 +161,13 @@ function DiscoveryView({
 }) {
   const [activeSection, setActiveSection] = useState(getSectionFromHash)
   const [activeAlbumId, setActiveAlbumId] = useState(getAlbumIdFromHash)
+  const [activeArtistId, setActiveArtistId] = useState(getArtistIdFromHash)
   const [activePlaylistId, setActivePlaylistId] = useState(getPlaylistIdFromHash)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [preview, setPreview] = useState(null)
   const [discoveryLoading, setDiscoveryLoading] = useState(false)
   const [discoveryMix, setDiscoveryMix] = useState([])
+  const [selectedSongContext, setSelectedSongContext] = useState(null)
   const [selectedSongPlaying, setSelectedSongPlaying] = useState(false)
   const [playerAnimationNonce, setPlayerAnimationNonce] = useState(0)
   const [playbackToggleNonce, setPlaybackToggleNonce] = useState(0)
@@ -156,7 +179,9 @@ function DiscoveryView({
   const previewAudioUnlockedRef = useRef(false)
   const previewItemIdRef = useRef(null)
   const previewTimerRef = useRef(null)
-  const selectedSong = songs.find((song) => song.id === selectedSongId) ?? null
+  const selectedSong = selectedSongContext?.id === selectedSongId
+    ? selectedSongContext
+    : songs.find((song) => song.id === selectedSongId) ?? null
   const playbackSongs = discoveryMix.length ? discoveryMix : songs
   const nextSongs = getFollowingSongs(playbackSongs, selectedSongId)
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase()
@@ -197,15 +222,25 @@ function DiscoveryView({
   const albumItems = createAlbumItems(filteredSongs)
   const allAlbumItems = createAlbumItems(songs)
   const artistItems = createArtistItems(filteredSongs)
-  const orderedPlaylists = playlists
+  const playlistsWithArtwork = playlists.map((playlist) => {
+    if (playlist.artwork) return playlist
+    const firstSong = playlist.songIds
+      .map((songId) => songs.find((song) => song.id === songId))
+      .find(Boolean)
+    return firstSong?.artwork ? { ...playlist, artwork: firstSong.artwork } : playlist
+  })
+  const orderedPlaylists = playlistsWithArtwork
     .toSorted((first, second) => Number(second.pinned) - Number(first.pinned))
     .map((playlist) => ({ ...playlist, meta: `${playlist.songIds.length} canciones` }))
-  const activePlaylist = playlists.find((playlist) => playlist.id === activePlaylistId) ?? null
+  const activePlaylist = playlistsWithArtwork.find((playlist) => playlist.id === activePlaylistId) ?? null
   const activeAlbum = allAlbumItems.find((album) => album.id === activeAlbumId) ?? null
+  const allArtistItems = createArtistItems(songs)
+  const activeArtist = allArtistItems.find((artist) => artist.artistId === activeArtistId) ?? null
   useEffect(() => {
     function syncSectionFromHash() {
       setActiveSection(getSectionFromHash())
       setActiveAlbumId(getAlbumIdFromHash())
+      setActiveArtistId(getArtistIdFromHash())
       setActivePlaylistId(getPlaylistIdFromHash())
     }
 
@@ -267,8 +302,11 @@ function DiscoveryView({
     const currentIndex = playbackSongs.findIndex((song) => song.id === selectedSongId)
     const startIndex = currentIndex >= 0 ? currentIndex : 0
     const nextIndex = (startIndex + offset + playbackSongs.length) % playbackSongs.length
-    setSelectedSongPlaying(false)
-    onSongSelect(playbackSongs[nextIndex].id)
+    selectSong(playbackSongs[nextIndex].id, {
+      animatePlayer: false,
+      contextSong: playbackSongs[nextIndex],
+      preserveDiscoveryMix: true,
+    })
   }
 
   function startPreview(item) {
@@ -312,10 +350,17 @@ function DiscoveryView({
     audio.currentTime = 0
   }
 
-  function selectSong(songId, { animatePlayer = true, preserveDiscoveryMix = false } = {}) {
+  function selectSong(songId, {
+    animatePlayer = true,
+    contextSong = null,
+    contextSongs = null,
+    preserveDiscoveryMix = false,
+  } = {}) {
     clearTimeout(discoveryLoadingTimerRef.current)
     setDiscoveryLoading(false)
-    if (!preserveDiscoveryMix) setDiscoveryMix([])
+    if (contextSongs) setDiscoveryMix(contextSongs)
+    else if (!preserveDiscoveryMix) setDiscoveryMix([])
+    setSelectedSongContext(contextSong?.id === songId ? contextSong : null)
     stopPreview()
     setSelectedSongPlaying(false)
     if (songId !== null && animatePlayer) setPlayerAnimationNonce((nonce) => nonce + 1)
@@ -330,14 +375,11 @@ function DiscoveryView({
     clearTimeout(discoveryLoadingTimerRef.current)
     stopPreview()
     setDiscoveryMix(weeklyMix)
-    setDiscoveryLoading(true)
+    setSelectedSongContext(null)
+    setDiscoveryLoading(false)
     setSelectedSongPlaying(false)
     setPlayerAnimationNonce((nonce) => nonce + 1)
     onSongSelect(firstSong.id)
-
-    discoveryLoadingTimerRef.current = setTimeout(() => {
-      setDiscoveryLoading(false)
-    }, 1900)
   }
 
   const handleMiniPlayerCommand = useEffectEvent((command) => {
@@ -349,7 +391,13 @@ function DiscoveryView({
       selectRelativeSong(-1)
       return
     }
-    if (command.type === 'select') selectSong(command.songId, { animatePlayer: false })
+    if (command.type === 'select') {
+      selectSong(command.songId, {
+        animatePlayer: false,
+        contextSong: playbackSongs.find((song) => song.id === command.songId) ?? null,
+        preserveDiscoveryMix: true,
+      })
+    }
   })
 
   useEffect(() => {
@@ -369,14 +417,13 @@ function DiscoveryView({
 
   const publishMiniPlayerSnapshot = useCallback((playbackState) => {
     playbackStateRef.current = playbackState
-    const track = songs.find((song) => song.id === selectedSongId) ?? null
     publishPlaybackState({
       ...playbackState,
       queue: getFollowingSongs(playbackSongs, selectedSongId),
-      track,
+      track: selectedSong,
       updatedAt: Date.now(),
     }).catch(() => {})
-  }, [playbackSongs, selectedSongId, songs])
+  }, [playbackSongs, selectedSong, selectedSongId])
 
   useEffect(() => {
     if (selectedSong) {
@@ -386,7 +433,7 @@ function DiscoveryView({
         currentTime: 0,
         duration: selectedSong.durationSeconds ?? playbackState.duration,
         isPlaying: false,
-        queue: getFollowingSongs(songs, selectedSong.id),
+        queue: getFollowingSongs(playbackSongs, selectedSong.id),
         track: selectedSong,
         updatedAt: Date.now(),
       }).catch(() => {})
@@ -402,13 +449,14 @@ function DiscoveryView({
       updatedAt: Date.now(),
       volume: 0,
     }).catch(() => {})
-  }, [selectedSong, songs])
+  }, [playbackSongs, selectedSong])
 
   function navigateTo(section) {
     const nextHash = sectionHashes[section]
     if (!nextHash) return
     setActiveSection(section)
     setActiveAlbumId(null)
+    setActiveArtistId(null)
     setActivePlaylistId(null)
     if (window.location.hash !== nextHash) {
       window.history.pushState({ previousAppHash: window.location.hash || sectionHashes.home }, '', nextHash)
@@ -419,6 +467,7 @@ function DiscoveryView({
     const nextHash = `#playlist-${playlistId}`
     setActiveSection('playlist')
     setActiveAlbumId(null)
+    setActiveArtistId(null)
     setActivePlaylistId(playlistId)
     if (window.location.hash !== nextHash) {
       window.history.pushState({ previousAppHash: window.location.hash || sectionHashes.playlists }, '', nextHash)
@@ -430,8 +479,21 @@ function DiscoveryView({
     setActiveSection('album')
     setActiveAlbumId(albumId)
     setActivePlaylistId(null)
+    setActiveArtistId(null)
     if (window.location.hash !== nextHash) {
       window.history.pushState({ previousAppHash: window.location.hash || sectionHashes.albums }, '', nextHash)
+    }
+  }
+
+  function navigateToArtist(artistId) {
+    if (!artistId) return
+    const nextHash = `#artist-${artistId}`
+    setActiveSection('artist')
+    setActiveArtistId(artistId)
+    setActiveAlbumId(null)
+    setActivePlaylistId(null)
+    if (window.location.hash !== nextHash) {
+      window.history.pushState({ previousAppHash: window.location.hash || sectionHashes.artists }, '', nextHash)
     }
   }
 
@@ -454,24 +516,34 @@ function DiscoveryView({
     if (playlistToEdit) setPlaylistEditor({ mode: 'edit', initialPlaylist: playlistToEdit, pendingSongId: null })
   }
 
-  function savePlaylist(details) {
+  async function savePlaylist(details) {
     if (!playlistEditor) return
 
     if (playlistEditor.mode === 'create') {
-      const playlistId = createPlaylist(details)
-      if (playlistEditor.pendingSongId) addSongToPlaylist(playlistId, playlistEditor.pendingSongId)
+      const playlistId = await createPlaylist(details)
+      if (!playlistId) return
+      if (playlistEditor.pendingSongId) await addSongToPlaylist(playlistId, playlistEditor.pendingSongId)
       setPlaylistEditor(null)
       navigateToPlaylist(playlistId)
       return
     }
 
-    onUpdatePlaylist(playlistEditor.initialPlaylist.id, details)
+    const updated = await onUpdatePlaylist(playlistEditor.initialPlaylist.id, details)
+    if (!updated) return
     setPlaylistEditor(null)
   }
 
   function togglePlaylistPinned(playlist) {
     const playlistToUpdate = playlist?.id ? playlist : activePlaylist
     if (playlistToUpdate) onUpdatePlaylist(playlistToUpdate.id, { pinned: !playlistToUpdate.pinned })
+  }
+
+  async function deletePlaylist(playlist) {
+    const deleted = await onDeletePlaylist?.(playlist.id)
+    if (!deleted) return false
+    setActivePlaylistId(null)
+    navigateTo('playlists')
+    return true
   }
 
   return (
@@ -500,7 +572,7 @@ function DiscoveryView({
 
       <div className="music-app__content">
         <main className="music-app__main">
-          <div className="music-workspace" key={`${activeSection}-${activePlaylistId ?? activeAlbumId ?? ''}`}>
+          <div className="music-workspace" key={`${activeSection}-${activePlaylistId ?? activeAlbumId ?? activeArtistId ?? ''}`}>
             {activeSection === 'home' && (
               <div className="home-page">
                 <HomeDiscoveryPrompt
@@ -509,12 +581,16 @@ function DiscoveryView({
                   onDiscover={startWeeklyDiscovery}
                 />
 
-                <HomeRail items={orderedPlaylists} onSelect={navigateToPlaylist} selectedId={activePlaylistId} title="Playlists destacadas" />
+                {orderedPlaylists.length > 0 && (
+                  <HomeRail items={orderedPlaylists} onSelect={navigateToPlaylist} selectedId={activePlaylistId} title="Tus playlists" />
+                )}
 
                 <SongList
                   key={normalizedQuery}
                   likedSongIds={likedSongIds}
                   onAddToPlaylist={setPlaylistPickerSong}
+                  onAlbumSelect={(albumId) => navigateToAlbum(`album-${albumId}`)}
+                  onArtistSelect={navigateToArtist}
                   onPlaybackToggle={() => setPlaybackToggleNonce((nonce) => nonce + 1)}
                   onPreviewStart={startPreview}
                   onPreviewStop={stopPreview}
@@ -552,14 +628,17 @@ function DiscoveryView({
               </div>
             )}
 
-            {activeSection !== 'home' && activeSection !== 'downloads' && activeSection !== 'radio' && activeSection !== 'playlists' && activeSection !== 'playlist' && activeSection !== 'album' && (
+            {activeSection !== 'home' && activeSection !== 'downloads' && activeSection !== 'radio' && activeSection !== 'playlists' && activeSection !== 'playlist' && activeSection !== 'album' && activeSection !== 'artist' && (
               <SectionRoute
                 albumItems={albumItems}
                 artistItems={artistItems}
+                likedAlbumIds={likedAlbumIds}
+                likedArtistIds={likedArtistIds}
                 likedSongIds={likedSongIds}
                 newReleaseSongs={newReleaseSongs}
                 onAddToPlaylist={setPlaylistPickerSong}
                 onAlbumSelect={navigateToAlbum}
+                onArtistSelect={navigateToArtist}
                 onPlaybackToggle={() => setPlaybackToggleNonce((nonce) => nonce + 1)}
                 onPreviewStart={startPreview}
                 onPreviewStop={stopPreview}
@@ -578,13 +657,17 @@ function DiscoveryView({
             {activeSection === 'album' && activeAlbum && (
               <AlbumView
                 album={activeAlbum}
+                likedAlbumIds={likedAlbumIds}
                 likedSongIds={likedSongIds}
                 onAddToPlaylist={setPlaylistPickerSong}
                 onBack={() => navigateBack('albums')}
+                onArtistSelect={navigateToArtist}
                 onPlaybackToggle={() => setPlaybackToggleNonce((nonce) => nonce + 1)}
                 onSongSelect={selectSong}
+                onToggleAlbumFavorite={onToggleAlbumFavorite}
                 onToggleFavorite={onToggleFavorite}
                 selectedSongId={selectedSongId}
+                selectedSongAlbumId={selectedSong?.albumId}
                 selectedSongPlaying={selectedSongPlaying}
                 songs={songs}
               />
@@ -592,6 +675,28 @@ function DiscoveryView({
 
             {activeSection === 'album' && !activeAlbum && (
               <div className="collection-empty" role="status">No encontramos este álbum.</div>
+            )}
+
+            {activeSection === 'artist' && activeArtist && (
+              <ArtistView
+                artist={activeArtist}
+                likedArtistIds={likedArtistIds}
+                likedSongIds={likedSongIds}
+                onAddToPlaylist={setPlaylistPickerSong}
+                onAlbumSelect={(albumId) => navigateToAlbum(`album-${albumId}`)}
+                onBack={() => navigateBack('artists')}
+                onPlaybackToggle={() => setPlaybackToggleNonce((nonce) => nonce + 1)}
+                onSongSelect={selectSong}
+                onToggleArtistFavorite={onToggleArtistFavorite}
+                onToggleFavorite={onToggleFavorite}
+                selectedSongId={selectedSongId}
+                selectedSongPlaying={selectedSongPlaying}
+                songs={songs}
+              />
+            )}
+
+            {activeSection === 'artist' && !activeArtist && (
+              <div className="collection-empty" role="status">No encontramos este artista.</div>
             )}
 
             {activeSection === 'playlists' && (
@@ -609,6 +714,7 @@ function DiscoveryView({
                 likedSongIds={likedSongIds}
                 onAddToPlaylist={setPlaylistPickerSong}
                 onBack={() => navigateBack('playlists')}
+                onDelete={deletePlaylist}
                 onEdit={openEditPlaylist}
                 onPlaybackToggle={() => setPlaybackToggleNonce((nonce) => nonce + 1)}
                 onReorderPlaylist={onReorderPlaylist}
@@ -659,7 +765,13 @@ function DiscoveryView({
           onPlaybackChange={setSelectedSongPlaying}
           onPlaybackStateChange={publishMiniPlayerSnapshot}
           onPrevious={() => selectRelativeSong(-1)}
-          onQueueSelect={(songId) => selectSong(songId, { animatePlayer: false, preserveDiscoveryMix: true })}
+          onQueueSelect={(songId) => selectSong(songId, {
+            animatePlayer: false,
+            contextSong: playbackSongs.find((song) => song.id === songId) ?? null,
+            preserveDiscoveryMix: true,
+          })}
+          liked={likedSongIds?.has(selectedSong.id)}
+          onToggleFavorite={(liked) => onToggleFavorite?.(selectedSong.id, liked)}
           playbackToggleNonce={playbackToggleNonce}
           queue={nextSongs}
           track={selectedSong}
@@ -679,13 +791,13 @@ function DiscoveryView({
 
       {playlistPickerSong && (
         <PlaylistPickerModal
-          onAdd={(playlistId) => addSongToPlaylist(playlistId, playlistPickerSong.id)}
           onClose={() => setPlaylistPickerSong(null)}
           onCreate={() => openCreatePlaylist(playlistPickerSong.id)}
           onManage={() => {
             setPlaylistPickerSong(null)
             navigateTo('playlists')
           }}
+          onToggle={(playlistId, included) => onSetSongInPlaylist(playlistId, playlistPickerSong.id, included)}
           playlists={playlists}
           song={playlistPickerSong}
         />

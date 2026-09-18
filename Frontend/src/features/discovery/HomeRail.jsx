@@ -3,6 +3,8 @@ import { useRef } from 'react'
 import PreviewIndicator from '../../components/PreviewIndicator.jsx'
 
 function HomeRail({
+  emptyMessage = 'Todavía no hay elementos.',
+  headingAction,
   items,
   onPlaybackToggle,
   onPreviewStart,
@@ -12,6 +14,7 @@ function HomeRail({
   selectedId,
   selectedItemPlaying,
   title,
+  variant = 'default',
 }) {
   const railRef = useRef(null)
 
@@ -20,21 +23,23 @@ function HomeRail({
   }
 
   return (
-    <section className="home-shelf" aria-labelledby={`${title.toLocaleLowerCase().replaceAll(' ', '-')}-title`}>
+    <section className={`home-shelf${variant === 'artist' ? ' home-shelf--artists' : ''}`} aria-labelledby={`${title.toLocaleLowerCase().replaceAll(' ', '-')}-title`}>
       <div className="home-shelf__heading">
         <h2 id={`${title.toLocaleLowerCase().replaceAll(' ', '-')}-title`}>{title}</h2>
-        <div className="home-shelf__actions">
-          <span>Ver todo</span>
-          <button type="button" aria-label={`Anterior: ${title}`} title="Anterior" onClick={() => scrollRail(-520)}>
-            <ChevronLeft size={16} strokeWidth={1.7} aria-hidden="true" />
-          </button>
-          <button type="button" aria-label={`Siguiente: ${title}`} title="Siguiente" onClick={() => scrollRail(520)}>
-            <ChevronRight size={16} strokeWidth={1.7} aria-hidden="true" />
-          </button>
-        </div>
+        {headingAction ?? (items.length > 0 && (
+          <div className="home-shelf__actions">
+            <span>Ver todo</span>
+            <button type="button" aria-label={`Anterior: ${title}`} title="Anterior" onClick={() => scrollRail(-520)}>
+              <ChevronLeft size={16} strokeWidth={1.7} aria-hidden="true" />
+            </button>
+            <button type="button" aria-label={`Siguiente: ${title}`} title="Siguiente" onClick={() => scrollRail(520)}>
+              <ChevronRight size={16} strokeWidth={1.7} aria-hidden="true" />
+            </button>
+          </div>
+        ))}
       </div>
 
-      <div className="home-shelf__rail" ref={railRef}>
+      {items.length > 0 ? <div className="home-shelf__rail" ref={railRef}>
         {items.map((item, index) => {
           const previewStatus = preview?.itemId === item.id ? preview.status : null
           const isSelected = selectedId === item.id
@@ -50,7 +55,6 @@ function HomeRail({
                 onClick={() => {
                   if (previewStatus) {
                     onPreviewStop?.()
-                    return
                   }
                   if (isSelected && onPlaybackToggle) {
                     onPlaybackToggle()
@@ -79,7 +83,7 @@ function HomeRail({
             </article>
           )
         })}
-      </div>
+      </div> : <div className="home-shelf__empty" role="status">{emptyMessage}</div>}
     </section>
   )
 }

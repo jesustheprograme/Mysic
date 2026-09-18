@@ -133,12 +133,11 @@ export function createNavidromeClient({
         'connection',
       )
     }
-    const payload = await response.json().catch(() => null)
-
     if (!response.ok) {
       const kind = response.status === 404 ? 'endpoint' : response.status === 401 || response.status === 403 ? 'authentication' : 'http'
       throw new NavidromeError(`Navidrome respondió HTTP ${response.status}.`, kind, response.status)
     }
+    const payload = await response.json().catch(() => null)
     if (payload?.['subsonic-response']?.status === 'failed') {
       const error = payload['subsonic-response'].error
       const kind = error?.code === 40 ? 'authentication' : error?.code === 10 ? 'parameters' : 'subsonic'
