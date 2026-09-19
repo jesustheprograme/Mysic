@@ -25,6 +25,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+automa_mysic/asignar_metadatos/.state.json
+automa_mysic/biblioteca/
 
 # Editors and operating systems
 .vscode/

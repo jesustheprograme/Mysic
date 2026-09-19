@@ -1,0 +1,17 @@
+{
+  "name": "automa-mysic",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Importador local de musica para Mysic",
+  "main": "import-music.js",
+  "scripts": {
+    "test": "node --test *.test.js",
+    "preview": "node run-import.js --dry-run",
+    "import": "node run-import.js"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.1",
+    "music-metadata": "^11.15.0",
+    "node-id3": "^0.2.9"
+  }
+}
