@@ -5,6 +5,7 @@ const { spawn } = require('node:child_process')
 
 const { readManifest, selectCoverForFolder } = require('./import-music')
 const { processEntry } = require('./process-entry')
+const { resolveMusicBrainzEntry } = require('./musicbrainz')
 
 const ROOT = __dirname
 const INBOX_ROOT = path.join(ROOT, 'asignar_metadatos')
@@ -85,12 +86,19 @@ async function processImports(options = {}) {
     }
 
     try {
-      const cover = selectCoverForFolder(assets, entry.cloudinaryFolder, folderMode)
+      const sourcePath = path.join(inboxRoot, entry.file)
+      const resolvedEntry = entry.metadataSource === 'musicbrainz'
+        ? await (options.resolveMetadata || resolveMusicBrainzEntry)({ ...entry, filePath: sourcePath })
+        : entry
+      if (!resolvedEntry.artist || !resolvedEntry.title || !resolvedEntry.kind || !resolvedEntry.releaseName || !resolvedEntry.trackNumber) {
+        throw new Error('Faltan metadatos necesarios después de la identificación.')
+      }
+      const cover = selectCoverForFolder(assets, resolvedEntry.cloudinaryFolder, folderMode)
       if (dryRun) {
-        summary.results.push({ file: entry.file, status: 'ready', cloudinaryFolder: entry.cloudinaryFolder, coverUrl: cover.secure_url })
+        summary.results.push({ file: entry.file, status: 'ready', artist: resolvedEntry.artist, title: resolvedEntry.title, releaseName: resolvedEntry.releaseName, cloudinaryFolder: resolvedEntry.cloudinaryFolder, coverUrl: cover.secure_url })
         continue
       }
-      const result = await processEntry(entry, { inboxRoot, libraryRoot, cover, hasEmbeddedCover })
+      const result = await processEntry(resolvedEntry, { inboxRoot, libraryRoot, cover, hasEmbeddedCover })
       state.processed = { ...(state.processed || {}), [entry.file]: hash }
       await fs.writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`)
       summary.processed += 1

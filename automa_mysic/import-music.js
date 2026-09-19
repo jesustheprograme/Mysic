@@ -25,11 +25,13 @@ function normalizeEntry(raw) {
 
   const file = cleanSegment(raw.file, 'file')
   if (path.extname(file).toLowerCase() !== '.mp3') throw new Error('file debe terminar en .mp3.')
-  const kind = String(raw.kind || '').trim().toLowerCase()
-  if (!['album', 'single'].includes(kind)) throw new Error('kind debe ser album o single.')
+  const metadataSource = String(raw.metadataSource || (raw.artist && raw.title ? 'manual' : 'musicbrainz')).trim().toLowerCase()
+  if (!['manual', 'musicbrainz'].includes(metadataSource)) throw new Error('metadataSource debe ser manual o musicbrainz.')
+  const kind = raw.kind == null || raw.kind === '' ? null : String(raw.kind).trim().toLowerCase()
+  if (kind != null && !['album', 'single'].includes(kind)) throw new Error('kind debe ser album o single.')
 
-  const trackNumber = Number(raw.trackNumber)
-  if (!Number.isInteger(trackNumber) || trackNumber < 1) throw new Error('trackNumber debe ser un entero positivo.')
+  const trackNumber = raw.trackNumber == null || raw.trackNumber === '' ? null : Number(raw.trackNumber)
+  if (trackNumber != null && (!Number.isInteger(trackNumber) || trackNumber < 1)) throw new Error('trackNumber debe ser un entero positivo.')
 
   const year = raw.year == null || raw.year === '' ? null : Number(raw.year)
   if (year != null && (!Number.isInteger(year) || year < 1 || year > 9999)) throw new Error('year no es válido.')
@@ -40,13 +42,19 @@ function normalizeEntry(raw) {
 
   return {
     file,
-    artist: cleanSegment(raw.artist, 'artist'),
-    title: cleanSegment(raw.title, 'title'),
+    artist: raw.artist ? cleanSegment(raw.artist, 'artist') : null,
+    title: raw.title ? cleanSegment(raw.title, 'title') : null,
     kind,
-    releaseName: cleanSegment(raw.releaseName, 'releaseName'),
+    releaseName: raw.releaseName ? cleanSegment(raw.releaseName, 'releaseName') : null,
     year,
     genres,
     trackNumber,
+    metadataSource,
+    musicbrainzRecordingId: raw.musicbrainzRecordingId?.trim() || null,
+    artistOverride: raw.artistOverride ? cleanSegment(raw.artistOverride, 'artistOverride') : null,
+    titleOverride: raw.titleOverride ? cleanSegment(raw.titleOverride, 'titleOverride') : null,
+    releaseNameOverride: raw.releaseNameOverride ? cleanSegment(raw.releaseNameOverride, 'releaseNameOverride') : null,
+    kindOverride: raw.kindOverride ? String(raw.kindOverride).trim().toLowerCase() : null,
     cloudinaryFolder: normalizeFolder(raw.cloudinaryFolder),
   }
 }
