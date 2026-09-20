@@ -279,6 +279,7 @@ function MainApp() {
       <DiscoveryView
       onLogout={auth.logout}
       onDeletePlaylist={deletePlaylist}
+      onImportNav={() => { window.location.hash = '#/importar' }}
       onSearchChange={setSearchQuery}
       onSongSelect={setSelectedSongId}
       addSongToPlaylist={addSongToPlaylist}

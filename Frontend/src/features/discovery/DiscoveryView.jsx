@@ -7,6 +7,7 @@ import ArtistView from '../collections/ArtistView.jsx'
 import PlaylistEditorModal from '../playlists/PlaylistEditorModal.jsx'
 import PlaylistPickerModal from '../playlists/PlaylistPickerModal.jsx'
 import PlaylistView from '../playlists/PlaylistView.jsx'
+import MusicImportView from '../music-import/MusicImportView.jsx'
 import HomeDiscoveryPrompt from './HomeDiscoveryPrompt.jsx'
 import HomeRail from './HomeRail.jsx'
 import SectionRoute from './SectionRoute.jsx'
@@ -18,14 +19,15 @@ import {
 import { openMiniPlayerWindow } from '../mini-player/openMiniPlayerWindow.tsx'
 
 const sectionHashes = {
-  home: '#inicio',
-  explore: '#explorar',
-  'for-you': '#favoritas',
-  recent: '#historial',
-  albums: '#albumes',
-  artists: '#artistas',
-  playlists: '#playlists',
-  downloads: '#descargas',
+  home: '#/inicio',
+  explore: '#/explorar',
+  'for-you': '#/favoritas',
+  recent: '#/historial',
+  albums: '#/albumes',
+  artists: '#/artistas',
+  playlists: '#/playlists',
+  downloads: '#/descargas',
+  import: '#/importar',
 }
 
 const hashSections = Object.fromEntries(
@@ -143,6 +145,7 @@ function DiscoveryView({
   likedAlbumIds,
   likedArtistIds,
   likedSongIds,
+  onImportNav,
   onLogout,
   onDeletePlaylist,
   onReorderPlaylist,
@@ -236,12 +239,13 @@ function DiscoveryView({
   const activeAlbum = allAlbumItems.find((album) => album.id === activeAlbumId) ?? null
   const allArtistItems = createArtistItems(songs)
   const activeArtist = allArtistItems.find((artist) => artist.artistId === activeArtistId) ?? null
+
   useEffect(() => {
     function syncSectionFromHash() {
-      setActiveSection(getSectionFromHash())
-      setActiveAlbumId(getAlbumIdFromHash())
-      setActiveArtistId(getArtistIdFromHash())
-      setActivePlaylistId(getPlaylistIdFromHash())
+      setActiveSection(getSectionFromHash)
+      setActiveAlbumId(getAlbumIdFromHash)
+      setActiveArtistId(getArtistIdFromHash)
+      setActivePlaylistId(getPlaylistIdFromHash)
     }
 
     window.addEventListener('hashchange', syncSectionFromHash)
@@ -564,6 +568,7 @@ function DiscoveryView({
         collapsed={sidebarCollapsed}
         onCreatePlaylist={() => openCreatePlaylist()}
         onEditPlaylist={openEditPlaylist}
+        onImportNav={onImportNav}
         onNavigate={navigateTo}
         onOpenPlaylist={navigateToPlaylist}
         onTogglePlaylistPinned={togglePlaylistPinned}
@@ -571,6 +576,9 @@ function DiscoveryView({
       />
 
       <div className="music-app__content">
+        {activeSection === 'import' ? (
+          <MusicImportView />
+        ) : (
         <main className="music-app__main">
           <div className="music-workspace" key={`${activeSection}-${activePlaylistId ?? activeAlbumId ?? activeArtistId ?? ''}`}>
             {activeSection === 'home' && (
@@ -753,7 +761,8 @@ function DiscoveryView({
             )}
           </div>
         </main>
-      </div>
+      )}
+    </div>
 
       {selectedSong && (
         <PlayerDock
