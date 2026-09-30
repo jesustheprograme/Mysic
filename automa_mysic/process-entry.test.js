@@ -57,3 +57,18 @@ test('does not touch the source when the destination already exists', async () =
   assert.equal(await fs.readFile(fixture.source, 'utf8'), 'fake mp3')
   await fs.rm(fixture.root, { recursive: true, force: true })
 })
+
+test('can retain the inbox copy until a remote upload succeeds', async () => {
+  const fixture = await makeFixture()
+
+  await processEntry(entry, {
+    ...fixture,
+    cover: {},
+    writeTags: async () => {},
+    removeSource: false,
+  })
+
+  assert.equal(await fs.readFile(fixture.source, 'utf8'), 'fake mp3')
+  assert.equal(await fs.stat(buildDestination(fixture.libraryRoot, entry)).then(() => true), true)
+  await fs.rm(fixture.root, { recursive: true, force: true })
+})

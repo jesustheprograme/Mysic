@@ -42,6 +42,7 @@
 
 .heart-container--song-row:hover {
   color: #79e89c;
+  background: transparent;
 }
 
 .heart-container--artist {

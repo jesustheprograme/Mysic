@@ -1,0 +1,68 @@
+{
+  "id": "MysicAcqStatus001",
+  "name": "Mysic - Estado de adquisición",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mysic/acquisition-status",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "b56151b4-221f-4df2-87f3-2c9dd788d780",
+      "name": "Consultar adquisición",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "543f1656-4081-4fb3-aaf1-c701a201542e",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "MYSIC_WEBHOOK_TOKEN",
+          "name": "Mysic webhook token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=http://127.0.0.1:4310/jobs/{{ $json.body.jobId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": { "timeout": 15000 }
+      },
+      "id": "b3ffd3af-a19c-4b0c-88a0-d3702ea29a87",
+      "name": "Leer trabajo del worker",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 0],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "MYSIC_WORKER_TOKEN",
+          "name": "Mysic worker token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "a7fc5262-814e-4b99-a7a0-861a9ac0d252",
+      "name": "Responder progreso",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [480, 0]
+    }
+  ],
+  "connections": {
+    "Consultar adquisición": { "main": [[{ "node": "Leer trabajo del worker", "type": "main", "index": 0 }]] },
+    "Leer trabajo del worker": { "main": [[{ "node": "Responder progreso", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1", "executionTimeout": 60 },
+  "versionId": "02788146-9d5f-40ef-9637-67c435943887",
+  "meta": { "templateCredsSetupCompleted": true },
+  "pinData": {},
+  "tags": []
+}

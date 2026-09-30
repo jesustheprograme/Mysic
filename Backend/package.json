@@ -14,7 +14,8 @@
     "music:cloudinary": "node scripts/sync-cloudinary-images.js",
     "music:cloudinary:apply": "node scripts/sync-cloudinary-images.js --apply",
     "music:links": "node scripts/link-album-tracks.js",
-    "music:links:apply": "node scripts/link-album-tracks.js --apply"
+    "music:links:apply": "node scripts/link-album-tracks.js --apply",
+    "music:dates:apply": "node scripts/apply-release-dates.js"
   },
   "keywords": [],
   "author": "",

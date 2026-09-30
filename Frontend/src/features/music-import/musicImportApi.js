@@ -20,6 +20,22 @@ export async function saveMusicImport(stateJson) {
   return invoke('save_music_import', { stateJson })
 }
 
+export async function removeMusicImport(file) {
+  return invoke('remove_music_import', { file })
+}
+
+export async function createMusicAcquisition(urls, rightsConfirmed) {
+  return invoke('create_music_acquisition', { urls, rightsConfirmed })
+}
+
+export async function readMusicAcquisition(jobId) {
+  return invoke('read_music_acquisition', { jobId })
+}
+
+export async function cancelMusicAcquisition(jobId) {
+  return invoke('cancel_music_acquisition', { jobId })
+}
+
 export async function previewMusicImport() {
   return invoke('preview_music_import')
 }

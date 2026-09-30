@@ -2,6 +2,10 @@
 
 Aplicacion React con autenticacion mediante correo/contrasena o Google y sesiones persistentes en MongoDB.
 
+## Automatización local con n8n
+
+La pantalla **Importar música** permite preparar MP3 desde uno o varios enlaces autorizados mediante n8n, yt-dlp y FFmpeg. La adquisición se ejecuta localmente, una URL a la vez, y siempre deja los archivos pendientes de análisis y aprobación humana antes de cualquier subida. Consulta [n8n/README.md](n8n/README.md) para instalar dependencias, crear las dos credenciales Header Auth, importar el workflow y usar el iniciador único de Windows.
+
 ## Configuracion
 
 1. Copia `Backend/.env.example` como `Backend/.env`.

@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import * as musicImportApi from './musicImportApi.js'
+import { formatMusicImportError, parseMusicImportResponse } from './musicImportErrors.js'
 import './music-import.css'
 
 const STATUS_LABELS = {
@@ -10,6 +11,9 @@ const STATUS_LABELS = {
   processed: 'Procesado',
   skipped: 'Omitido',
 }
+
+const ACQUISITION_TERMINAL_STATUSES = new Set(['completed', 'completed_with_errors', 'failed', 'cancelled'])
+const ACQUISITION_JOB_KEY = 'mysic.acquisitionJob'
 
 function StatusBadge({ status }) {
   return <span className={`mi-status mi-status--${status}`}>{STATUS_LABELS[status] ?? status}</span>
@@ -26,7 +30,7 @@ function ConfidenceBar({ confidence }) {
   )
 }
 
-function MusicImportView() {
+function MusicImportView({ onCatalogRefresh }) {
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
@@ -37,15 +41,31 @@ function MusicImportView() {
   const [error, setError] = useState('')
   const [dragActive, setDragActive] = useState(false)
   const [editingRow, setEditingRow] = useState(null)
+  const [deletingRow, setDeletingRow] = useState(null)
   const [editFolder, setEditFolder] = useState('')
   const [editArtist, setEditArtist] = useState('')
   const [editTitle, setEditTitle] = useState('')
-  const fileInputRef = useRef(null)
+  const [sourceUrls, setSourceUrls] = useState('')
+  const [rightsConfirmed, setRightsConfirmed] = useState(false)
+  const [acquisitionJob, setAcquisitionJob] = useState(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem(ACQUISITION_JOB_KEY))
+    } catch {
+      return null
+    }
+  })
+  const [startingAcquisition, setStartingAcquisition] = useState(false)
+  const [cancellingAcquisition, setCancellingAcquisition] = useState(false)
+
+  function reportError(operation, error, fallback) {
+    console.error(`[Importar música] ${operation}`, error)
+    setError(formatMusicImportError(error, fallback))
+  }
 
   async function loadState() {
     try {
       const raw = await musicImportApi.readMusicImportState()
-      const data = JSON.parse(raw)
+      const data = parseMusicImportResponse(raw)
       setEntries(data.entries ?? [])
     } catch {
       setEntries([])
@@ -54,21 +74,89 @@ function MusicImportView() {
 
   useEffect(() => {
     loadState()
+    const refreshTimer = window.setInterval(loadState, 5000)
+    return () => window.clearInterval(refreshTimer)
   }, [])
 
-  async function handleFiles(files) {
-    if (!files.length) return
+  useEffect(() => {
+    if (acquisitionJob?.id) window.localStorage.setItem(ACQUISITION_JOB_KEY, JSON.stringify(acquisitionJob))
+    else window.localStorage.removeItem(ACQUISITION_JOB_KEY)
+  }, [acquisitionJob])
+
+  useEffect(() => {
+    if (!acquisitionJob?.id || ACQUISITION_TERMINAL_STATUSES.has(acquisitionJob.status)) return undefined
+    let cancelled = false
+    let timer
+    const poll = async () => {
+      try {
+        const raw = await musicImportApi.readMusicAcquisition(acquisitionJob.id)
+        const next = parseMusicImportResponse(raw)
+        if (cancelled) return
+        setError('')
+        setAcquisitionJob(next)
+        if (ACQUISITION_TERMINAL_STATUSES.has(next.status)) await loadState()
+      } catch (err) {
+        if (!cancelled) reportError('No se pudo consultar la adquisición.', err, 'No se pudo consultar el trabajo de n8n.')
+      } finally {
+        if (!cancelled) timer = window.setTimeout(poll, 2000)
+      }
+    }
+    timer = window.setTimeout(poll, 2000)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [acquisitionJob])
+
+  async function handlePrepareUrls() {
+    const urls = [...new Set(sourceUrls.split(/\r?\n/).map((value) => value.trim()).filter(Boolean))]
+    if (urls.length === 0) {
+      setError('Pega al menos un enlace, uno por línea.')
+      return
+    }
+    if (!rightsConfirmed) {
+      setError('Debes confirmar que el contenido es propio o que tienes autorización para descargarlo.')
+      return
+    }
+    setStartingAcquisition(true)
+    setError('')
+    try {
+      const raw = await musicImportApi.createMusicAcquisition(urls, true)
+      setAcquisitionJob(parseMusicImportResponse(raw))
+    } catch (err) {
+      reportError('No se pudo iniciar la adquisición.', err, 'No se pudo conectar con n8n.')
+    } finally {
+      setStartingAcquisition(false)
+    }
+  }
+
+  async function handleCancelAcquisition() {
+    if (!acquisitionJob?.id) return
+    setCancellingAcquisition(true)
+    try {
+      const raw = await musicImportApi.cancelMusicAcquisition(acquisitionJob.id)
+      setAcquisitionJob(parseMusicImportResponse(raw))
+      await loadState()
+    } catch (err) {
+      reportError('No se pudo cancelar la adquisición.', err, 'No se pudo cancelar el trabajo.')
+    } finally {
+      setCancellingAcquisition(false)
+    }
+  }
+
+  async function handlePickFiles() {
     setLoading(true)
     setError('')
     try {
-      const paths = Array.from(files).map((f) => f.path || f.webkitRelativePath || f.name)
+      const paths = await musicImportApi.pickMusicFiles()
+      if (!paths || paths.length === 0) return
       const staged = await musicImportApi.stageMusicFiles(paths)
       await loadState()
       if (staged.length === 0) {
         setError('No se encontraron archivos .mp3 para importar.')
       }
     } catch (err) {
-      setError(err.message || 'Error al agregar archivos.')
+      reportError('No se pudieron agregar los archivos.', err, 'Error al agregar archivos.')
     } finally {
       setLoading(false)
     }
@@ -77,7 +165,6 @@ function MusicImportView() {
   function onDrop(e) {
     e.preventDefault()
     setDragActive(false)
-    handleFiles(Array.from(e.dataTransfer.files))
   }
 
   function onDragOver(e) {
@@ -89,11 +176,6 @@ function MusicImportView() {
     setDragActive(false)
   }
 
-  async function handleFileInput(e) {
-    handleFiles(Array.from(e.target.files))
-    e.target.value = ''
-  }
-
   async function handleAnalyze() {
     setAnalyzing(true)
     setError('')
@@ -101,11 +183,11 @@ function MusicImportView() {
     setImportResult(null)
     try {
       const raw = await musicImportApi.analyzeMusicImport()
-      const result = JSON.parse(raw)
+      const result = parseMusicImportResponse(raw)
       await loadState()
       return result
     } catch (err) {
-      setError(err.message || 'Error al analizar.')
+      reportError('Falló el análisis de metadatos.', err, 'Error al analizar.')
     } finally {
       setAnalyzing(false)
     }
@@ -116,10 +198,10 @@ function MusicImportView() {
     setPreviewResult(null)
     try {
       const raw = await musicImportApi.previewMusicImport()
-      const result = JSON.parse(raw)
+      const result = parseMusicImportResponse(raw)
       setPreviewResult(result)
     } catch (err) {
-      setError(err.message || 'Error en vista previa.')
+      reportError('Falló la vista previa.', err, 'Error en vista previa.')
     } finally {
       setPreviewing(false)
     }
@@ -130,11 +212,12 @@ function MusicImportView() {
     setImportResult(null)
     try {
       const raw = await musicImportApi.applyMusicImport()
-      const result = JSON.parse(raw)
+      const result = parseMusicImportResponse(raw)
+      await onCatalogRefresh?.()
       setImportResult(result)
       await loadState()
     } catch (err) {
-      setError(err.message || 'Error al importar.')
+      reportError('Falló la importación.', err, 'Error al importar.')
     } finally {
       setImporting(false)
     }
@@ -150,7 +233,7 @@ function MusicImportView() {
   async function saveEdit(entry) {
     try {
       const raw = await musicImportApi.readMusicImportState()
-      const data = JSON.parse(raw)
+      const data = parseMusicImportResponse(raw)
       const target = data.entries.find((e) => e.file === entry.file)
       if (target) {
         if (editFolder) target.cloudinaryFolder = editFolder
@@ -169,7 +252,22 @@ function MusicImportView() {
       }
       setEditingRow(null)
     } catch (err) {
-      setError(err.message || 'Error al guardar cambios.')
+      reportError('No se pudieron guardar los cambios.', err, 'Error al guardar cambios.')
+    }
+  }
+
+  async function handleRemove(entry) {
+    if (!window.confirm(`¿Eliminar ${entry.file} de la importación? También se borrará la copia preparada.`)) return
+    setDeletingRow(entry.file)
+    setError('')
+    try {
+      await musicImportApi.removeMusicImport(entry.file)
+      if (editingRow === entry.file) setEditingRow(null)
+      await loadState()
+    } catch (err) {
+      reportError('No se pudo eliminar la fila.', err, 'Error al eliminar la fila.')
+    } finally {
+      setDeletingRow(null)
     }
   }
 
@@ -182,38 +280,91 @@ function MusicImportView() {
     <div className="mi-page">
       <header className="mi-header">
         <h1>Importar música</h1>
-        <p>Arrastra MP3, identifícalos con MusicBrainz y importarlos a tu biblioteca.</p>
+        <p>Identifica los MP3, asigna la portada de Cloudinary y súbelos a la carpeta correcta del servidor.</p>
       </header>
 
       {error && (
         <div className="mi-error" role="alert">
-          {error}
-          <button type="button" onClick={() => setError('')}>×</button>
+          <span className="mi-error__message">{error}</span>
+          <button type="button" aria-label="Cerrar mensaje de error" onClick={() => setError('')}>×</button>
         </div>
       )}
+
+      <section className="mi-acquisition" aria-labelledby="mi-acquisition-title">
+        <div className="mi-acquisition__heading">
+          <div>
+            <h2 id="mi-acquisition-title">Preparar desde enlaces</h2>
+            <p>Un enlace por línea. n8n y el worker solo preparan los MP3; tú decides cuándo analizarlos e importarlos.</p>
+          </div>
+          <span className="mi-acquisition__format">MP3 · 192 kbps</span>
+        </div>
+        <textarea
+          className="mi-acquisition__urls"
+          value={sourceUrls}
+          onChange={(event) => setSourceUrls(event.target.value)}
+          placeholder={'https://music.youtube.com/playlist?list=…\nhttps://youtu.be/…'}
+          rows={4}
+          disabled={startingAcquisition || (acquisitionJob && !ACQUISITION_TERMINAL_STATUSES.has(acquisitionJob.status))}
+          aria-label="Enlaces autorizados"
+        />
+        <label className="mi-acquisition__rights">
+          <input
+            type="checkbox"
+            checked={rightsConfirmed}
+            onChange={(event) => setRightsConfirmed(event.target.checked)}
+            disabled={startingAcquisition}
+          />
+          Confirmo que el contenido es mío, libre o que tengo autorización para descargarlo.
+        </label>
+        <div className="mi-acquisition__actions">
+          <button
+            className="mi-btn mi-btn--primary"
+            type="button"
+            onClick={handlePrepareUrls}
+            disabled={startingAcquisition || !rightsConfirmed || (acquisitionJob && !ACQUISITION_TERMINAL_STATUSES.has(acquisitionJob.status))}
+          >
+            {startingAcquisition ? 'Enviando a n8n…' : 'Preparar desde enlaces'}
+          </button>
+          {acquisitionJob && !ACQUISITION_TERMINAL_STATUSES.has(acquisitionJob.status) && (
+            <button className="mi-btn mi-btn--danger" type="button" onClick={handleCancelAcquisition} disabled={cancellingAcquisition}>
+              {cancellingAcquisition ? 'Cancelando…' : 'Cancelar'}
+            </button>
+          )}
+        </div>
+        {acquisitionJob && (
+          <div className={`mi-acquisition-job mi-acquisition-job--${acquisitionJob.status}`}>
+            <div className="mi-acquisition-job__summary">
+              <strong>{acquisitionJob.status}</strong>
+              <span>{acquisitionJob.progress?.completed ?? 0} de {acquisitionJob.progress?.total ?? 0} enlaces</span>
+              <span>{acquisitionJob.results?.filter((item) => item.status === 'staged').length ?? 0} MP3 preparados</span>
+            </div>
+            <progress value={acquisitionJob.progress?.completed ?? 0} max={acquisitionJob.progress?.total || 1} />
+            {acquisitionJob.currentUrl && <div className="mi-acquisition-job__current" title={acquisitionJob.currentUrl}>{acquisitionJob.currentUrl}</div>}
+            {acquisitionJob.errors?.length > 0 && (
+              <ul className="mi-acquisition-job__errors">
+                {acquisitionJob.errors.map((item) => (
+                  <li key={`${item.url || 'error'}-${item.file || ''}-${item.message}`}>{item.message}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </section>
 
       <div
         className={`mi-dropzone${dragActive ? ' mi-dropzone--active' : ''}`}
         onDrop={onDrop}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
-        onClick={() => fileInputRef.current?.click()}
+        onClick={handlePickFiles}
         role="button"
         tabIndex={0}
         aria-label="Arrastra archivos MP3 o haz clic para seleccionar"
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click() }}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handlePickFiles() }}
       >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".mp3"
-          multiple
-          className="mi-file-input"
-          onChange={handleFileInput}
-        />
         <div className="mi-dropzone__icon">⬆</div>
         <div className="mi-dropzone__text">
-          Arrastra archivos MP3 aquí o haz clic para buscar
+          {loading ? 'Seleccionando archivos…' : 'Arrastra archivos MP3 aquí o haz clic para buscar'}
         </div>
       </div>
 
@@ -257,6 +408,14 @@ function MusicImportView() {
       {previewResult && (
         <div className="mi-preview-result">
           <h3>Vista previa</h3>
+          <button
+            className="mi-result-close"
+            type="button"
+            aria-label="Cerrar vista previa"
+            onClick={() => setPreviewResult(null)}
+          >
+            ×
+          </button>
           <pre>{JSON.stringify(previewResult, null, 2)}</pre>
         </div>
       )}
@@ -264,6 +423,14 @@ function MusicImportView() {
       {importResult && (
         <div className="mi-import-result">
           <h3>Importación completada</h3>
+          <button
+            className="mi-result-close"
+            type="button"
+            aria-label="Cerrar resultado de importación"
+            onClick={() => setImportResult(null)}
+          >
+            ×
+          </button>
           <pre>{JSON.stringify(importResult, null, 2)}</pre>
         </div>
       )}
@@ -283,6 +450,7 @@ function MusicImportView() {
                 <th>Pista</th>
                 <th>Confianza</th>
                 <th>Carpeta Cloudinary</th>
+                <th>Destino servidor</th>
                 <th>Estado</th>
                 <th></th>
               </tr>
@@ -298,6 +466,7 @@ function MusicImportView() {
                     <input
                       className="mi-edit"
                       value={editArtist}
+                      aria-label={`Artista de ${entry.file}`}
                       onChange={(e) => setEditArtist(e.target.value)}
                       placeholder="Artista"
                     />
@@ -308,6 +477,7 @@ function MusicImportView() {
                     <input
                       className="mi-edit"
                       value={editTitle}
+                      aria-label={`Título de ${entry.file}`}
                       onChange={(e) => setEditTitle(e.target.value)}
                       placeholder="Título"
                     />
@@ -325,6 +495,7 @@ function MusicImportView() {
                         <input
                           className="mi-edit"
                           value={editFolder}
+                          aria-label={`Carpeta Cloudinary de ${entry.file}`}
                           onChange={(e) => setEditFolder(e.target.value)}
                           placeholder="artistas/album"
                         />
@@ -340,6 +511,13 @@ function MusicImportView() {
                       <span className="mi-folder">{entry.cloudinaryFolder}</span>
                     ) : (
                       <span className="mi-muted">Sin carpeta</span>
+                    )}
+                  </td>
+                  <td>
+                    {entry.remoteDestination ? (
+                      <span className="mi-folder" title={entry.remoteDestination}>{entry.remoteDestination}</span>
+                    ) : (
+                      <span className="mi-muted">Se calcula al analizar</span>
                     )}
                   </td>
                   <td><StatusBadge status={entry.status} /></td>
@@ -379,6 +557,14 @@ function MusicImportView() {
                         Editar
                       </button>
                     )}
+                    <button
+                      className="mi-btn mi-btn--small mi-btn--danger"
+                      type="button"
+                      disabled={deletingRow === entry.file || analyzing || importing}
+                      onClick={() => handleRemove(entry)}
+                    >
+                      {deletingRow === entry.file ? 'Eliminando…' : 'Eliminar'}
+                    </button>
                   </td>
                 </tr>
               ))}

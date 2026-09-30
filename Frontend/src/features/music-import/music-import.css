@@ -21,6 +21,122 @@
   font-size: 14px;
 }
 
+.mi-acquisition {
+  padding: 18px;
+  margin-bottom: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.mi-acquisition__heading,
+.mi-acquisition__actions,
+.mi-acquisition-job__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mi-acquisition__heading h2 {
+  margin: 0 0 4px;
+  color: var(--text);
+  font-size: 16px;
+}
+
+.mi-acquisition__heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mi-acquisition__format {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: var(--teal);
+  background: rgba(89, 199, 186, 0.12);
+  font-size: 11px;
+}
+
+.mi-acquisition__urls {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 92px;
+  margin: 16px 0 10px;
+  padding: 10px 12px;
+  resize: vertical;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  outline: none;
+  background: var(--bg);
+  color: var(--text);
+  font: 12px/1.5 monospace;
+}
+
+.mi-acquisition__urls:focus {
+  border-color: var(--coral);
+}
+
+.mi-acquisition__rights {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 14px;
+  color: var(--muted-bright);
+  font-size: 12px;
+}
+
+.mi-acquisition__rights input {
+  margin-top: 2px;
+}
+
+.mi-acquisition__actions {
+  justify-content: flex-start;
+}
+
+.mi-acquisition-job {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--muted-bright);
+  font-size: 12px;
+}
+
+.mi-acquisition-job__summary {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.mi-acquisition-job progress {
+  width: 100%;
+  height: 8px;
+  margin: 10px 0 6px;
+  accent-color: var(--coral);
+}
+
+.mi-acquisition-job__current {
+  overflow: hidden;
+  color: var(--muted);
+  font-family: monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mi-acquisition-job__errors {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: #ff8c8c;
+}
+
+@media (max-width: 720px) {
+  .mi-acquisition__heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .mi-dropzone {
   border: 2px dashed var(--line-strong);
   border-radius: 12px;
@@ -133,6 +249,18 @@
   border-radius: 4px;
 }
 
+.mi-btn--danger {
+  color: #ff8c8c;
+  border-color: rgba(255, 92, 92, 0.45);
+  background: rgba(120, 24, 24, 0.2);
+}
+
+.mi-btn--danger:hover:not(:disabled) {
+  color: #fff;
+  border-color: #ff5c5c;
+  background: rgba(160, 32, 32, 0.45);
+}
+
 .mi-error {
   background: #3b1717;
   color: #ffd6d6;
@@ -145,7 +273,14 @@
   font-size: 13px;
 }
 
+.mi-error__message {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .mi-error button {
+  flex: 0 0 auto;
   background: none;
   border: none;
   color: #ffd6d6;
@@ -301,11 +436,35 @@
 
 .mi-preview-result,
 .mi-import-result {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 16px;
+  padding-right: 48px;
   margin-bottom: 20px;
+}
+
+.mi-result-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-bright);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.mi-result-close:hover,
+.mi-result-close:focus-visible {
+  background: var(--surface-raised);
+  color: var(--text);
+  outline: none;
 }
 
 .mi-preview-result h3,

@@ -10,6 +10,7 @@ import PlaylistView from '../playlists/PlaylistView.jsx'
 import MusicImportView from '../music-import/MusicImportView.jsx'
 import HomeDiscoveryPrompt from './HomeDiscoveryPrompt.jsx'
 import HomeRail from './HomeRail.jsx'
+import NewArtistSpotlight from './NewArtistSpotlight.jsx'
 import SectionRoute from './SectionRoute.jsx'
 import SongList from './SongList.jsx'
 import {
@@ -17,6 +18,7 @@ import {
   publishPlaybackState,
 } from '../mini-player/playerBridge.ts'
 import { openMiniPlayerWindow } from '../mini-player/openMiniPlayerWindow.tsx'
+import { catalogApi } from '../../lib/api.js'
 
 const sectionHashes = {
   home: '#/inicio',
@@ -146,6 +148,7 @@ function DiscoveryView({
   likedArtistIds,
   likedSongIds,
   onImportNav,
+  onCatalogRefresh,
   onLogout,
   onDeletePlaylist,
   onReorderPlaylist,
@@ -165,8 +168,11 @@ function DiscoveryView({
   const [activeSection, setActiveSection] = useState(getSectionFromHash)
   const [activeAlbumId, setActiveAlbumId] = useState(getAlbumIdFromHash)
   const [activeArtistId, setActiveArtistId] = useState(getArtistIdFromHash)
+  const [activeArtistProfile, setActiveArtistProfile] = useState(null)
+  const [spotlightArtist, setSpotlightArtist] = useState(null)
   const [activePlaylistId, setActivePlaylistId] = useState(getPlaylistIdFromHash)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [playerCollapsed, setPlayerCollapsed] = useState(false)
   const [preview, setPreview] = useState(null)
   const [discoveryLoading, setDiscoveryLoading] = useState(false)
   const [discoveryMix, setDiscoveryMix] = useState([])
@@ -238,7 +244,14 @@ function DiscoveryView({
   const activePlaylist = playlistsWithArtwork.find((playlist) => playlist.id === activePlaylistId) ?? null
   const activeAlbum = allAlbumItems.find((album) => album.id === activeAlbumId) ?? null
   const allArtistItems = createArtistItems(songs)
-  const activeArtist = allArtistItems.find((artist) => artist.artistId === activeArtistId) ?? null
+  const activeArtistItem = allArtistItems.find((artist) => artist.artistId === activeArtistId) ?? null
+  const activeArtist = activeArtistItem && activeArtistProfile?.id === activeArtistId
+    ? {
+        ...activeArtistItem,
+        artwork: activeArtistProfile.artwork,
+        images: activeArtistProfile.images,
+      }
+    : activeArtistItem
 
   useEffect(() => {
     function syncSectionFromHash() {
@@ -258,6 +271,39 @@ function DiscoveryView({
   }, [])
 
   useEffect(() => () => clearTimeout(discoveryLoadingTimerRef.current), [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    setActiveArtistProfile(null)
+    if (!activeArtistId) return undefined
+
+    catalogApi.getArtist(activeArtistId)
+      .then((profile) => {
+        if (!cancelled) setActiveArtistProfile(profile)
+      })
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeArtistId])
+
+  useEffect(() => {
+    let cancelled = false
+
+    if (activeSection !== 'home' || !user) return undefined
+
+    catalogApi.getArtistSpotlight()
+      .then((artist) => {
+        if (!cancelled) setSpotlightArtist(artist)
+      })
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeSection, user])
 
   useEffect(() => {
     const previewAudio = new Audio()
@@ -501,6 +547,18 @@ function DiscoveryView({
     }
   }
 
+  function dismissArtistSpotlight() {
+    const artistId = spotlightArtist?.artistId
+    setSpotlightArtist(null)
+    if (artistId) catalogApi.markArtistSpotlightViewed(artistId).catch(() => {})
+  }
+
+  function openLatestArtistSpotlight() {
+    catalogApi.getArtistSpotlight({ includeViewed: true })
+      .then(setSpotlightArtist)
+      .catch(() => {})
+  }
+
   function navigateBack(fallbackSection) {
     if (window.history.state?.previousAppHash) {
       window.history.back()
@@ -551,10 +609,11 @@ function DiscoveryView({
   }
 
   return (
-    <div className={`music-app${sidebarCollapsed ? ' music-app--sidebar-collapsed' : ''}${selectedSong ? ' music-app--player-open' : ''}`} id="music-home">
+    <div className={`music-app${sidebarCollapsed ? ' music-app--sidebar-collapsed' : ''}${selectedSong ? ' music-app--player-open' : ''}${selectedSong && playerCollapsed ? ' music-app--player-collapsed' : ''}`} id="music-home">
       <AppHeader
         collapsed={sidebarCollapsed}
         glowArtwork={activeAlbum?.artwork ?? activePlaylist?.artwork ?? selectedSong?.artwork ?? null}
+        onArtistSpotlightOpen={openLatestArtistSpotlight}
         onHome={() => navigateTo('home')}
         onLogout={onLogout}
         onSearchChange={onSearchChange}
@@ -577,7 +636,7 @@ function DiscoveryView({
 
       <div className="music-app__content">
         {activeSection === 'import' ? (
-          <MusicImportView />
+          <MusicImportView onCatalogRefresh={onCatalogRefresh} />
         ) : (
         <main className="music-app__main">
           <div className="music-workspace" key={`${activeSection}-${activePlaylistId ?? activeAlbumId ?? activeArtistId ?? ''}`}>
@@ -588,6 +647,26 @@ function DiscoveryView({
                   loading={discoveryLoading}
                   onDiscover={startWeeklyDiscovery}
                 />
+
+                {spotlightArtist && <NewArtistSpotlight
+                  artist={spotlightArtist}
+                  artistLiked={likedArtistIds?.has(spotlightArtist.artistId)}
+                  likedSongIds={likedSongIds}
+                  onAddToPlaylist={setPlaylistPickerSong}
+                  onAlbumSelect={(albumId) => navigateToAlbum(`album-${albumId}`)}
+                  onArtistSelect={navigateToArtist}
+                  onDismiss={dismissArtistSpotlight}
+                  onPlaybackToggle={() => setPlaybackToggleNonce((nonce) => nonce + 1)}
+                  onPreviewStart={startPreview}
+                  onPreviewStop={stopPreview}
+                  onSongSelect={selectSong}
+                  onToggleFavorite={onToggleFavorite}
+                  onToggleArtistFavorite={onToggleArtistFavorite}
+                  preview={preview}
+                  selectedSongId={selectedSongId}
+                  selectedSongPlaying={selectedSongPlaying}
+                  songs={spotlightArtist.songs}
+                />}
 
                 {orderedPlaylists.length > 0 && (
                   <HomeRail items={orderedPlaylists} onSelect={navigateToPlaylist} selectedId={activePlaylistId} title="Tus playlists" />
@@ -711,7 +790,6 @@ function DiscoveryView({
               <div className="route-page playlist-library-page">
                 <div className="collection-heading">
                   <h1>Playlists</h1>
-                  <span>{String(playlists.length).padStart(2, '0')}</span>
                 </div>
                 <HomeRail items={orderedPlaylists} onSelect={navigateToPlaylist} selectedId={activePlaylistId} title="Tus playlists" />
               </div>
@@ -744,7 +822,6 @@ function DiscoveryView({
               <section className="library-view" aria-labelledby="downloads-title">
                 <div className="collection-heading">
                   <h1 id="downloads-title">Descargas</h1>
-                  <span>00</span>
                 </div>
                 <div className="collection-empty">Aun no tienes musica descargada.</div>
               </section>
@@ -767,6 +844,7 @@ function DiscoveryView({
       {selectedSong && (
         <PlayerDock
           animationNonce={playerAnimationNonce}
+          collapsed={playerCollapsed}
           isLoading={discoveryLoading}
           onClose={() => selectSong(null)}
           onNext={() => selectRelativeSong(1)}
@@ -781,6 +859,7 @@ function DiscoveryView({
           })}
           liked={likedSongIds?.has(selectedSong.id)}
           onToggleFavorite={(liked) => onToggleFavorite?.(selectedSong.id, liked)}
+          onToggleCollapsed={() => setPlayerCollapsed((collapsed) => !collapsed)}
           playbackToggleNonce={playbackToggleNonce}
           queue={nextSongs}
           track={selectedSong}

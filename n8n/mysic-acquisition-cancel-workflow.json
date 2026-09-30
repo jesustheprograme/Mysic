@@ -1,0 +1,69 @@
+{
+  "id": "MysicAcqCancel001",
+  "name": "Mysic - Cancelar adquisición",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mysic/acquisition-cancel",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "4010a5e2-2b24-44a3-9c09-9fa73e4bfbb0",
+      "name": "Cancelar adquisición",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "162b7028-d249-41f5-ae7b-c510b7954a75",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "MYSIC_WEBHOOK_TOKEN",
+          "name": "Mysic webhook token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:4310/jobs/{{ $json.body.jobId }}/cancel",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": { "timeout": 15000 }
+      },
+      "id": "32aadf0d-ab8e-49ea-a124-06410f10d68c",
+      "name": "Cancelar trabajo en worker",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 0],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "MYSIC_WORKER_TOKEN",
+          "name": "Mysic worker token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "acfed22b-20cb-45f2-b9e4-6884a910f9d0",
+      "name": "Responder cancelación",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [480, 0]
+    }
+  ],
+  "connections": {
+    "Cancelar adquisición": { "main": [[{ "node": "Cancelar trabajo en worker", "type": "main", "index": 0 }]] },
+    "Cancelar trabajo en worker": { "main": [[{ "node": "Responder cancelación", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1", "executionTimeout": 60 },
+  "versionId": "16a33293-b999-4e21-bce6-7eb4dcbadf84",
+  "meta": { "templateCredsSetupCompleted": true },
+  "pinData": {},
+  "tags": []
+}

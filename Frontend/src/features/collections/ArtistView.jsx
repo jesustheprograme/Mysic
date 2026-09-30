@@ -1,9 +1,18 @@
 import { ArrowLeft, Disc3, ListMusic, ListPlus, Pause, Play, Shuffle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import HeartToggle from '../../components/HeartToggle.jsx'
+import PreviewIndicator from '../../components/PreviewIndicator.jsx'
 
 const portraitDirections = ['left', 'down', 'right', 'up']
 const PORTRAIT_DURATION = 5600
+
+function getArtistTitleScale(title) {
+  const length = Array.from(title.trim()).length
+  if (length > 32) return 'xlong'
+  if (length > 22) return 'long'
+  if (length > 13) return 'medium'
+  return 'short'
+}
 
 function formatDuration(seconds) {
   const minutes = Math.floor(seconds / 60)
@@ -18,10 +27,11 @@ function collectAlbums(songs) {
       const current = albums.get(album.id)
       if (current) {
         current.songCount += 1
+        current.songs.push(song)
         return
       }
 
-      albums.set(album.id, { ...album, songCount: 1 })
+      albums.set(album.id, { ...album, songCount: 1, songs: [song] })
     })
   })
 
@@ -30,6 +40,53 @@ function collectAlbums(songs) {
     const secondYear = second.releaseDate ? new Date(second.releaseDate).getUTCFullYear() : 0
     return secondYear - firstYear || first.title.localeCompare(second.title)
   })
+}
+
+function isSingleRelease(release) {
+  return release.songCount === 1 || /^singles?$/i.test(release.title.trim())
+}
+
+function ReleaseCard({ onAlbumSelect, onPlay, playing, release }) {
+  const year = release.releaseDate ? new Date(release.releaseDate).getUTCFullYear() : null
+
+  return (
+    <article className={`home-shelf-card artist-profile__album${playing ? ' home-shelf-card--playing' : ''}`}>
+      <div className="artist-profile__album-visual">
+        <button
+          className="artist-profile__album-cover"
+          type="button"
+          aria-label={`Abrir ${release.title}`}
+          onClick={() => onAlbumSelect?.(release.id)}
+        >
+          <span className={`home-shelf-card__visual${release.artwork ? '' : ' home-shelf-card__visual--empty'}`}>
+            {release.artwork && <img src={release.artwork} alt="" loading="lazy" />}
+          </span>
+        </button>
+        <button
+          className="home-shelf-card__play artist-profile__album-play"
+          type="button"
+          aria-label={playing ? `Pausar ${release.title}` : `Reproducir ${release.title}`}
+          aria-pressed={playing}
+          onClick={onPlay}
+        >
+          {playing
+            ? <Pause size={13} fill="currentColor" aria-hidden="true" />
+            : <Play size={13} fill="currentColor" aria-hidden="true" />}
+        </button>
+      </div>
+      <button
+        className="artist-profile__album-meta-button"
+        type="button"
+        aria-label={`Abrir ${release.title}`}
+        onClick={() => onAlbumSelect?.(release.id)}
+      >
+        <span className="home-shelf-card__meta">
+          <strong>{release.title}</strong>
+          <span>{year ? `${year} · ` : ''}{release.songCount} {release.songCount === 1 ? 'canción' : 'canciones'}</span>
+        </span>
+      </button>
+    </article>
+  )
 }
 
 function ArtistView({
@@ -52,6 +109,8 @@ function ArtistView({
     || song.artists?.some((songArtist) => songArtist.id === artist.artistId)
   )), [artist.artistId, songs])
   const albums = useMemo(() => collectAlbums(artistSongs), [artistSongs])
+  const albumReleases = albums.filter((release) => !isSingleRelease(release))
+  const singleReleases = albums.filter(isSingleRelease)
   const featuredSongs = artistSongs.slice(0, 8)
   const portraits = artist.images?.length ? artist.images : [artist.artwork].filter(Boolean)
   const [portraitIndex, setPortraitIndex] = useState(0)
@@ -87,6 +146,17 @@ function ArtistView({
     onSongSelect(shuffledSongs[0].id, { contextSong: shuffledSongs[0], contextSongs: shuffledSongs })
   }
 
+  function playAlbum(album) {
+    const selectedSongBelongsToAlbum = album.songs.some((song) => song.id === selectedSongId)
+    if (selectedSongBelongsToAlbum) {
+      onPlaybackToggle?.()
+      return
+    }
+
+    const firstSong = album.songs[0]
+    if (firstSong) onSongSelect(firstSong.id, { contextSong: firstSong, contextSongs: album.songs })
+  }
+
   return (
     <article className="artist-profile" aria-labelledby="artist-profile-title">
       <header className="artist-profile__hero">
@@ -108,7 +178,12 @@ function ArtistView({
           </button>
         )}
         <div className="artist-profile__hero-copy">
-          <h1 id="artist-profile-title">{artist.title}</h1>
+          <h1
+            className={`artist-profile__title artist-profile__title--${getArtistTitleScale(artist.title)}`}
+            id="artist-profile-title"
+          >
+            {artist.title}
+          </h1>
           <p>{artistSongs.length} canciones · {albums.length} lanzamientos</p>
           <div className="artist-profile__hero-actions">
             <button className="artist-profile__play" type="button" disabled={!artistSongs.length} onClick={playArtist}>
@@ -181,9 +256,7 @@ function ArtistView({
                       }}
                     >
                       <img src={song.artwork} alt="" loading="lazy" />
-                      <span aria-hidden="true">
-                        {selected && selectedSongPlaying ? <Pause fill="currentColor" /> : <Play fill="currentColor" />}
-                      </span>
+                        <PreviewIndicator status={selected && selectedSongPlaying ? 'playing' : null} />
                     </button>
                     <span className="song-row__copy"><strong>{song.title}</strong></span>
                   </div>
@@ -222,23 +295,45 @@ function ArtistView({
               <span>DISCOGRAFÍA</span>
               <h2 id="artist-albums-title">Lanzamientos</h2>
             </div>
-            <strong>{albums.length}</strong>
           </div>
-          <div className="artist-profile__albums">
-            {albums.map((album, index) => {
-              const year = album.releaseDate ? new Date(album.releaseDate).getUTCFullYear() : null
-              return (
-                <button className="artist-profile__album" type="button" onClick={() => onAlbumSelect?.(album.id)} key={album.id}>
-                  <span className="artist-profile__album-index">{String(index + 1).padStart(2, '0')}</span>
-                  {album.artwork ? <img src={album.artwork} alt="" loading="lazy" /> : <span className="artist-profile__album-placeholder" />}
-                  <span className="artist-profile__album-copy">
-                    <strong>{album.title}</strong>
-                    <small>{year ? `${year} · ` : ''}{album.songCount} canciones</small>
-                  </span>
-                  <ArrowLeft className="artist-profile__album-arrow" aria-hidden="true" />
-                </button>
-              )
-            })}
+          <div className="artist-profile__release-groups">
+            {albumReleases.length > 0 && (
+              <section className="artist-profile__release-group" aria-labelledby="artist-album-releases-title">
+                <div className="artist-profile__release-heading">
+                  <h3 id="artist-album-releases-title">Álbumes</h3>
+                </div>
+                <div className="artist-profile__albums">
+                  {albumReleases.map((release) => (
+                    <ReleaseCard
+                      key={release.id}
+                      onAlbumSelect={onAlbumSelect}
+                      onPlay={() => playAlbum(release)}
+                      playing={selectedSongPlaying && release.songs.some((song) => song.id === selectedSongId)}
+                      release={release}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {singleReleases.length > 0 && (
+              <section className="artist-profile__release-group" aria-labelledby="artist-single-releases-title">
+                <div className="artist-profile__release-heading">
+                  <h3 id="artist-single-releases-title">Singles</h3>
+                </div>
+                <div className="artist-profile__albums">
+                  {singleReleases.map((release) => (
+                    <ReleaseCard
+                      key={release.id}
+                      onAlbumSelect={onAlbumSelect}
+                      onPlay={() => playAlbum(release)}
+                      playing={selectedSongPlaying && release.songs.some((song) => song.id === selectedSongId)}
+                      release={release}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         </section>
       </div>

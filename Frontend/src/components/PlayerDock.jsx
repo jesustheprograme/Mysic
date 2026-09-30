@@ -14,6 +14,24 @@ import WaveSurfer from 'wavesurfer.js'
 import { listenToMiniPlayerCommands } from '../features/mini-player/playerBridge.ts'
 import HeartToggle from './HeartToggle.jsx'
 
+function PlayerPanelToggleIcon({ collapsed }) {
+  return (
+    <svg width="1em" height="1em" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M0 0h24v24H0z" fill="none" />
+      <path
+        fill="currentColor"
+        d={collapsed
+          ? 'M11.28 9.53L8.81 12l2.47 2.47a.749.749 0 0 1-.326 1.275.75.75 0 0 1-.734-.215l-3-3a.75.75 0 0 1 0-1.06l3-3a.749.749 0 0 1 1.275.326.75.75 0 0 1-.215.734'
+          : 'M7.22 14.47L9.69 12 7.22 9.53a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215l3 3a.75.75 0 0 1 0 1.06l-3 3a.75.75 0 0 1-1.042-.018.75.75 0 0 1-.018-1.042'}
+      />
+      <path
+        fill="currentColor"
+        d="M3.75 2h16.5c.966 0 1.75.784 1.75 1.75v16.5A1.75 1.75 0 0 1 20.25 22H3.75A1.75 1.75 0 0 1 2 20.25V3.75C2 2.784 2.784 2 3.75 2M3.5 3.75v16.5c0 .138.112.25.25.25H15v-17H3.75a.25.25 0 0 0-.25.25m13 16.75h3.75a.25.25 0 0 0 .25-.25V3.75a.25.25 0 0 0-.25-.25H16.5Z"
+      />
+    </svg>
+  )
+}
+
 function formatTime(seconds) {
   const safeSeconds = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0
   const minutes = Math.floor(safeSeconds / 60)
@@ -93,7 +111,7 @@ function PlayerDiscoveryLoader() {
   )
 }
 
-function PlayerDock({ animationNonce, isLoading = false, liked = false, onClose, onNext, onOpenMiniPlayer, onPlaybackChange, onPlaybackStateChange, onPrevious, onQueueSelect, onToggleFavorite, playbackToggleNonce, queue, track }) {
+function PlayerDock({ animationNonce, collapsed = false, isLoading = false, liked = false, onClose, onNext, onOpenMiniPlayer, onPlaybackChange, onPlaybackStateChange, onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, playbackToggleNonce, queue, track }) {
   const PAUSE_FADE_DURATION_MS = 400
   const waveformRef = useRef(null)
   const waveSurferRef = useRef(null)
@@ -412,20 +430,81 @@ function PlayerDock({ animationNonce, isLoading = false, liked = false, onClose,
 
   return (
     <aside
-      className={`player-dock${animationEnabled ? ' player-dock--animated' : ''}`}
+      className={`player-dock${collapsed ? ' player-dock--collapsed' : ''}${animationEnabled ? ' player-dock--animated' : ''}`}
       aria-label={`Reproductor de ${track.title}`}
     >
+      <button
+        className="player-dock__collapse"
+        type="button"
+        aria-expanded={!collapsed}
+        aria-label={collapsed ? 'Desplegar reproductor' : 'Contraer reproductor'}
+        title={collapsed ? 'Desplegar reproductor' : 'Contraer reproductor'}
+        onClick={onToggleCollapsed}
+      >
+        <PlayerPanelToggleIcon collapsed={collapsed} />
+      </button>
+      {collapsed && !isLoading && (
+        <div className="player-dock__compact">
+          <img className="player-dock__compact-artwork" src={track.artwork} alt="" />
+          <div className="player-dock__compact-copy">
+            <strong title={track.title}>{track.title}</strong>
+            <span title={track.artist}>{track.artist}</span>
+          </div>
+          <div className="player-dock__compact-transport">
+            <button type="button" aria-label="Anterior" title="Anterior" onClick={onPrevious}>
+              <SkipBack size={14} fill="currentColor" aria-hidden="true" />
+            </button>
+            <button
+              className="player-dock__compact-play"
+              type="button"
+              aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
+              title={hasAudio ? (isPlaying ? 'Pausar' : 'Reproducir') : 'Audio no disponible'}
+              disabled={!hasAudio}
+              onClick={togglePlayback}
+            >
+              {isPlaying
+                ? <Pause size={14} fill="currentColor" aria-hidden="true" />
+                : <Play size={14} fill="currentColor" aria-hidden="true" />}
+            </button>
+            <button type="button" aria-label="Siguiente" title="Siguiente" onClick={onNext}>
+              <SkipForward size={14} fill="currentColor" aria-hidden="true" />
+            </button>
+          </div>
+          <div className="player-dock__compact-actions">
+            <button
+              className="player-dock__compact-mini"
+              type="button"
+              aria-label="Abrir mini reproductor"
+              title="Abrir mini reproductor"
+              onClick={onOpenMiniPlayer}
+            >
+              <ListMusic size={16} aria-hidden="true" />
+            </button>
+            <div className="player-dock__compact-volume">
+              <VolumeControl
+                expanded={volumeExpanded}
+                onExpandedChange={setVolumeExpanded}
+                onVolumeChange={changeVolume}
+                volume={volume}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="player-dock__scroller">
       <div className="player-dock__header">
         <strong>{isLoading ? 'Descubrimiento semanal' : 'Reproduciendo ahora'}</strong>
-        <button
-          className="player-dock__close"
-          type="button"
-          aria-label="Cerrar reproductor"
-          title="Cerrar reproductor"
-          onClick={onClose}
-        >
-          <X size={18} aria-hidden="true" />
-        </button>
+        <div className="player-dock__header-actions">
+          <button
+            className="player-dock__close"
+            type="button"
+            aria-label="Cerrar reproductor"
+            title="Cerrar reproductor"
+            onClick={onClose}
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -433,8 +512,15 @@ function PlayerDock({ animationNonce, isLoading = false, liked = false, onClose,
       ) : (
         <>
           <div className="player-dock__track">
-            <img src={track.artwork} alt="" />
-            <div>
+            <div className="player-dock__artwork">
+              <span
+                className="player-dock__artwork-backdrop"
+                style={{ backgroundImage: `url(${track.artwork})` }}
+                aria-hidden="true"
+              />
+              <img src={track.artwork} alt="" />
+            </div>
+            <div className="player-dock__details">
               <strong>{track.title}</strong>
               <span>{track.artist}</span>
             </div>
@@ -553,6 +639,7 @@ function PlayerDock({ animationNonce, isLoading = false, liked = false, onClose,
           </section>
         </>
       )}
+      </div>
     </aside>
   )
 }

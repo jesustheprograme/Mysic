@@ -3,6 +3,8 @@ const fsPromises = require('node:fs/promises')
 const path = require('node:path')
 const { fileURLToPath } = require('node:url')
 const express = require('express')
+const { getAuthenticatedUser } = require('./auth')
+const { getArtistSpotlightViewsCollection } = require('./database')
 const { proxyNavidromeAudio } = require('./navidrome')
 const { prisma } = require('./prisma')
 
@@ -11,9 +13,10 @@ const catalogImageDirectory = path.join(__dirname, '..', 'storage', 'catalog-ima
 function mapImage(image) {
   if (!image) return null
 
-  const version = image.url.startsWith('catalog-image:')
+  const cloudinaryVersion = /^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v(\d+)\//i.exec(image.url)?.[1]
+  const version = cloudinaryVersion ?? (image.url.startsWith('catalog-image:')
     ? path.parse(image.url.slice('catalog-image:'.length)).name
-    : null
+    : null)
 
   return `/catalog/images/${image.id}${version ? `?v=${encodeURIComponent(version)}` : ''}`
 }
@@ -75,6 +78,25 @@ function mapSong(song, track = song.albums?.[0]) {
   }
 }
 
+function mapArtist(artist) {
+  return {
+    id: artist.id,
+    name: artist.name,
+    slug: artist.slug,
+    biography: artist.biography,
+    artwork: mapImage(artist.image) ?? mapImage(artist.profileImages[0]),
+    images: artist.profileImages.map(mapImage),
+    albums: artist.albums.map(({ album }) => ({
+      id: album.id,
+      title: album.title,
+      slug: album.slug,
+      artwork: mapImage(album.coverImage),
+      releaseDate: album.releaseDate,
+    })),
+    songs: artist.songs.map(({ song }) => mapSong(song)),
+  }
+}
+
 function asyncRoute(handler) {
   return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next)
 }
@@ -97,6 +119,62 @@ function parseByteRange(rangeHeader, fileSize) {
 
 function createCatalogRouter(config) {
   const router = express.Router()
+
+  router.get('/spotlight', asyncRoute(async (req, res) => {
+    const user = await getAuthenticatedUser(req, res, config)
+    if (!user) return
+    const includeViewed = req.query.includeViewed === 'true'
+
+    const artist = await prisma.artist.findFirst({
+      where: {
+        songs: { some: {} },
+        albums: { some: {} },
+        OR: [
+          { image: { isNot: null } },
+          { profileImages: { some: {} } },
+        ],
+      },
+      include: {
+        image: true,
+        profileImages: { orderBy: { position: 'asc' } },
+        songs: { include: { song: { include: songRelations } } },
+        albums: { include: { album: { include: { coverImage: true } } } },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    if (!artist) return res.json({ artist: null })
+
+    const viewed = includeViewed
+      ? null
+      : await getArtistSpotlightViewsCollection().findOne({
+          userId: user._id,
+          artistId: artist.id,
+        })
+
+    return res.json({ artist: viewed ? null : mapArtist(artist) })
+  }))
+
+  router.put('/spotlight/:artistId/viewed', asyncRoute(async (req, res) => {
+    const user = await getAuthenticatedUser(req, res, config)
+    if (!user) return
+
+    const artistId = String(req.params.artistId || '').trim()
+    if (!artistId || artistId.length > 128) {
+      return res.status(400).json({ message: 'El artista solicitado no es valido.' })
+    }
+
+    const artist = await prisma.artist.findUnique({ where: { id: artistId }, select: { id: true } })
+    if (!artist) return res.status(404).json({ message: 'Artista no encontrado.' })
+
+    await getArtistSpotlightViewsCollection().updateOne(
+      { userId: user._id, artistId },
+      { $setOnInsert: { userId: user._id, artistId, viewedAt: new Date() } },
+      { upsert: true },
+    )
+
+    return res.json({ viewed: true })
+  }))
 
   router.get('/songs', asyncRoute(async (req, res) => {
     const search = String(req.query.search || '').trim()
@@ -160,23 +238,7 @@ function createCatalogRouter(config) {
     })
     if (!artist) return res.status(404).json({ message: 'Artista no encontrado.' })
 
-    return res.json({
-      artist: {
-        id: artist.id,
-        name: artist.name,
-        slug: artist.slug,
-        biography: artist.biography,
-        artwork: mapImage(artist.image) ?? mapImage(artist.profileImages[0]),
-        images: artist.profileImages.map(mapImage),
-        albums: artist.albums.map(({ album }) => ({
-          id: album.id,
-          title: album.title,
-          slug: album.slug,
-          artwork: mapImage(album.coverImage),
-        })),
-        songs: artist.songs.map(({ song }) => mapSong(song)),
-      },
-    })
+    return res.json({ artist: mapArtist(artist) })
   }))
 
   router.get('/albums', asyncRoute(async (_req, res) => {
@@ -299,4 +361,4 @@ function createCatalogRouter(config) {
   return router
 }
 
-module.exports = { createCatalogRouter, mapSong, parseByteRange }
+module.exports = { createCatalogRouter, mapImage, mapSong, parseByteRange }

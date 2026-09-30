@@ -3,11 +3,10 @@ import { useState } from 'react'
 import HomeRail from './HomeRail.jsx'
 import SongList from './SongList.jsx'
 
-function RouteHeading({ count, title }) {
+function RouteHeading({ title }) {
   return (
     <div className="collection-heading">
       <h1>{title}</h1>
-      <span>{String(count).padStart(2, '0')}</span>
     </div>
   )
 }
@@ -123,7 +122,7 @@ function SectionRoute({
   if (section === 'recent') {
     return (
       <div className="route-page">
-        <RouteHeading count={recentSongs.length} title="Historial" />
+        <RouteHeading title="Historial" />
         <HomeRail
           items={recentSongs}
           onPlaybackToggle={onPlaybackToggle}
@@ -142,7 +141,7 @@ function SectionRoute({
   if (section === 'albums') {
     return (
       <div className="route-page">
-        <RouteHeading count={albumItems.length} title="Albumes" />
+        <RouteHeading title="Albumes" />
         <HomeRail items={albumItems} onPreviewStart={onPreviewStart} onPreviewStop={onPreviewStop} onSelect={onAlbumSelect} preview={preview} title="Albumes" />
       </div>
     )
@@ -151,7 +150,7 @@ function SectionRoute({
   if (section === 'artists') {
     return (
       <div className="route-page">
-        <RouteHeading count={artistItems.length} title="Artistas" />
+        <RouteHeading title="Artistas" />
         <HomeRail items={artistItems} onSelect={(itemId) => onArtistSelect?.(itemId.replace(/^artist-/, ''))} title="Artistas" variant="artist" />
       </div>
     )
@@ -160,7 +159,7 @@ function SectionRoute({
   if (section === 'explore') {
     return (
       <div className="route-page">
-        <RouteHeading count={songs.length} title="Explorar" />
+        <RouteHeading title="Explorar" />
         <HomeRail
           items={newReleaseSongs}
           onPlaybackToggle={onPlaybackToggle}

@@ -43,6 +43,7 @@ async function processEntry(entry, dependencies) {
     hasEmbeddedCover = async () => false,
     writeTags = writeId3Tags,
     downloadCover = defaultDownloadCover,
+    removeSource = true,
   } = dependencies
 
   const source = path.resolve(inboxRoot, entry.file)
@@ -74,7 +75,7 @@ async function processEntry(entry, dependencies) {
       coverUrl: cover?.secure_url || null,
     })
     await fs.rename(temporary, destination)
-    await fs.unlink(source)
+    if (removeSource) await fs.unlink(source)
     return { status: 'processed', source, destination, coverUrl: cover?.secure_url || null }
   } catch (error) {
     await fs.rm(temporary, { force: true })

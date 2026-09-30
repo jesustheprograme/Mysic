@@ -1,8 +1,8 @@
-import { Bell, ChevronDown, LogOut, Menu, Search, UserRound } from 'lucide-react'
+import { Bell, ChevronDown, LogOut, Menu, Search, Sparkles, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import BrandLogo from './BrandLogo.jsx'
 
-function AppHeader({ collapsed, glowArtwork, onHome, onLogout, onSearchChange, onSidebarToggle, searchQuery, user }) {
+function AppHeader({ collapsed, glowArtwork, onArtistSpotlightOpen, onHome, onLogout, onSearchChange, onSidebarToggle, searchQuery, user }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
   const searchStyle = glowArtwork ? { '--search-glow-image': `url("${glowArtwork}")` } : undefined
@@ -68,6 +68,15 @@ function AppHeader({ collapsed, glowArtwork, onHome, onLogout, onSearchChange, o
         </label>
 
         <div className="app-header__actions">
+          <button
+            className="header-icon-button"
+            type="button"
+            aria-label="Presentación del artista nuevo"
+            title="Artista nuevo"
+            onClick={onArtistSpotlightOpen}
+          >
+            <Sparkles size={19} strokeWidth={1.6} aria-hidden="true" />
+          </button>
           <button className="header-icon-button" type="button" aria-label="Notificaciones" title="Notificaciones">
             <Bell size={19} strokeWidth={1.6} aria-hidden="true" />
           </button>

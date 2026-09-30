@@ -5,6 +5,7 @@ let users
 let favorites
 let favoriteLogs
 let playlists
+let artistSpotlightViews
 
 const favoriteCollectionNames = {
   song: 'Mysic_fav_usuarios_can',
@@ -23,6 +24,7 @@ async function connectDatabase(config) {
   )
   favoriteLogs = database.collection('Mysic_fav_logs')
   playlists = database.collection('Mysic_playlist_usuarios')
+  artistSpotlightViews = database.collection('Mysic_artist_spotlight_views')
 
   await Promise.all([
     users.createIndex({ email: 1 }, { unique: true }),
@@ -32,6 +34,7 @@ async function connectDatabase(config) {
     )),
     favoriteLogs.createIndex({ userId: 1, createdAt: -1 }),
     playlists.createIndex({ userId: 1, updatedAt: -1 }),
+    artistSpotlightViews.createIndex({ userId: 1, artistId: 1 }, { unique: true }),
   ])
 
   return database
@@ -61,6 +64,14 @@ function getPlaylistsCollection() {
   return playlists
 }
 
+function getArtistSpotlightViewsCollection() {
+  if (!artistSpotlightViews) {
+    throw new Error('La base de datos todavia no esta conectada.')
+  }
+
+  return artistSpotlightViews
+}
+
 async function closeDatabase() {
   if (client) {
     await client.close()
@@ -70,6 +81,7 @@ async function closeDatabase() {
 module.exports = {
   closeDatabase,
   connectDatabase,
+  getArtistSpotlightViewsCollection,
   getFavoriteCollections,
   getPlaylistsCollection,
   getUsersCollection,

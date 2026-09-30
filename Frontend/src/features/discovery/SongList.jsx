@@ -27,7 +27,9 @@ function SongList({
   preview,
   selectedSongId,
   selectedSongPlaying,
+  showNumbers = false,
   songs,
+  trailingContent,
   title = 'Canciones',
 }) {
   const [page, setPage] = useState(0)
@@ -70,14 +72,14 @@ function SongList({
     <section className="song-section" aria-labelledby="song-list-title">
       <div className="collection-heading">
         <h2 id="song-list-title">{title}</h2>
-        {headingAction ?? <span>{String(songs.length).padStart(2, '0')}</span>}
+        {headingAction}
       </div>
 
       {songs.length > 0 ? (
         <>
           <div className="song-list-frame">
             <div className={`song-list song-list--slide-${direction}`} key={currentPage}>
-              {visibleSongs.map((song) => {
+              {visibleSongs.map((song, index) => {
                 const isSelected = selectedSongId === song.id
                 const isLiked = likedSongIds?.has(song.id)
                 const previewStatus = preview?.itemId === song.id ? preview.status : null
@@ -85,9 +87,14 @@ function SongList({
 
                 return (
                   <div
-                    className={`song-row${isSelected ? ' song-row--active' : ''}${isSelected && selectedSongPlaying ? ' song-row--playing' : ''}${previewStatus ? ` song-row--preview-${previewStatus}` : ''}`}
+                    className={`song-row${showNumbers ? ' song-row--numbered' : ''}${isSelected ? ' song-row--active' : ''}${isSelected && selectedSongPlaying ? ' song-row--playing' : ''}${previewStatus ? ` song-row--preview-${previewStatus}` : ''}`}
                     key={song.id}
                   >
+                    {showNumbers && (
+                      <span className="song-row__number" aria-hidden="true">
+                        {(currentPage * SONGS_PER_PAGE) + index + 1}
+                      </span>
+                    )}
                     <div className="song-row__main">
                       <button
                         className="song-row__artwork playback-hover"
@@ -167,6 +174,7 @@ function SongList({
                   </div>
                 )
               })}
+              {trailingContent}
             </div>
           </div>
 

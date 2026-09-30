@@ -1,8 +1,9 @@
 import { isTauri } from '@tauri-apps/api/core'
 
 const isTauriRuntime = isTauri() || Boolean(window.__TAURI_INTERNALS__)
+const apiHost = isTauriRuntime ? 'localhost' : window.location.hostname
 const defaultApiUrl = import.meta.env.DEV || isTauriRuntime
-  ? `http://localhost:4000/api`
+  ? `http://${apiHost}:4000/api`
   : '/api'
 const API_URL = (import.meta.env.VITE_API_URL || defaultApiUrl).replace(/\/$/, '')
 
@@ -125,6 +126,20 @@ function mapCatalogSong(song) {
   }
 }
 
+function mapCatalogArtist(artist) {
+  if (!artist) return null
+
+  return {
+    ...artist,
+    artistId: artist.id,
+    title: artist.name,
+    artwork: mapCatalogAsset(artist.artwork),
+    images: artist.images?.map(mapCatalogAsset) ?? [],
+    albums: artist.albums.map((album) => ({ ...album, artwork: mapCatalogAsset(album.artwork) })),
+    songs: artist.songs.map(mapCatalogSong),
+  }
+}
+
 export const catalogApi = {
   listSongs: async (search = '') => {
     const query = search ? `?search=${encodeURIComponent(search)}` : ''
@@ -133,14 +148,17 @@ export const catalogApi = {
   },
   getArtist: async (artistId) => {
     const data = await request(`/catalog/artists/${encodeURIComponent(artistId)}`)
-    return {
-      ...data.artist,
-      artwork: mapCatalogAsset(data.artist.artwork),
-      images: data.artist.images?.map(mapCatalogAsset) ?? [],
-      albums: data.artist.albums.map((album) => ({ ...album, artwork: mapCatalogAsset(album.artwork) })),
-      songs: data.artist.songs.map(mapCatalogSong),
-    }
+    return mapCatalogArtist(data.artist)
   },
+  getArtistSpotlight: async ({ includeViewed = false } = {}) => {
+    const query = includeViewed ? '?includeViewed=true' : ''
+    const data = await request(`/catalog/spotlight${query}`)
+    return mapCatalogArtist(data.artist)
+  },
+  markArtistSpotlightViewed: (artistId) => request(
+    `/catalog/spotlight/${encodeURIComponent(artistId)}/viewed`,
+    { method: 'PUT' },
+  ),
   getAlbum: async (albumId) => {
     const data = await request(`/catalog/albums/${encodeURIComponent(albumId)}`)
     return {

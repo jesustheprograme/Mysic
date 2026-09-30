@@ -8,7 +8,7 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint src",
-    "test": "node --test src/lib/tracks.test.js src/features/discovery/paginatedArtwork.test.js",
+    "test": "node --test src/lib/tracks.test.js src/features/discovery/paginatedArtwork.test.js src/features/music-import/musicImportErrors.test.js",
     "preview": "vite preview",
     "tauri": "node scripts/run-tauri.mjs",
     "tauri:dev": "node scripts/run-tauri.mjs dev",

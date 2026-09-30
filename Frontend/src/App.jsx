@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { songs } from './data/music.js'
 import { clearPlaylists, loadPlaylists } from './data/playlists.js'
 import { catalogApi, favoritesApi, playlistsApi } from './lib/api.js'
 import AuthView from './features/auth/AuthView.jsx'
 import useAuth from './features/auth/useAuth.js'
 import DiscoveryView from './features/discovery/DiscoveryView.jsx'
+import NewArtistSpotlightDemo from './features/discovery/NewArtistSpotlightDemo.jsx'
 import MiniPlayer from './features/mini-player/MiniPlayer.tsx'
 import './styles/app.css'
 import './styles/home.css'
@@ -25,20 +26,27 @@ function MainApp() {
   const [playlistsError, setPlaylistsError] = useState('')
   const [navidromeError, setNavidromeError] = useState(null)
 
+  const refreshLibrary = useCallback(async () => {
+    const catalogSongs = await catalogApi.listSongs()
+    const songsWithArtwork = catalogSongs.map((song, index) => ({
+      ...song,
+      artwork: song.artwork ?? songs[index % songs.length]?.artwork ?? null,
+    }))
+    setLibrarySongs(songsWithArtwork)
+    setNavidromeError(catalogSongs.length
+      ? null
+      : { kind: 'empty', message: 'El catálogo PostgreSQL todavía no contiene canciones.' })
+    return songsWithArtwork
+  }, [])
+
   useEffect(() => {
     let cancelled = false
 
     async function loadLibrary() {
       try {
-        const catalogSongs = await catalogApi.listSongs()
+        const catalogSongs = await refreshLibrary()
         if (cancelled) return
         if (catalogSongs.length > 0) {
-          const songsWithArtwork = catalogSongs.map((song, index) => ({
-            ...song,
-            artwork: song.artwork ?? songs[index % songs.length]?.artwork ?? null,
-          }))
-          setLibrarySongs(songsWithArtwork)
-          setNavidromeError(null)
           setLibraryLoading(false)
           return
         }
@@ -59,7 +67,7 @@ function MainApp() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [refreshLibrary])
 
   useEffect(() => {
     let cancelled = false
@@ -278,6 +286,7 @@ function MainApp() {
       )}
       <DiscoveryView
       onLogout={auth.logout}
+      onCatalogRefresh={refreshLibrary}
       onDeletePlaylist={deletePlaylist}
       onImportNav={() => { window.location.hash = '#/importar' }}
       onSearchChange={setSearchQuery}
@@ -305,6 +314,7 @@ function MainApp() {
 
 function App() {
   if (window.__MYSIC_MINI_PLAYER__ || window.location.hash === '#/mini-player') return <MiniPlayer />
+  if (window.location.hash === '#/demo/nuevo-artista') return <NewArtistSpotlightDemo />
   return <MainApp />
 }
 

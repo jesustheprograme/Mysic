@@ -10,6 +10,7 @@ const {
   addEntries,
   updateEntry,
   getEntry,
+  removeEntry,
   setEntryStatus,
 } = require('./ui-state')
 
@@ -112,6 +113,22 @@ test('setEntryStatus updates status and metadata', async () => {
     const errorEntry = await setEntryStatus('song.mp3', 'error', null, 'fpcalc no encontrado')
     assert.equal(errorEntry.status, 'error')
     assert.equal(errorEntry.error, 'fpcalc no encontrado')
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test('removeEntry removes the row and its staged MP3', async () => {
+  const { root, inbox } = await makeState()
+  try {
+    await fs.writeFile(path.join(inbox, 'song.mp3'), 'audio')
+    await addEntries([{ file: 'song.mp3' }])
+
+    const removed = await removeEntry('song.mp3')
+    assert.equal(removed.file, 'song.mp3')
+    assert.equal((await readUiState()).entries.some((entry) => entry.file === 'song.mp3'), false)
+    await assert.rejects(fs.stat(path.join(inbox, 'song.mp3')), { code: 'ENOENT' })
+    await assert.rejects(removeEntry('../song.mp3'), /no es válido/)
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }

@@ -1,0 +1,298 @@
+{
+  "id": "MysicAcq2026A001",
+  "name": "Mysic - Adquisición autorizada",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mysic/acquisition",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "9f36bd93-ea21-48ed-b23e-61d148279c01",
+      "name": "Crear adquisición",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "4e504343-6379-4c52-97f3-f0040a522f6e",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "MYSIC_WEBHOOK_TOKEN",
+          "name": "Mysic webhook token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:4310/jobs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { urls: $json.body.urls, rightsConfirmed: $json.body.rightsConfirmed } }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "b63e4f8e-f227-49ca-978c-c9ce1e798ac9",
+      "name": "Crear trabajo en worker",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "MYSIC_WORKER_TOKEN",
+          "name": "Mysic worker token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "8318666c-ddd0-4539-84d6-43650f2747e0",
+      "name": "Responder con jobId",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "id": "87249db6-6350-4201-97c3-63d2f6bcd353",
+      "name": "Esperar progreso",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [720, 0],
+      "webhookId": "8088025b-68c8-4408-8711-cadbd96f6cc4"
+    },
+    {
+      "parameters": {
+        "url": "=http://127.0.0.1:4310/jobs/{{ $json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "c53975a3-8ecb-410f-8b16-59734ef54c30",
+      "name": "Consultar progreso interno",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "MYSIC_WORKER_TOKEN",
+          "name": "Mysic worker token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "e89eaebe-766c-44c5-8804-4e6812dcf107",
+              "leftValue": "={{ ['completed', 'completed_with_errors', 'failed', 'cancelled'].includes($json.status) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8b929afe-7de0-473a-88ca-1fe05193ad71",
+      "name": "¿Trabajo terminado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1200, 0]
+    },
+    {
+      "parameters": {},
+      "id": "49af70e3-f1aa-44b5-99fa-6d2b1c3c7c68",
+      "name": "Resumen final",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1440, -80]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "mysic/acquisition/status",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "e2ff7cbe-35ca-4543-807e-ec46f215ef5e",
+      "name": "Consultar adquisición",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 320],
+      "webhookId": "cd94d0b0-c433-438c-a23d-d99fa861663f",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "MYSIC_WEBHOOK_TOKEN",
+          "name": "Mysic webhook token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=http://127.0.0.1:4310/jobs/{{ $json.query.jobId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "e7149df9-9fa8-4fb3-83aa-174ec6b18dfd",
+      "name": "Leer trabajo del worker",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 320],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "MYSIC_WORKER_TOKEN",
+          "name": "Mysic worker token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "d6758900-c2bc-4bc5-84ce-92f8775ab175",
+      "name": "Responder progreso",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [480, 320]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mysic/acquisition/cancel",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "c3f81917-75fd-46ae-ab7f-d3fb1fa1002a",
+      "name": "Cancelar adquisición",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 560],
+      "webhookId": "1139f920-570d-468d-b0d9-f7436ba049f6",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "MYSIC_WEBHOOK_TOKEN",
+          "name": "Mysic webhook token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:4310/jobs/{{ $json.body.jobId }}/cancel",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "c07658c8-89ca-48dd-81b1-d11d85379b24",
+      "name": "Cancelar trabajo en worker",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 560],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "MYSIC_WORKER_TOKEN",
+          "name": "Mysic worker token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "c750af3f-38e4-45e0-800d-dc68b828e47a",
+      "name": "Responder cancelación",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [480, 560]
+    }
+  ],
+  "connections": {
+    "Crear adquisición": {
+      "main": [[{ "node": "Crear trabajo en worker", "type": "main", "index": 0 }]]
+    },
+    "Crear trabajo en worker": {
+      "main": [[{ "node": "Responder con jobId", "type": "main", "index": 0 }]]
+    },
+    "Responder con jobId": {
+      "main": [[{ "node": "Esperar progreso", "type": "main", "index": 0 }]]
+    },
+    "Esperar progreso": {
+      "main": [[{ "node": "Consultar progreso interno", "type": "main", "index": 0 }]]
+    },
+    "Consultar progreso interno": {
+      "main": [[{ "node": "¿Trabajo terminado?", "type": "main", "index": 0 }]]
+    },
+    "¿Trabajo terminado?": {
+      "main": [
+        [{ "node": "Resumen final", "type": "main", "index": 0 }],
+        [{ "node": "Esperar progreso", "type": "main", "index": 0 }]
+      ]
+    },
+    "Consultar adquisición": {
+      "main": [[{ "node": "Leer trabajo del worker", "type": "main", "index": 0 }]]
+    },
+    "Leer trabajo del worker": {
+      "main": [[{ "node": "Responder progreso", "type": "main", "index": 0 }]]
+    },
+    "Cancelar adquisición": {
+      "main": [[{ "node": "Cancelar trabajo en worker", "type": "main", "index": 0 }]]
+    },
+    "Cancelar trabajo en worker": {
+      "main": [[{ "node": "Responder cancelación", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "executionTimeout": 21600
+  },
+  "versionId": "296bf2fd-fcb0-4c10-9010-33b02c6699ad",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

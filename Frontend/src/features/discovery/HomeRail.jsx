@@ -14,6 +14,7 @@ function HomeRail({
   selectedId,
   selectedItemPlaying,
   title,
+  trailingContent,
   variant = 'default',
 }) {
   const railRef = useRef(null)
@@ -83,6 +84,7 @@ function HomeRail({
             </article>
           )
         })}
+        {trailingContent}
       </div> : <div className="home-shelf__empty" role="status">{emptyMessage}</div>}
     </section>
   )

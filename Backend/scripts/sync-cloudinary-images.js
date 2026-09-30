@@ -147,6 +147,25 @@ function buildImageCandidates(assets, config) {
 async function syncCloudinaryImages(database, candidates) {
   const skipped = []
   let linked = 0
+  const profileUrls = new Set(
+    candidates
+      .filter((candidate) => candidate.kind === 'profile')
+      .map((candidate) => candidate.url),
+  )
+  const cloudinaryProfileImages = await database.artistProfileImage.findMany({
+    where: { url: { startsWith: 'https://res.cloudinary.com/' } },
+    select: { id: true, url: true },
+  })
+  const staleProfileImageIds = cloudinaryProfileImages
+    .filter((image) => !profileUrls.has(image.url))
+    .map((image) => image.id)
+
+  if (staleProfileImageIds.length) {
+    await database.artistProfileImage.deleteMany({
+      where: { id: { in: staleProfileImageIds } },
+    })
+  }
+
   for (const candidate of candidates) {
     const artist = await database.artist.findFirst({ where: { name: candidate.artistName } })
     if (!artist) {
@@ -184,7 +203,7 @@ async function syncCloudinaryImages(database, candidates) {
     })
     linked += 1
   }
-  return { linked, skipped }
+  return { linked, removed: staleProfileImageIds.length, skipped }
 }
 
 async function main() {
@@ -212,7 +231,7 @@ async function main() {
   const database = new PrismaClient()
   try {
     const result = await syncCloudinaryImages(database, candidates)
-    console.log(`Imágenes vinculadas: ${result.linked}/${candidates.length}.`)
+    console.log(`Imágenes vinculadas: ${result.linked}/${candidates.length}. Referencias obsoletas eliminadas: ${result.removed}.`)
     result.skipped.forEach((item) => console.warn(`Omitida en ${item.folder}: ${item.reason}`))
   } finally {
     await database.$disconnect()

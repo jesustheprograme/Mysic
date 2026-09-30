@@ -2,6 +2,7 @@ const crypto = require('node:crypto')
 const fs = require('node:fs/promises')
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
+const releaseDates = require('../catalog/release-dates.json')
 
 require('dotenv').config({
   path: path.join(__dirname, '..', '.env'),
@@ -167,6 +168,8 @@ async function importCandidate(prisma, candidate) {
     `song:${candidate.relativePath.toLocaleLowerCase('es')}`,
   )
   const mediaUrl = candidate.mediaUrl || pathToFileURL(candidate.absolutePath).href
+  const knownReleaseDate = releaseDates[candidate.artistName]?.[candidate.albumTitle]
+  const releaseDate = knownReleaseDate ? new Date(knownReleaseDate) : undefined
 
   return prisma.$transaction(async (database) => {
     const artist = await database.artist.upsert({
@@ -176,8 +179,8 @@ async function importCandidate(prisma, candidate) {
     })
     const album = await database.album.upsert({
       where: { slug: albumSlug },
-      update: { title: candidate.albumTitle },
-      create: { title: candidate.albumTitle, slug: albumSlug },
+      update: { title: candidate.albumTitle, releaseDate },
+      create: { title: candidate.albumTitle, slug: albumSlug, releaseDate },
     })
     const [assetWithSong, songBySlug, trackAtPosition] = await Promise.all([
       database.mediaAsset.findFirst({

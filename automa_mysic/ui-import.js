@@ -3,14 +3,22 @@ const path = require('node:path')
 const { execFile } = require('node:child_process')
 const { promisify } = require('node:util')
 
-const { readUiState, addEntries, analyzeEntries, INBOX_ROOT, STATE_PATH } = require('./ui-state')
+const { readUiState, addEntries, analyzeEntries, getInboxRoot, removeEntry } = require('./ui-state')
 const { readManifest } = require('./import-music')
+const { appendErrorLog } = require('./error-log')
 
 const execFileAsync = promisify(execFile)
 
+function loadEnv() {
+  require('dotenv').config({ path: path.join(__dirname, '..', 'Backend', '.env'), quiet: true })
+  require('dotenv').config({ path: path.join(__dirname, '.env'), quiet: true })
+}
+
+loadEnv()
+
 async function stageFiles(sourcePaths) {
   const root = path.resolve(__dirname, '..', '..')
-  const inboxRoot = INBOX_ROOT
+  const inboxRoot = getInboxRoot()
 
   await fs.mkdir(inboxRoot, { recursive: true })
 
@@ -49,9 +57,8 @@ async function fileExists(filePath) {
 
 async function runAnalysisCommand(options = {}) {
   const state = await readUiState()
-  const pending = state.entries.filter((e) => e.status === 'pending')
 
-  if (!pending.length) {
+  if (!state.entries.length) {
     return { analyzed: 0, results: [] }
   }
 
@@ -73,7 +80,7 @@ async function generateImportJson() {
 
   const imports = ready.map((e) => ({
     file: e.file,
-    metadataSource: 'musicbrainz',
+    metadataSource: e.metadata?.metadataSource === 'musicbrainz' ? 'musicbrainz' : 'manual',
     artist: e.metadata?.artist || undefined,
     title: e.metadata?.title || undefined,
     kind: e.metadata?.kind || undefined,
@@ -83,18 +90,12 @@ async function generateImportJson() {
     trackNumber: e.metadata?.trackNumber || undefined,
     musicbrainzRecordingId: e.metadata?.musicbrainzRecordingId || undefined,
     cloudinaryFolder: e.cloudinaryFolder,
-  }).filter((v, k, arr) => {
-    for (const key of ['artist', 'title', 'kind', 'releaseName', 'trackNumber']) {
-      if (!v[key]) {
-        arr.splice(k, 1)
-        break
-      }
-    }
-    return true
-  }))
+  })).filter((entry) => (
+    ['artist', 'title', 'kind', 'releaseName', 'year', 'trackNumber'].every((key) => entry[key])
+  ))
 
-  const manifestPath = path.join(INBOX_ROOT, 'import.json')
-  await fs.mkdir(INBOX_ROOT, { recursive: true })
+  const manifestPath = path.join(getInboxRoot(), 'import.json')
+  await fs.mkdir(getInboxRoot(), { recursive: true })
   await fs.writeFile(manifestPath, JSON.stringify({ imports }, null, 2), 'utf8')
   return imports.length
 }
@@ -136,13 +137,23 @@ async function main() {
       break
     }
 
+    case 'remove': {
+      const file = process.argv[3]
+      if (!file) throw new Error('Indica el archivo que se debe eliminar.')
+      await removeEntry(file)
+      await generateImportJson()
+      console.log(JSON.stringify({ removed: file }, null, 2))
+      break
+    }
+
     default:
-      console.error('Uso: node ui-import.js {stage|analyze|import-json|state}')
+      console.error('Uso: node ui-import.js {stage|analyze|import-json|state|remove}')
       process.exit(1)
   }
 }
 
-if (require.main === module) main().catch((error) => {
+if (require.main === module) main().catch(async (error) => {
+  await appendErrorLog('ui-import', error, { command: process.argv[2] }).catch(() => {})
   console.error(JSON.stringify({ error: error.message }))
   process.exitCode = 1
 })

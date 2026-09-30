@@ -1,6 +1,9 @@
 const fs = require('node:fs/promises')
 const path = require('node:path')
 
+const { containsJapanese, hasRomanizedSuffix } = require('./release-title')
+const { normalizeGenres } = require('./genres')
+
 const IMAGE_FORMATS = new Set(['jpg', 'jpeg', 'png', 'webp', 'avif'])
 
 function cleanSegment(value, field) {
@@ -36,9 +39,7 @@ function normalizeEntry(raw) {
   const year = raw.year == null || raw.year === '' ? null : Number(raw.year)
   if (year != null && (!Number.isInteger(year) || year < 1 || year > 9999)) throw new Error('year no es válido.')
 
-  const genres = Array.isArray(raw.genres)
-    ? [...new Set(raw.genres.map((genre) => String(genre).trim()).filter(Boolean))]
-    : []
+  const genres = normalizeGenres(Array.isArray(raw.genres) ? raw.genres : [])
 
   return {
     file,
@@ -59,10 +60,32 @@ function normalizeEntry(raw) {
   }
 }
 
-function buildDestination(libraryRoot, entry) {
+function destinationParts(entry) {
+  const artist = cleanSegment(entry.artist, 'artist')
+  const title = cleanSegment(entry.title, 'title')
+  const releaseName = cleanSegment(entry.releaseName, 'releaseName')
+  if (containsJapanese(title) && !hasRomanizedSuffix(title)) {
+    throw new Error('El título japonés necesita una romanización oficial entre paréntesis.')
+  }
+  if (!['album', 'single'].includes(entry.kind)) throw new Error('kind debe ser album o single.')
+  const trackNumber = Number(entry.trackNumber)
+  if (!Number.isInteger(trackNumber) || trackNumber < 1) throw new Error('trackNumber debe ser un entero positivo.')
+
   const kindFolder = entry.kind === 'album' ? 'Albums' : 'Singles'
-  const fileName = `${String(entry.trackNumber).padStart(2, '0')} - ${entry.title}.mp3`
-  return path.join(libraryRoot, 'Artistas', entry.artist, kindFolder, entry.releaseName, fileName)
+  const fileName = `${String(trackNumber).padStart(2, '0')} - ${title}.mp3`
+  return ['Artistas', artist, kindFolder, releaseName, fileName]
+}
+
+function buildReleaseFolder(entry) {
+  return destinationParts(entry).slice(0, -1).join('/')
+}
+
+function buildRelativeDestination(entry) {
+  return destinationParts(entry).join('/')
+}
+
+function buildDestination(libraryRoot, entry) {
+  return path.join(libraryRoot, ...destinationParts(entry))
 }
 
 function getAssetFolder(asset, folderMode) {
@@ -101,6 +124,8 @@ async function readManifest(manifestPath) {
 
 module.exports = {
   buildDestination,
+  buildRelativeDestination,
+  buildReleaseFolder,
   normalizeEntry,
   readManifest,
   selectCoverForFolder,

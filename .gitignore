@@ -26,6 +26,8 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 automa_mysic/asignar_metadatos/.state.json
+automa_mysic/asignar_metadatos/.acquisition-index.json
+automa_mysic/acquisition-data/
 automa_mysic/biblioteca/
 
 # Editors and operating systems

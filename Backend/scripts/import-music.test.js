@@ -4,7 +4,8 @@ const { parseTrackFileName } = require('./import-music')
 const { loadAlbumLinkManifests, resolveSourceSong } = require('./link-album-tracks')
 const { candidateFromNavidromeSong } = require('./sync-navidrome')
 const { parseRemoteImagePath } = require('./sync-images')
-const { buildImageCandidates, listCloudinaryImages } = require('./sync-cloudinary-images')
+const { buildImageCandidates, listCloudinaryImages, syncCloudinaryImages } = require('./sync-cloudinary-images')
+const { mapImage } = require('../src/catalog')
 
 test('extrae disco, pista y título de un álbum multidisco', () => {
   assert.deepEqual(
@@ -192,4 +193,49 @@ test('lee todas las páginas de la búsqueda de Cloudinary', async () => {
 
   assert.deepEqual(cursors, [null, 'page-two'])
   assert.deepEqual(assets.map((asset) => asset.public_id), ['first', 'second'])
+})
+
+test('elimina retratos de perfil que ya no existen en Cloudinary', async () => {
+  const deletedIds = []
+  const upserts = []
+  const currentUrl = 'https://res.cloudinary.com/example/image/upload/v2/current.webp'
+  const database = {
+    artist: {
+      findFirst: async () => ({ id: 'artist-1' }),
+    },
+    artistProfileImage: {
+      findMany: async () => [
+        { id: 'current', url: currentUrl },
+        { id: 'stale', url: 'https://res.cloudinary.com/example/image/upload/v1/deleted.webp' },
+      ],
+      deleteMany: async ({ where }) => {
+        deletedIds.push(...where.id.in)
+      },
+      upsert: async (operation) => {
+        upserts.push(operation)
+      },
+    },
+  }
+
+  const result = await syncCloudinaryImages(database, [{
+    artistName: 'Ado',
+    folder: 'Artistas/Ado/Perfil',
+    kind: 'profile',
+    position: 1,
+    url: currentUrl,
+  }])
+
+  assert.deepEqual(deletedIds, ['stale'])
+  assert.equal(upserts.length, 1)
+  assert.equal(result.linked, 1)
+  assert.equal(result.removed, 1)
+})
+
+test('incluye la versión de Cloudinary para invalidar portadas reemplazadas', () => {
+  const image = {
+    id: 'image-1',
+    url: 'https://res.cloudinary.com/example/image/upload/v1790480000/cover.webp',
+  }
+
+  assert.equal(mapImage(image), '/catalog/images/image-1?v=1790480000')
 })

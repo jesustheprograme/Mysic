@@ -1,6 +1,10 @@
 const fs = require('node:fs/promises')
 const path = require('node:path')
 
+const { buildRelativeDestination, buildReleaseFolder } = require('./import-music')
+const { primaryArtist } = require('./artist')
+const { identifyFromSource, sourceId } = require('./source-metadata')
+
 function getInboxRoot() {
   return path.join(process.env.UI_STATE_DIR || __dirname, 'asignar_metadatos')
 }
@@ -13,6 +17,20 @@ const DEFAULT_STATE = { entries: [] }
 
 function cleanString(value) {
   return String(value || '').trim()
+}
+
+function deriveDestinations(metadata, currentCloudinaryFolder = null) {
+  const entry = {
+    artist: metadata.artist,
+    title: metadata.title,
+    kind: metadata.kind,
+    releaseName: metadata.album,
+    trackNumber: metadata.trackNumber,
+  }
+  return {
+    cloudinaryFolder: currentCloudinaryFolder || buildReleaseFolder(entry),
+    remoteDestination: buildRelativeDestination(entry),
+  }
 }
 
 async function readUiState() {
@@ -77,6 +95,22 @@ async function getEntry(file) {
   return state.entries.find((e) => e.file === file) ?? null
 }
 
+async function removeEntry(file) {
+  const cleanFile = cleanString(file)
+  if (!cleanFile || path.basename(cleanFile) !== cleanFile || path.extname(cleanFile).toLowerCase() !== '.mp3') {
+    throw new Error('El nombre del MP3 no es válido.')
+  }
+
+  const state = await readUiState()
+  const entry = state.entries.find((item) => item.file === cleanFile)
+  if (!entry) throw new Error(`No se encontro la entrada: ${cleanFile}`)
+
+  await fs.rm(path.join(getInboxRoot(), cleanFile), { force: true })
+  state.entries = state.entries.filter((item) => item.file !== cleanFile)
+  await writeUiState(state)
+  return entry
+}
+
 async function setEntryStatus(file, status, metadata = null, error = null) {
   const updates = { status, lastModified: new Date().toISOString() }
   if (metadata !== null) updates.metadata = metadata
@@ -87,9 +121,36 @@ async function setEntryStatus(file, status, metadata = null, error = null) {
 async function analyzeEntries(fpcalcPath, acoustIdApiKey, fetchJson, runFpcalc, wait, minimumScore) {
   const state = await readUiState()
   const results = []
+  const picardBatch = await preparePicardBatch(state.entries)
 
   for (const entry of state.entries) {
-    if (entry.status === 'ready' || entry.status === 'processed') {
+    const needsSourceRefresh = entry.status === 'ready'
+      && sourceId(entry.file)
+      && entry.metadata?.metadataSource !== 'source'
+    if ((entry.status === 'ready' && !needsSourceRefresh) || entry.status === 'processed') {
+      try {
+        let metadata = entry.metadata
+        if (entry.metadata?.musicbrainzReleaseId) {
+          const { completePicardMetadata } = require('./picard')
+          const refreshed = await completePicardMetadata({
+            ...entry.metadata,
+            releaseName: entry.metadata.album,
+          })
+          if (refreshed.releaseName !== entry.metadata.album) {
+            metadata = { ...entry.metadata, album: refreshed.releaseName }
+          }
+          if (refreshed.title !== metadata.title) {
+            metadata = { ...metadata, title: refreshed.title }
+          }
+        }
+        await updateEntry(entry.file, {
+          metadata,
+          ...deriveDestinations(metadata, entry.cloudinaryFolder),
+        })
+      } catch (error) {
+        results.push({ file: entry.file, status: 'skipped', reason: `No se pudo actualizar el álbum: ${error.message}` })
+        continue
+      }
       results.push({ file: entry.file, status: 'skipped', reason: 'Ya tiene metadatos.' })
       continue
     }
@@ -102,11 +163,15 @@ async function analyzeEntries(fpcalcPath, acoustIdApiKey, fetchJson, runFpcalc, 
         runFpcalc,
         wait,
         minimumScore,
+        identifiedEntry: picardBatch.get(entry.file),
       })
       await updateEntry(entry.file, {
         status: 'ready',
         metadata: result.metadata,
-        cloudinaryFolder: entry.cloudinaryFolder,
+        ...deriveDestinations(
+          result.metadata,
+          entry.metadata?.metadataSource === result.metadata.metadataSource ? entry.cloudinaryFolder : null,
+        ),
         error: null,
         embeddedCover: result.embeddedCover,
       })
@@ -134,17 +199,32 @@ async function runAnalysis(file, options) {
     minimumScore = Number(process.env.ACOUSTID_MIN_SCORE) || 0.85,
   } = options
 
-  const { resolveMusicBrainzEntry } = require('./musicbrainz')
-
   const sourcePath = path.join(getInboxRoot(), file)
-  const entry = await resolveMusicBrainzEntry(
-    { file, filePath: sourcePath },
-    { fpcalcPath, acoustIdApiKey, fetchJson, runFpcalc, wait, minimumScore },
-  )
+  let entry
+  if (options.identifiedEntry) {
+    if (options.identifiedEntry.error) throw options.identifiedEntry.error
+    entry = { file, filePath: sourcePath, ...options.identifiedEntry.metadata }
+  } else if (sourceId(file)) {
+    try {
+      entry = { file, filePath: sourcePath, ...(await identifyFromSource(file)) }
+    } catch (sourceError) {
+      try {
+        entry = await identifyWithConfiguredEngine(file, sourcePath, {
+          fpcalcPath, acoustIdApiKey, fetchJson, runFpcalc, wait, minimumScore,
+        })
+      } catch (fallbackError) {
+        throw new Error(`Origen: ${sourceError.message} Respaldo: ${fallbackError.message}`)
+      }
+    }
+  } else {
+    entry = await identifyWithConfiguredEngine(file, sourcePath, {
+      fpcalcPath, acoustIdApiKey, fetchJson, runFpcalc, wait, minimumScore,
+    })
+  }
 
   return {
     metadata: {
-      artist: entry.artist,
+      artist: primaryArtist(entry.artist),
       title: entry.title,
       album: entry.releaseName,
       year: entry.year,
@@ -152,10 +232,45 @@ async function runAnalysis(file, options) {
       trackNumber: entry.trackNumber,
       kind: entry.kind,
       musicbrainzRecordingId: entry.musicbrainzRecordingId,
-      confidence: null,
+      musicbrainzReleaseId: entry.musicbrainzReleaseId,
+      confidence: entry.confidence,
+      metadataSource: entry.metadataSource || 'musicbrainz',
     },
     embeddedCover: false,
   }
+}
+
+async function preparePicardBatch(entries) {
+  const batch = new Map()
+  if (String(process.env.METADATA_ENGINE || '').toLowerCase() !== 'picard') return batch
+
+  const candidates = entries.filter((entry) => (
+    !['ready', 'processed'].includes(entry.status) && !sourceId(entry.file)
+  ))
+  if (!candidates.length) return batch
+
+  const { identifyManyWithPicard } = require('./picard')
+  const paths = candidates.map((entry) => path.join(getInboxRoot(), entry.file))
+  try {
+    const identified = await identifyManyWithPicard(paths)
+    for (const result of identified) batch.set(path.basename(result.filePath), result)
+  } catch (error) {
+    for (const entry of candidates) batch.set(entry.file, { error })
+  }
+  return batch
+}
+
+async function identifyWithConfiguredEngine(file, sourcePath, options) {
+  if (String(process.env.METADATA_ENGINE || '').toLowerCase() === 'picard') {
+    const { identifyWithPicard } = require('./picard')
+    return { file, filePath: sourcePath, ...(await identifyWithPicard(sourcePath)) }
+  }
+
+  const { resolveMusicBrainzEntry } = require('./musicbrainz')
+  return resolveMusicBrainzEntry(
+    { file, filePath: sourcePath },
+    options,
+  )
 }
 
 async function defaultFetchJson(url) {
@@ -182,6 +297,7 @@ module.exports = {
   addEntries,
   updateEntry,
   getEntry,
+  removeEntry,
   setEntryStatus,
   analyzeEntries,
   getInboxRoot,
