@@ -9,7 +9,6 @@
   overflow: hidden;
   isolation: isolate;
 }
-
 .playlist-page--reference::before {
   position: absolute;
   z-index: -2;

@@ -4,7 +4,6 @@
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   grid-template-rows: 64px minmax(0, 1fr) 0;
 }
-
 .music-app--sidebar-collapsed {
   --sidebar-width: 92px;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);

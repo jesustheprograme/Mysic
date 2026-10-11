@@ -14,7 +14,6 @@
     grid-template-columns 280ms cubic-bezier(0.22, 1, 0.36, 1),
     grid-template-rows 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-
 .music-app--sidebar-collapsed {
   grid-template-columns: 92px minmax(0, 1fr);
 }

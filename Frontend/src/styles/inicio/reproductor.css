@@ -9,7 +9,6 @@
   grid-template-rows: 64px minmax(0, 1fr);
   transition: grid-template-columns var(--caelestia-spatial-duration) var(--caelestia-spatial-ease);
 }
-
 .music-app--player-open {
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr) 332px;
   grid-template-rows: 64px minmax(0, 1fr);

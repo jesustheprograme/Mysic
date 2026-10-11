@@ -7,4 +7,3 @@ Wants=network-online.target
 Type=oneshot
 EnvironmentFile=/etc/mysic/duckdns.env
 ExecStart=/usr/local/sbin/update-mysic-duckdns
-

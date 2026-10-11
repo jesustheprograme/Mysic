@@ -3,7 +3,6 @@
   border-color: rgba(255, 255, 255, 0.1);
   background: linear-gradient(105deg, #0b0d0d, #121515 58%, #080a0a);
 }
-
 .new-artist-card__button:hover {
   border-color: rgba(255, 255, 255, 0.25);
 }

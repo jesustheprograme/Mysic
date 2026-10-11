@@ -11,4 +11,3 @@ if [[ "$response" != "OK" ]]; then
   echo "DuckDNS respondió: $response" >&2
   exit 1
 fi
-
