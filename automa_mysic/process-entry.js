@@ -12,6 +12,7 @@ function writeId3Tags(filePath, tags) {
     year: tags.year ? String(tags.year) : undefined,
     genre: tags.genres?.join('; '),
     trackNumber: tags.trackNumber ? String(tags.trackNumber) : undefined,
+    userDefinedText: tags.kind ? [{ description: 'MusicBrainz Album Type', value: tags.kind }] : undefined,
   }
   if (tags.coverBuffer) {
     id3Tags.image = {
@@ -69,6 +70,7 @@ async function processEntry(entry, dependencies) {
       album: entry.releaseName,
       year: entry.year,
       genres: entry.genres,
+      kind: entry.kind,
       trackNumber: entry.trackNumber,
       coverBuffer,
       coverMime: cover?.format ? `image/${cover.format === 'jpg' ? 'jpeg' : cover.format}` : null,

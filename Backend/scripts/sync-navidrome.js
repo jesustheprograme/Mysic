@@ -5,7 +5,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env'), quiet: true
 const { PrismaClient } = require('@prisma/client')
 const { getConfig } = require('../src/config')
 const { navidromeRequest } = require('../src/navidrome')
-const { assignTrackNumbers, importCandidate, parseTrackFileName } = require('./import-music')
+const { assignTrackNumbers, importCandidate, normalizeGenres, parseTrackFileName } = require('./import-music')
 
 const PAGE_SIZE = 500
 
@@ -50,10 +50,12 @@ function candidateFromNavidromeSong(song, { preferFilename = false } = {}) {
     relativePath: relativePath || `${artistName}/${albumTitle}/${fileName}`,
     artistName: artistName.trim(),
     albumTitle: albumTitle.trim(),
+    releaseType: category === 'singles' ? 'single' : category === 'eps' ? 'ep' : 'album',
     title: cleanName(parsedName.title || song.title) || 'Sin título',
     requestedDiscNo,
     requestedTrackNo,
     durationSec: Number(song.duration) || null,
+    genres: normalizeGenres(song.genre),
     mediaUrl: `navidrome:${song.id}`,
     structuredPath,
   }

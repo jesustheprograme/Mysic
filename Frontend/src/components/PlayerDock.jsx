@@ -5,122 +5,43 @@ import {
   Play,
   SkipBack,
   SkipForward,
-  Volume2,
-  VolumeX,
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
+import { takePrimedAudio } from '../features/auth/autoplayUnlock.js'
 import { listenToMiniPlayerCommands } from '../features/mini-player/playerBridge.ts'
+import { connectAudioAnalyser, disconnectAudioAnalyser } from '../lib/audioAnalyser.js'
 import HeartToggle from './HeartToggle.jsx'
+import {
+  CompactNowPlaying,
+  PlayerDiscoveryLoader,
+  PlayerPanelToggleIcon,
+  VolumeControl,
+} from './reproductor/ControlesReproductor.jsx'
+import {
+  createWaveformPeaks,
+  formatTime,
+  getMediaSessionArtwork,
+  setMediaSessionAction,
+} from './reproductor/utilidadesReproductor.js'
 
-function PlayerPanelToggleIcon({ collapsed }) {
-  return (
-    <svg width="1em" height="1em" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M0 0h24v24H0z" fill="none" />
-      <path
-        fill="currentColor"
-        d={collapsed
-          ? 'M11.28 9.53L8.81 12l2.47 2.47a.749.749 0 0 1-.326 1.275.75.75 0 0 1-.734-.215l-3-3a.75.75 0 0 1 0-1.06l3-3a.749.749 0 0 1 1.275.326.75.75 0 0 1-.215.734'
-          : 'M7.22 14.47L9.69 12 7.22 9.53a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215l3 3a.75.75 0 0 1 0 1.06l-3 3a.75.75 0 0 1-1.042-.018.75.75 0 0 1-.018-1.042'}
-      />
-      <path
-        fill="currentColor"
-        d="M3.75 2h16.5c.966 0 1.75.784 1.75 1.75v16.5A1.75 1.75 0 0 1 20.25 22H3.75A1.75 1.75 0 0 1 2 20.25V3.75C2 2.784 2.784 2 3.75 2M3.5 3.75v16.5c0 .138.112.25.25.25H15v-17H3.75a.25.25 0 0 0-.25.25m13 16.75h3.75a.25.25 0 0 0 .25-.25V3.75a.25.25 0 0 0-.25-.25H16.5Z"
-      />
-    </svg>
-  )
-}
-
-function formatTime(seconds) {
-  const safeSeconds = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0
-  const minutes = Math.floor(safeSeconds / 60)
-  return `${minutes}:${String(safeSeconds % 60).padStart(2, '0')}`
-}
-
-function createWaveformPeaks(seed, count = 96) {
-  let hash = Array.from(String(seed ?? 'track')).reduce((value, character) => (
-    ((value * 31) + character.charCodeAt(0)) >>> 0
-  ), 7)
-
-  return Array.from({ length: count }, (_, index) => {
-    hash = (hash * 1664525 + 1013904223) >>> 0
-    const noise = hash / 0xffffffff
-    const envelope = 0.55 + Math.sin((index / count) * Math.PI) * 0.45
-    return Math.min(1, Math.max(0.12, (0.35 + noise * 0.65) * envelope))
-  })
-}
-
-function VolumeControl({ expanded, onExpandedChange, onVolumeChange, volume }) {
-  const Icon = volume === 0 ? VolumeX : Volume2
-  const closeTimerRef = useRef(null)
-  const [hoverOpen, setHoverOpen] = useState(false)
-  const open = expanded || hoverOpen
-
-  useEffect(() => () => clearTimeout(closeTimerRef.current), [])
-
-  function openFromPointer() {
-    clearTimeout(closeTimerRef.current)
-    setHoverOpen(true)
-  }
-
-  function closeFromPointer() {
-    clearTimeout(closeTimerRef.current)
-    closeTimerRef.current = setTimeout(() => setHoverOpen(false), 320)
-  }
-
-  return (
-    <div
-      className={`volume-control${open ? ' volume-control--open' : ''}${expanded ? ' volume-control--pinned' : ''}`}
-      onPointerEnter={openFromPointer}
-      onPointerLeave={closeFromPointer}
-    >
-      <input
-        className="volume-control__level"
-        type="range"
-        min="0"
-        max="100"
-        value={volume}
-        aria-label="Volumen"
-        onChange={(event) => onVolumeChange(Number(event.target.value))}
-        style={{ '--volume-level': `${volume}%` }}
-      />
-      <button
-        className="volume-control__button"
-        type="button"
-        aria-expanded={expanded}
-        aria-label={expanded ? 'Cerrar control de volumen' : 'Mantener control de volumen abierto'}
-        title={expanded ? 'Cerrar control de volumen' : 'Mantener control de volumen abierto'}
-        onClick={() => onExpandedChange(!expanded)}
-      >
-        <Icon size={20} strokeWidth={1.7} aria-hidden="true" />
-      </button>
-    </div>
-  )
-}
-
-function PlayerDiscoveryLoader() {
-  return (
-    <div className="player-discovery-loader" role="status" aria-live="polite">
-      <p>Preparando tu descubrimiento</p>
-      <div className="player-discovery-loader__spinner-container" aria-hidden="true">
-        <div className="player-discovery-loader__spinner" />
-      </div>
-      <span>Estamos mezclando canciones para ti</span>
-    </div>
-  )
-}
-
-function PlayerDock({ animationNonce, collapsed = false, isLoading = false, liked = false, onClose, onNext, onOpenMiniPlayer, onPlaybackChange, onPlaybackStateChange, onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, playbackToggleNonce, queue, track }) {
+function PlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoading = false, liked = false, onAnalyserChange, onClose, onNext, onOpenMiniPlayer, onPlaybackChange, onPlaybackStateChange, onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, playbackToggleNonce, queue, suppressed = false, track }) {
   const PAUSE_FADE_DURATION_MS = 400
+  const START_FADE_DURATION_MS = 1200
   const waveformRef = useRef(null)
   const waveSurferRef = useRef(null)
   const hasMountedRef = useRef(false)
   const previousTrackRef = useRef({ audioUrl: track.audioUrl, id: track.id })
   const trackDurationRef = useRef(track.durationSeconds ?? 0)
   const volumeRef = useRef(75)
+  const fadeInFrameRef = useRef(null)
+  const fadeInNonceRef = useRef(0)
+  const fadeInPendingRef = useRef(false)
   const pauseFadeRef = useRef({ frameId: null, resolve: null, promise: null, waveSurfer: null })
   const onPlaybackStateChangeRef = useRef(onPlaybackStateChange)
+  const onNextRef = useRef(onNext)
+  const nextTrackPreloadRef = useRef(null)
   const playbackStateRef = useRef({
     currentTime: 0,
     duration: track.durationSeconds ?? 0,
@@ -132,8 +53,11 @@ function PlayerDock({ animationNonce, collapsed = false, isLoading = false, like
   const [isPlaying, setIsPlaying] = useState(false)
   const [volume, setVolume] = useState(75)
   const [volumeExpanded, setVolumeExpanded] = useState(false)
-  const [animationEnabled, setAnimationEnabled] = useState(true)
+  const [trackChangeAnimationEnabled, setTrackChangeAnimationEnabled] = useState(false)
+  const [analyser, setAnalyser] = useState(null)
   const hasAudio = Boolean(track.audioUrl)
+  const nextTrackAudioUrl = queue[0]?.audioUrl ?? null
+  const notifyAnalyserChange = useEffectEvent((nextAnalyser) => onAnalyserChange?.(nextAnalyser))
 
   const notifyPlaybackState = useCallback((patch) => {
     const nextPlaybackState = { ...playbackStateRef.current, ...patch }
@@ -155,9 +79,57 @@ function PlayerDock({ animationNonce, collapsed = false, isLoading = false, like
     onPlaybackStateChangeRef.current = onPlaybackStateChange
   }, [onPlaybackStateChange])
 
+  useEffect(() => {
+    onNextRef.current = onNext
+  }, [onNext, nextTrackAudioUrl])
+
+  useEffect(() => {
+    const connection = navigator.connection
+    if (!nextTrackAudioUrl || connection?.saveData || /(^|-)2g$/.test(connection?.effectiveType || '')) {
+      nextTrackPreloadRef.current = null
+      return undefined
+    }
+
+    const audio = new Audio()
+    audio.crossOrigin = 'anonymous'
+    audio.preload = 'none'
+    audio.src = nextTrackAudioUrl
+    nextTrackPreloadRef.current = { audio, started: false }
+
+    return () => {
+      audio.removeAttribute('src')
+      audio.load()
+      if (nextTrackPreloadRef.current?.audio === audio) nextTrackPreloadRef.current = null
+    }
+  }, [nextTrackAudioUrl])
+
   const setOutputVolume = useCallback((nextVolume) => {
     const normalizedVolume = Math.min(Math.max(nextVolume / 100, 0), 1)
     waveSurferRef.current?.setVolume(normalizedVolume)
+  }, [])
+
+
+  const startFadeIn = useCallback((waveSurfer) => {
+    if (fadeInFrameRef.current !== null) cancelAnimationFrame(fadeInFrameRef.current)
+
+    const targetVolume = volumeRef.current / 100
+    const startedAt = performance.now()
+    const step = (frameTime) => {
+      if (waveSurferRef.current !== waveSurfer) return
+
+      const progress = Math.min((frameTime - startedAt) / START_FADE_DURATION_MS, 1)
+      const easedProgress = 1 - ((1 - progress) ** 2)
+      waveSurfer.setVolume(targetVolume * easedProgress)
+
+      if (progress < 1) {
+        fadeInFrameRef.current = requestAnimationFrame(step)
+        return
+      }
+
+      fadeInFrameRef.current = null
+    }
+
+    fadeInFrameRef.current = requestAnimationFrame(step)
   }, [])
 
   const stopPauseFade = useCallback((restoreVolume = true, resumePlayback = false) => {
@@ -240,8 +212,8 @@ function PlayerDock({ animationNonce, collapsed = false, isLoading = false, like
       return undefined
     }
 
-    setAnimationEnabled(false)
-    const frameId = requestAnimationFrame(() => setAnimationEnabled(true))
+    setTrackChangeAnimationEnabled(false)
+    const frameId = requestAnimationFrame(() => setTrackChangeAnimationEnabled(true))
     return () => cancelAnimationFrame(frameId)
   }, [animationNonce])
 
@@ -249,12 +221,25 @@ function PlayerDock({ animationNonce, collapsed = false, isLoading = false, like
     const container = waveformRef.current
     if (!container || !hasAudio) return undefined
 
-    const media = new Audio(track.audioUrl)
+    const media = takePrimedAudio(track.audioUrl) ?? new Audio()
+    media.crossOrigin = 'anonymous'
+    if (media.getAttribute('src') !== track.audioUrl) media.src = track.audioUrl
     media.preload = 'auto'
     media.hidden = true
     media.muted = false
     media.setAttribute('aria-hidden', 'true')
     container.appendChild(media)
+
+    let trackAnalyser = null
+    try {
+      trackAnalyser = connectAudioAnalyser(media)
+      setAnalyser(trackAnalyser)
+      notifyAnalyserChange(trackAnalyser)
+    } catch {
+      setAnalyser(null)
+      notifyAnalyserChange(null)
+    }
+
 
     const mediaDuration = Number.isFinite(track.durationSeconds) && track.durationSeconds > 0
       ? track.durationSeconds
@@ -280,16 +265,38 @@ function PlayerDock({ animationNonce, collapsed = false, isLoading = false, like
 
     waveSurferRef.current = waveSurfer
     waveSurfer.setVolume(volumeRef.current / 100)
+    let renderedWidth = Math.round(container.getBoundingClientRect().width)
+    const waveformResizeObserver = new ResizeObserver(([entry]) => {
+      const nextWidth = Math.round(entry.contentRect.width)
+      if (nextWidth <= 0 || nextWidth === renderedWidth) return
+      renderedWidth = nextWidth
+      waveSurfer.setOptions({ width: nextWidth })
+    })
+    waveformResizeObserver.observe(container)
+    const shouldFadeIn = fadeInNonce !== fadeInNonceRef.current
+    fadeInNonceRef.current = fadeInNonce
+    fadeInPendingRef.current = shouldFadeIn
+    if (shouldFadeIn) waveSurfer.setVolume(0)
+
     const cleanups = [
       waveSurfer.on('ready', (readyDuration) => {
         const nextDuration = readyDuration || trackDurationRef.current || 0
         setDuration(nextDuration)
         setCurrentTime(0)
         notifyPlaybackState({ currentTime: 0, duration: nextDuration })
-        waveSurfer.play().catch(() => updatePlaybackState(false))
+        waveSurfer.play().then(() => {
+          fadeInPendingRef.current = false
+          if (shouldFadeIn) startFadeIn(waveSurfer)
+        }).catch(() => {
+          fadeInPendingRef.current = false
+          setOutputVolume(volumeRef.current)
+          updatePlaybackState(false)
+        })
       }),
       waveSurfer.on('play', () => {
-        if (!pauseFadeRef.current.promise) setOutputVolume(volumeRef.current)
+        if (!pauseFadeRef.current.promise && !fadeInPendingRef.current && fadeInFrameRef.current === null) {
+          setOutputVolume(volumeRef.current)
+        }
         updatePlaybackState(true)
       }),
       waveSurfer.on('pause', () => updatePlaybackState(false)),
@@ -297,18 +304,33 @@ function PlayerDock({ animationNonce, collapsed = false, isLoading = false, like
         if (pauseFadeRef.current.promise) return
         setCurrentTime(time)
         notifyPlaybackState({ currentTime: time })
+        const next = nextTrackPreloadRef.current
+        const remaining = waveSurfer.getDuration() - time
+        if (next && !next.started && remaining > 0 && remaining <= 15) {
+          next.started = true
+          next.audio.preload = 'auto'
+          next.audio.load()
+        }
       }),
       waveSurfer.on('finish', () => {
         const finishedAt = waveSurfer.getDuration()
         setCurrentTime(finishedAt)
         notifyPlaybackState({ currentTime: finishedAt })
         updatePlaybackState(false)
+        if (nextTrackAudioUrl) onNextRef.current?.()
       }),
       waveSurfer.on('error', () => updatePlaybackState(false)),
     ]
 
     return () => {
+      if (fadeInFrameRef.current !== null) cancelAnimationFrame(fadeInFrameRef.current)
+      if (trackAnalyser) disconnectAudioAnalyser(media)
+      setAnalyser((currentAnalyser) => currentAnalyser === trackAnalyser ? null : currentAnalyser)
+      notifyAnalyserChange(null)
+      fadeInFrameRef.current = null
+      fadeInPendingRef.current = false
       stopPauseFade(false)
+      waveformResizeObserver.disconnect()
       cleanups.forEach((cleanup) => cleanup())
       waveSurfer.destroy()
       media.pause()
@@ -317,7 +339,7 @@ function PlayerDock({ animationNonce, collapsed = false, isLoading = false, like
       media.remove()
       if (waveSurferRef.current === waveSurfer) waveSurferRef.current = null
     }
-  }, [hasAudio, isLoading, notifyPlaybackState, setOutputVolume, stopPauseFade, track.audioUrl, track.durationSeconds, track.id, updatePlaybackState])
+  }, [fadeInNonce, hasAudio, isLoading, nextTrackAudioUrl, notifyPlaybackState, setOutputVolume, startFadeIn, stopPauseFade, track.audioUrl, track.durationSeconds, track.id, updatePlaybackState])
 
   useEffect(() => {
     const previousTrack = previousTrackRef.current
@@ -351,6 +373,7 @@ function PlayerDock({ animationNonce, collapsed = false, isLoading = false, like
         return
       }
 
+
       setOutputVolume(volumeRef.current)
       await waveSurfer.play()
     } catch {
@@ -369,7 +392,7 @@ function PlayerDock({ animationNonce, collapsed = false, isLoading = false, like
     togglePlayback().catch(() => updatePlaybackState(false))
   }, [hasAudio, playbackToggleNonce, togglePlayback, updatePlaybackState])
 
-  function seekTo(value) {
+  const seekTo = useCallback((value) => {
     const waveSurfer = waveSurferRef.current
     const mediaDuration = waveSurfer?.getDuration() || duration
     const safeEnd = mediaDuration > 0.1 ? mediaDuration - 0.05 : mediaDuration
@@ -378,7 +401,72 @@ function PlayerDock({ animationNonce, collapsed = false, isLoading = false, like
     setCurrentTime(nextTime)
     waveSurfer?.setTime(nextTime)
     notifyPlaybackState({ currentTime: nextTime })
-  }
+  }, [duration, notifyPlaybackState])
+
+  useEffect(() => {
+    if (!('mediaSession' in navigator) || !('MediaMetadata' in window)) return undefined
+
+    navigator.mediaSession.metadata = new window.MediaMetadata({
+      album: track.albumTitle ?? track.album?.title ?? '',
+      artist: track.artist ?? '',
+      artwork: getMediaSessionArtwork(track.artwork ?? track.album?.artwork),
+      title: track.title ?? 'Sin título',
+    })
+
+    return () => {
+      navigator.mediaSession.metadata = null
+    }
+  }, [track.album?.artwork, track.album?.title, track.albumTitle, track.artist, track.artwork, track.title])
+
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return undefined
+
+    const play = () => {
+      const waveSurfer = waveSurferRef.current
+      if (!waveSurfer || waveSurfer.isPlaying()) return
+      setOutputVolume(volumeRef.current)
+      waveSurfer.play().catch(() => updatePlaybackState(false))
+    }
+    const pause = () => {
+      if (waveSurferRef.current?.isPlaying()) pauseWithFade()
+    }
+    const seekBy = (seconds) => seekTo(playbackStateRef.current.currentTime + seconds)
+
+    setMediaSessionAction('play', play)
+    setMediaSessionAction('pause', pause)
+    setMediaSessionAction('stop', pause)
+    setMediaSessionAction('previoustrack', onPrevious)
+    setMediaSessionAction('nexttrack', onNext)
+    setMediaSessionAction('seekbackward', ({ seekOffset = 10 }) => seekBy(-seekOffset))
+    setMediaSessionAction('seekforward', ({ seekOffset = 10 }) => seekBy(seekOffset))
+    setMediaSessionAction('seekto', ({ seekTime }) => {
+      if (Number.isFinite(seekTime)) seekTo(seekTime)
+    })
+
+    return () => {
+      ;['play', 'pause', 'stop', 'previoustrack', 'nexttrack', 'seekbackward', 'seekforward', 'seekto']
+        .forEach((action) => setMediaSessionAction(action, null))
+    }
+  }, [onNext, onPrevious, pauseWithFade, seekTo, setOutputVolume, updatePlaybackState])
+
+  const mediaSessionPosition = Math.floor(currentTime)
+
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return
+
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused'
+    if (!Number.isFinite(duration) || duration <= 0) return
+
+    try {
+      navigator.mediaSession.setPositionState({
+        duration,
+        playbackRate: 1,
+        position: Math.min(Math.max(mediaSessionPosition, 0), duration),
+      })
+    } catch {
+      // La duración real puede tardar un instante en estar disponible.
+    }
+  }, [duration, isPlaying, mediaSessionPosition])
 
   function handleWaveformKeyDown(event) {
     const step = event.shiftKey ? 10 : 5
@@ -430,8 +518,11 @@ function PlayerDock({ animationNonce, collapsed = false, isLoading = false, like
 
   return (
     <aside
-      className={`player-dock${collapsed ? ' player-dock--collapsed' : ''}${animationEnabled ? ' player-dock--animated' : ''}`}
+      className={`player-dock player-dock--animated${collapsed ? ' player-dock--collapsed' : ''}${trackChangeAnimationEnabled ? ' player-dock--track-changing' : ''}${suppressed ? ' player-dock--suppressed' : ''}`}
       aria-label={`Reproductor de ${track.title}`}
+      aria-hidden={suppressed || undefined}
+      inert={suppressed || undefined}
+      style={collapsed && track.artwork ? { '--compact-artwork': `url(${track.artwork})` } : undefined}
     >
       <button
         className="player-dock__collapse"
@@ -445,50 +536,18 @@ function PlayerDock({ animationNonce, collapsed = false, isLoading = false, like
       </button>
       {collapsed && !isLoading && (
         <div className="player-dock__compact">
-          <img className="player-dock__compact-artwork" src={track.artwork} alt="" />
-          <div className="player-dock__compact-copy">
-            <strong title={track.title}>{track.title}</strong>
-            <span title={track.artist}>{track.artist}</span>
-          </div>
-          <div className="player-dock__compact-transport">
-            <button type="button" aria-label="Anterior" title="Anterior" onClick={onPrevious}>
-              <SkipBack size={14} fill="currentColor" aria-hidden="true" />
-            </button>
-            <button
-              className="player-dock__compact-play"
-              type="button"
-              aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
-              title={hasAudio ? (isPlaying ? 'Pausar' : 'Reproducir') : 'Audio no disponible'}
-              disabled={!hasAudio}
-              onClick={togglePlayback}
-            >
-              {isPlaying
-                ? <Pause size={14} fill="currentColor" aria-hidden="true" />
-                : <Play size={14} fill="currentColor" aria-hidden="true" />}
-            </button>
-            <button type="button" aria-label="Siguiente" title="Siguiente" onClick={onNext}>
-              <SkipForward size={14} fill="currentColor" aria-hidden="true" />
-            </button>
-          </div>
-          <div className="player-dock__compact-actions">
-            <button
-              className="player-dock__compact-mini"
-              type="button"
-              aria-label="Abrir mini reproductor"
-              title="Abrir mini reproductor"
-              onClick={onOpenMiniPlayer}
-            >
-              <ListMusic size={16} aria-hidden="true" />
-            </button>
-            <div className="player-dock__compact-volume">
-              <VolumeControl
-                expanded={volumeExpanded}
-                onExpandedChange={setVolumeExpanded}
-                onVolumeChange={changeVolume}
-                volume={volume}
-              />
-            </div>
-          </div>
+          <CompactNowPlaying
+            analyser={analyser}
+            currentTime={currentTime}
+            duration={duration}
+            hasAudio={hasAudio}
+            isPlaying={isPlaying}
+            onExpand={onToggleCollapsed}
+            onNext={onNext}
+            onPrevious={onPrevious}
+            onTogglePlayback={togglePlayback}
+            track={track}
+          />
         </div>
       )}
       <div className="player-dock__scroller">
@@ -532,6 +591,7 @@ function PlayerDock({ animationNonce, collapsed = false, isLoading = false, like
               <HeartToggle
                 key={track.id}
                 className="heart-container--player"
+                portalCelebration
                 label={`Me gusta ${track.title}`}
                 liked={liked}
                 onToggle={onToggleFavorite}

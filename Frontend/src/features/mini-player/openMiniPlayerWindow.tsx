@@ -1,11 +1,11 @@
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { createRoot } from 'react-dom/client'
-import MiniPlayer from './MiniPlayer'
 import {
   getStoredMiniPlayerHeight,
   MINI_PLAYER_COLLAPSED_HEIGHT,
   MINI_PLAYER_WIDTH,
 } from './miniPlayerConfig'
+import './mini-player.css'
 
 type DocumentPictureInPictureApi = {
   window: Window | null
@@ -56,6 +56,7 @@ async function openPictureInPicturePlayer(pipApi: DocumentPictureInPictureApi) {
   pipDocument.body.append(rootElement)
 
   const root = createRoot(rootElement)
+  const { default: MiniPlayer } = await import('./MiniPlayer')
   root.render(<MiniPlayer hostDocument={pipDocument} hostWindow={pipWindow} />)
   pipWindow.addEventListener('pagehide', () => window.setTimeout(() => root.unmount(), 0), { once: true })
 }

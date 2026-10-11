@@ -5,6 +5,8 @@ import { useState } from 'react'
 function PlaylistView({
   likedSongIds,
   onAddToPlaylist,
+  onAlbumSelect,
+  onArtistSelect,
   onBack,
   onDelete,
   onEdit,
@@ -24,6 +26,19 @@ function PlaylistView({
     const song = songs.find((item) => item.id === songId)
     return song ? [song] : []
   })
+  const playlistArtists = new Map()
+  playlistSongs.forEach((song) => {
+    const artist = song.artists?.[0]
+    const artistId = song.artistId ?? artist?.id
+    if (artistId && !playlistArtists.has(artistId)) {
+      playlistArtists.set(artistId, {
+        artwork: artist?.image ?? song.artwork,
+        id: artistId,
+        name: artist?.name ?? song.artist,
+      })
+    }
+  })
+  const playlistArtist = playlistArtists.size === 1 ? [...playlistArtists.values()][0] : null
 
   function moveSong(draggedSongId, targetSongId) {
     const nextSongIds = [...playlist.songIds]
@@ -50,11 +65,15 @@ function PlaylistView({
       <CollectionDetailView
         collection={{
           ...playlist,
-          artist: 'Tu biblioteca',
+          artist: playlistArtist?.name ?? 'Tu biblioteca',
+          artistArtwork: playlistArtist?.artwork,
+          artistId: playlistArtist?.id,
           kind: 'Playlist',
         }}
         likedSongIds={likedSongIds}
         onAddToPlaylist={onAddToPlaylist}
+        onAlbumSelect={onAlbumSelect}
+        onArtistSelect={onArtistSelect}
         onBack={onBack}
         onDelete={() => setDeleteModalOpen(true)}
         onEdit={() => onEdit?.(playlist)}

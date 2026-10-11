@@ -31,7 +31,11 @@ function normalizeEntry(raw) {
   const metadataSource = String(raw.metadataSource || (raw.artist && raw.title ? 'manual' : 'musicbrainz')).trim().toLowerCase()
   if (!['manual', 'musicbrainz'].includes(metadataSource)) throw new Error('metadataSource debe ser manual o musicbrainz.')
   const kind = raw.kind == null || raw.kind === '' ? null : String(raw.kind).trim().toLowerCase()
-  if (kind != null && !['album', 'single'].includes(kind)) throw new Error('kind debe ser album o single.')
+  if (kind != null && !['album', 'ep', 'single'].includes(kind)) throw new Error('kind debe ser album, ep o single.')
+  const kindOverride = raw.kindOverride ? String(raw.kindOverride).trim().toLowerCase() : null
+  if (kindOverride != null && !['album', 'ep', 'single'].includes(kindOverride)) {
+    throw new Error('kindOverride debe ser album, ep o single.')
+  }
 
   const trackNumber = raw.trackNumber == null || raw.trackNumber === '' ? null : Number(raw.trackNumber)
   if (trackNumber != null && (!Number.isInteger(trackNumber) || trackNumber < 1)) throw new Error('trackNumber debe ser un entero positivo.')
@@ -55,7 +59,7 @@ function normalizeEntry(raw) {
     artistOverride: raw.artistOverride ? cleanSegment(raw.artistOverride, 'artistOverride') : null,
     titleOverride: raw.titleOverride ? cleanSegment(raw.titleOverride, 'titleOverride') : null,
     releaseNameOverride: raw.releaseNameOverride ? cleanSegment(raw.releaseNameOverride, 'releaseNameOverride') : null,
-    kindOverride: raw.kindOverride ? String(raw.kindOverride).trim().toLowerCase() : null,
+    kindOverride,
     cloudinaryFolder: normalizeFolder(raw.cloudinaryFolder),
   }
 }
@@ -67,11 +71,11 @@ function destinationParts(entry) {
   if (containsJapanese(title) && !hasRomanizedSuffix(title)) {
     throw new Error('El título japonés necesita una romanización oficial entre paréntesis.')
   }
-  if (!['album', 'single'].includes(entry.kind)) throw new Error('kind debe ser album o single.')
+  if (!['album', 'ep', 'single'].includes(entry.kind)) throw new Error('kind debe ser album, ep o single.')
   const trackNumber = Number(entry.trackNumber)
   if (!Number.isInteger(trackNumber) || trackNumber < 1) throw new Error('trackNumber debe ser un entero positivo.')
 
-  const kindFolder = entry.kind === 'album' ? 'Albums' : 'Singles'
+  const kindFolder = entry.kind === 'album' ? 'Albums' : entry.kind === 'ep' ? 'EPs' : 'Singles'
   const fileName = `${String(trackNumber).padStart(2, '0')} - ${title}.mp3`
   return ['Artistas', artist, kindFolder, releaseName, fileName]
 }

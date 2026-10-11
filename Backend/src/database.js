@@ -1,6 +1,7 @@
 const { MongoClient } = require('mongodb')
 
 let client
+let database
 let users
 let favorites
 let favoriteLogs
@@ -17,7 +18,7 @@ async function connectDatabase(config) {
   client = new MongoClient(config.mongoUri)
   await client.connect()
 
-  const database = client.db(config.databaseName)
+  database = client.db(config.databaseName)
   users = database.collection(config.usersCollection)
   favorites = Object.fromEntries(
     Object.entries(favoriteCollectionNames).map(([type, name]) => [type, database.collection(name)]),
@@ -78,7 +79,13 @@ async function closeDatabase() {
   }
 }
 
+async function checkDatabaseHealth() {
+  if (!client || !database) throw new Error('MongoDB todavía no está conectado.')
+  await database.command({ ping: 1 })
+}
+
 module.exports = {
+  checkDatabaseHealth,
   closeDatabase,
   connectDatabase,
   getArtistSpotlightViewsCollection,

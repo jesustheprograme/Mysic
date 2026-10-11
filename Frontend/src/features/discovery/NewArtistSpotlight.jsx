@@ -140,16 +140,6 @@ function NewArtistSpotlight({
           </div>
           <div className="artist-spotlight-card__banner">
             {bannerImage && <img src={bannerImage} alt="" />}
-            {featuredSongs[0] && (
-              <button
-                className="artist-spotlight-card__banner-play"
-                type="button"
-                aria-label={`Reproducir ${featuredSongs[0].title}`}
-                onClick={() => playSong(featuredSongs[0])}
-              >
-                <Play size={25} fill="currentColor" aria-hidden="true" />
-              </button>
-            )}
           </div>
         </div>
 

@@ -1,6 +1,7 @@
 import { Bell, ChevronDown, LogOut, Menu, Search, Sparkles, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import BrandLogo from './BrandLogo.jsx'
+import { DesktopAppHeaderLink } from './DesktopAppDownload.jsx'
 
 function AppHeader({ collapsed, glowArtwork, onArtistSpotlightOpen, onHome, onLogout, onSearchChange, onSidebarToggle, searchQuery, user }) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -68,6 +69,7 @@ function AppHeader({ collapsed, glowArtwork, onArtistSpotlightOpen, onHome, onLo
         </label>
 
         <div className="app-header__actions">
+          <DesktopAppHeaderLink />
           <button
             className="header-icon-button"
             type="button"
@@ -116,7 +118,7 @@ function AppHeader({ collapsed, glowArtwork, onArtistSpotlightOpen, onHome, onLo
           >
             <button className="profile-menu__logout" type="button" role="menuitem" onClick={onLogout}>
               <LogOut size={17} strokeWidth={1.7} aria-hidden="true" />
-              <strong>Cerrar sesion</strong>
+              <strong>Cerrar sesión</strong>
             </button>
           </div>
         </div>

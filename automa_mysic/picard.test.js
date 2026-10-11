@@ -52,6 +52,14 @@ test('keeps no more than two Picard genres', () => {
   assert.deepEqual(result.genres, ['J-Pop', 'Rock'])
 })
 
+test('keeps EP as its own Picard release type', () => {
+  const result = mapPicardMetadata({
+    common: { title: 'Song', album: 'Short Release', releasetype: 'ep' },
+    native: {},
+  })
+  assert.equal(result.kind, 'ep')
+})
+
 test('completes a missing release type from the exact release selected by Picard', async () => {
   const metadata = await completePicardMetadata({
     artist: 'Artist',

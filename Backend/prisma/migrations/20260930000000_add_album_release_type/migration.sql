@@ -1,0 +1,2 @@
+ALTER TABLE "Album"
+ADD COLUMN "releaseType" TEXT NOT NULL DEFAULT 'album';

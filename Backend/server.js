@@ -1,17 +1,23 @@
 const path = require('node:path')
-require('dotenv').config({
+const dotenv = require('dotenv')
+
+dotenv.config({
   path: path.join(__dirname, 'private', 'mongodb.env'),
   quiet: true,
 })
-require('dotenv').config({
+dotenv.config({
   path: path.join(__dirname, '.env.cloudinary'),
   quiet: true,
 })
-require('dotenv').config({
+dotenv.config({
   path: path.join(__dirname, '.env'),
   override: true,
   quiet: true,
 })
+const runtimeEnvFile = process.env.MYSIC_RUNTIME_ENV?.trim()
+if (runtimeEnvFile) {
+  dotenv.config({ path: runtimeEnvFile, override: true, quiet: true })
+}
 const cookieParser = require('cookie-parser')
 const cors = require('cors')
 const express = require('express')
@@ -23,8 +29,8 @@ const { createCatalogRouter } = require('./src/catalog')
 const { createFavoritesRouter } = require('./src/favorites')
 const { createPlaylistsRouter } = require('./src/playlists')
 const { getConfig } = require('./src/config')
-const { closeDatabase, connectDatabase } = require('./src/database')
-const { closePrisma, connectPrisma } = require('./src/prisma')
+const { checkDatabaseHealth, closeDatabase, connectDatabase } = require('./src/database')
+const { checkPrismaHealth, closePrisma, connectPrisma } = require('./src/prisma')
 
 const app = express()
 let server
@@ -71,6 +77,7 @@ async function start() {
 
   await Promise.all([connectDatabase(config), connectPrisma()])
 
+  if (config.trustProxy !== false) app.set('trust proxy', config.trustProxy)
   app.disable('x-powered-by')
   app.use(helmet())
   app.use(cors({
@@ -96,7 +103,19 @@ async function start() {
   })
 
   app.get('/api/health', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store')
     res.json({ status: 'ok', service: 'mysic-api' })
+  })
+
+  app.get('/api/health/ready', async (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store')
+    try {
+      await Promise.all([checkDatabaseHealth(), checkPrismaHealth()])
+      return res.json({ status: 'ready', service: 'mysic-api' })
+    } catch (error) {
+      console.error(`Readiness check failed: ${error.message}`)
+      return res.status(503).json({ status: 'unavailable', service: 'mysic-api' })
+    }
   })
 
   app.get('/api/tracks', (_req, res) => {
@@ -126,8 +145,8 @@ async function start() {
     return res.status(500).json({ message: 'Ocurrio un error inesperado en el servidor.' })
   })
 
-  server = app.listen(config.port, '0.0.0.0', () => {
-    console.log(`Mysic API running on http://0.0.0.0:${config.port}`)
+  server = app.listen(config.port, config.bindHost, () => {
+    console.log(`Mysic API running on http://${config.bindHost}:${config.port}`)
   })
 }
 

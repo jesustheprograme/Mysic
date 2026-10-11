@@ -1,5 +1,6 @@
 # Local tooling
 .codex-video-analysis/
+.codex-video-contact.png
 
 # Dependencies
 **/node_modules/
@@ -9,7 +10,13 @@
 **/dist-ssr/
 **/target/
 **/build/
+deploy/*-upload.tar.gz
+deploy/controller-video-contact.jpg
+deploy/controller-video-frames/
+deploy/env/*.env
 Backend/storage/catalog-images/
+Frontend/*.tar.gz
+Frontend/public/downloads/*.exe
 
 # Environment variables and private credentials
 **/.env
@@ -27,6 +34,11 @@ yarn-error.log*
 pnpm-debug.log*
 automa_mysic/asignar_metadatos/.state.json
 automa_mysic/asignar_metadatos/.acquisition-index.json
+automa_mysic/asignar_metadatos/*.mp3
+automa_mysic/asignar_metadatos/*.flac
+automa_mysic/asignar_metadatos/*.m4a
+automa_mysic/asignar_metadatos/*.wav
+automa_mysic/asignar_metadatos/*.ogg
 automa_mysic/acquisition-data/
 automa_mysic/biblioteca/
 

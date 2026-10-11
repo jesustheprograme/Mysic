@@ -10,15 +10,15 @@ import { restrictToFirstScrollableAncestor, restrictToVerticalAxis } from '@dnd-
 import {
   SortableContext,
   sortableKeyboardCoordinates,
-  useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
+  ArrowDown,
   ArrowLeft,
-  Bookmark,
+  ArrowUp,
   Download,
-  GripVertical,
   ListPlus,
   MoreHorizontal,
   Pause,
@@ -30,8 +30,8 @@ import {
   Trash2,
 } from 'lucide-react'
 import HeartToggle from '../../components/HeartToggle.jsx'
-import PreviewIndicator from '../../components/PreviewIndicator.jsx'
 import { groupTracksByDisc } from '../../lib/tracks.js'
+import FilaCancionOrdenable from './componentes/FilaCancionOrdenable.jsx'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,156 +41,12 @@ import {
 
 const dragModifiers = [restrictToFirstScrollableAncestor, restrictToVerticalAxis]
 
-function formatDuration(seconds) {
-  const minutes = Math.floor(seconds / 60)
-  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`
-}
-
 function formatCollectionLength(seconds) {
   const minutes = Math.max(1, Math.round(seconds / 60))
   if (minutes < 60) return `${minutes} min`
   const hours = Math.floor(minutes / 60)
   const remainingMinutes = minutes % 60
   return `${hours} h${remainingMinutes ? ` ${remainingMinutes} min` : ''}`
-}
-
-function formatTrackNumber(song, index, displayTrackNumber) {
-  if (displayTrackNumber) return String(displayTrackNumber)
-  return String(song.trackNumber ?? song.trackNo ?? index + 1).padStart(2, '0')
-}
-
-function SortableTrack({
-  displayTrackNumber,
-  index,
-  onAddToPlaylist,
-  onAlbumSelect,
-  onArtistSelect,
-  onPlaybackToggle,
-  onSongSelect,
-  onToggleFavorite,
-  reorderable,
-  song,
-  status,
-  variant,
-}) {
-  const { isLiked, isPlaying, isSelected } = status
-  const showsTrackArtwork = variant === 'playlist'
-  const {
-    attributes,
-    isDragging,
-    isOver,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-  } = useSortable({
-    id: song.id,
-    disabled: !reorderable,
-    transition: {
-      duration: 260,
-      easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-    },
-  })
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition: [
-      transition,
-      'color 180ms ease',
-      'background-color 220ms ease',
-      'box-shadow 260ms ease',
-      'opacity 220ms ease',
-      'outline-color 220ms ease',
-      'scale 260ms cubic-bezier(0.22, 1, 0.36, 1)',
-    ].filter(Boolean).join(', '),
-  }
-  const className = [
-    'collection-detail__track',
-    isSelected && 'collection-detail__track--active',
-    isDragging && 'collection-detail__track--dragging',
-    isOver && !isDragging && 'collection-detail__track--drop-target',
-  ].filter(Boolean).join(' ')
-  const playbackLabel = isPlaying ? `Pausar ${song.title}` : `Reproducir ${song.title}`
-
-  function toggleTrackPlayback() {
-    if (isSelected) {
-      onPlaybackToggle?.()
-      return
-    }
-    onSongSelect(song.id)
-  }
-
-  return (
-    <li className={className} ref={setNodeRef} style={style}>
-      {reorderable && (
-        <button
-          className="collection-detail__drag-handle"
-          type="button"
-          aria-label={`Arrastrar ${song.title} para reordenar`}
-          title="Arrastrar para reordenar"
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical size={19} strokeWidth={2.2} aria-hidden="true" />
-        </button>
-      )}
-      {showsTrackArtwork ? (
-        <button
-          className={`collection-detail__track-artwork collection-detail__track-playback playback-hover${isPlaying ? ' collection-detail__track-playback--playing' : ''}`}
-          type="button"
-          aria-label={playbackLabel}
-          aria-pressed={isPlaying}
-          title={playbackLabel}
-          onClick={toggleTrackPlayback}
-        >
-          <img src={song.artwork} alt="" loading="lazy" />
-          <span className="collection-detail__track-playback-status" aria-hidden="true">
-            <PreviewIndicator status={isPlaying ? 'playing' : null} />
-          </span>
-        </button>
-      ) : (
-        <button
-          className={`collection-detail__track-index collection-detail__track-playback playback-hover${isPlaying ? ' collection-detail__track-playback--playing' : ''}`}
-          type="button"
-          aria-label={playbackLabel}
-          aria-pressed={isPlaying}
-          title={playbackLabel}
-          onClick={toggleTrackPlayback}
-        >
-          <span className="collection-detail__track-number" aria-hidden="true">{formatTrackNumber(song, index, displayTrackNumber)}</span>
-          <span className="collection-detail__track-playback-status" aria-hidden="true">
-            <PreviewIndicator status={isPlaying ? 'playing' : null} />
-          </span>
-        </button>
-      )}
-      <div className="collection-detail__track-main">
-        <button className="collection-detail__track-title" type="button" onClick={() => onSongSelect(song.id)}>{song.title}</button>
-        {variant !== 'album' && <small>
-          <button className="collection-detail__catalog-link" type="button" disabled={!song.artistId} onClick={() => onArtistSelect?.(song.artistId)}>{song.artist}</button>
-          {song.albumId && (
-            <>
-              {' · '}
-              <button className="collection-detail__catalog-link" type="button" onClick={() => onAlbumSelect?.(song.albumId)}>{song.albumTitle}</button>
-            </>
-          )}
-          {' · '}{song.plays}
-        </small>}
-      </div>
-      <span className="collection-detail__track-actions">
-        <HeartToggle
-          className="heart-container--song-row"
-          label={`Me gusta ${song.title}`}
-          liked={isLiked}
-          onToggle={(liked) => onToggleFavorite?.(song.id, liked)}
-          removeLabel={`Quitar ${song.title} de favoritas`}
-          size={17}
-        />
-        <button className="collection-detail__track-action" type="button" aria-label={`Añadir ${song.title} a una playlist`} title="Añadir a playlist" onClick={() => onAddToPlaylist?.(song)}>
-          <ListPlus size={17} strokeWidth={1.8} aria-hidden="true" />
-        </button>
-      </span>
-      <time>{formatDuration(song.durationSeconds)}</time>
-    </li>
-  )
 }
 
 function CollectionDetailView({
@@ -214,6 +70,12 @@ function CollectionDetailView({
   selectedSongPlaying,
   songs,
 }) {
+  const tracksRef = useRef(null)
+  const activeTrackRef = useRef(null)
+  const activeTrackArrowRef = useRef(null)
+  const activeTrackNaturalTopRef = useRef(0)
+  const suppressActiveTrackArrowRef = useRef(false)
+  const [activeTrackDirection, setActiveTrackDirection] = useState(null)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -233,6 +95,103 @@ function CollectionDetailView({
   const albumTrackNumbers = new Map(
     trackGroups.flatMap((group) => group.tracks).map((song, index) => [song.id, index + 1]),
   )
+  const selectedSongIndex = songs.findIndex((song) => (
+    song.id === selectedSongId && (!selectedSongAlbumId || song.albumId === selectedSongAlbumId)
+  ))
+  const selectedSong = selectedSongIndex >= 0 ? songs[selectedSongIndex] : null
+
+  useEffect(() => {
+    suppressActiveTrackArrowRef.current = false
+  }, [selectedSongId, selectedSongAlbumId])
+
+  useEffect(() => {
+    const tracks = tracksRef.current
+    const activeTrack = activeTrackRef.current
+    if (!tracks || !activeTrack || !selectedSongBelongsToCollection) {
+      setActiveTrackDirection(null)
+      return undefined
+    }
+
+    let frameId = 0
+    const updatePosition = () => {
+      cancelAnimationFrame(frameId)
+      frameId = requestAnimationFrame(() => {
+        const tracksBounds = tracks.getBoundingClientRect()
+        let naturalTop = activeTrack.offsetTop
+        let ancestor = activeTrack.offsetParent
+        while (ancestor && ancestor !== tracks) {
+          naturalTop += ancestor.offsetTop
+          ancestor = ancestor.offsetParent
+        }
+        activeTrackNaturalTopRef.current = naturalTop
+
+        const naturalViewportTop = tracksBounds.top + naturalTop - tracks.scrollTop
+        const naturalViewportBottom = naturalViewportTop + activeTrack.offsetHeight
+        const nextDirection = suppressActiveTrackArrowRef.current
+          ? null
+          : naturalViewportBottom < tracksBounds.top
+            ? 'up'
+            : naturalViewportTop > tracksBounds.bottom
+              ? 'down'
+              : null
+        const arrowTop = nextDirection === 'up'
+          ? tracksBounds.top + (activeTrack.offsetHeight / 2)
+          : tracksBounds.bottom - (activeTrack.offsetHeight / 2)
+
+        if (activeTrackArrowRef.current) {
+          activeTrackArrowRef.current.style.left = `${tracksBounds.left - 42}px`
+          activeTrackArrowRef.current.style.top = `${arrowTop}px`
+        }
+        setActiveTrackDirection((currentDirection) => (
+          currentDirection === nextDirection ? currentDirection : nextDirection
+        ))
+      })
+    }
+
+    const restoreArrowOnUserScroll = () => {
+      if (!suppressActiveTrackArrowRef.current) return
+      suppressActiveTrackArrowRef.current = false
+      updatePosition()
+    }
+    const restoreArrowOnKeyboardScroll = (event) => {
+      if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) {
+        restoreArrowOnUserScroll()
+      }
+    }
+
+    updatePosition()
+    tracks.addEventListener('scroll', updatePosition, { passive: true })
+    tracks.addEventListener('wheel', restoreArrowOnUserScroll, { passive: true })
+    tracks.addEventListener('touchstart', restoreArrowOnUserScroll, { passive: true })
+    tracks.addEventListener('pointerdown', restoreArrowOnUserScroll)
+    const resizeObserver = new ResizeObserver(updatePosition)
+    resizeObserver.observe(tracks)
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('keydown', restoreArrowOnKeyboardScroll)
+
+    return () => {
+      cancelAnimationFrame(frameId)
+      tracks.removeEventListener('scroll', updatePosition)
+      tracks.removeEventListener('wheel', restoreArrowOnUserScroll)
+      tracks.removeEventListener('touchstart', restoreArrowOnUserScroll)
+      tracks.removeEventListener('pointerdown', restoreArrowOnUserScroll)
+      resizeObserver.disconnect()
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('keydown', restoreArrowOnKeyboardScroll)
+    }
+  }, [selectedSongBelongsToCollection, selectedSongId, selectedSongAlbumId, songs])
+
+  function scrollToActiveTrack() {
+    const tracks = tracksRef.current
+    const activeTrack = activeTrackRef.current
+    if (!tracks || !activeTrack) return
+    suppressActiveTrackArrowRef.current = true
+    setActiveTrackDirection(null)
+    tracks.scrollTo({
+      behavior: 'smooth',
+      top: activeTrackNaturalTopRef.current - ((tracks.clientHeight - activeTrack.offsetHeight) / 2),
+    })
+  }
 
   function toggleCollectionPlayback() {
     if (!songs.length) return
@@ -241,14 +200,6 @@ function CollectionDetailView({
       return
     }
     onSongSelect(songs[0].id, { contextSong: songs[0], contextSongs: songs })
-  }
-
-  function toggleSaved() {
-    if (onTogglePinned) {
-      onTogglePinned()
-      return
-    }
-    onToggleCollectionFavorite?.(!collectionIsSaved)
   }
 
   function downloadCollection() {
@@ -301,7 +252,7 @@ function CollectionDetailView({
       && (!selectedSongAlbumId || selectedSongAlbumId === song.albumId)
 
     return (
-      <SortableTrack
+      <FilaCancionOrdenable
         displayTrackNumber={showsDiscHeadings ? albumTrackNumbers.get(song.id) : null}
         index={index}
         key={song.id}
@@ -311,6 +262,7 @@ function CollectionDetailView({
         onPlaybackToggle={onPlaybackToggle}
         onSongSelect={(songId) => onSongSelect(songId, { contextSong: song, contextSongs: songs })}
         onToggleFavorite={onToggleFavorite}
+        nodeRef={isSelected ? activeTrackRef : null}
         reorderable={Boolean(onMoveSong)}
         song={song}
         status={{
@@ -332,10 +284,22 @@ function CollectionDetailView({
         </button>
       )}
       <aside className="collection-detail__summary">
-        <span className="collection-detail__creator">
-          {collection.artwork && <img src={collection.artwork} alt="" />}
-          <span>{collection.artist}</span>
-        </span>
+        {collection.artistId && onArtistSelect ? (
+          <button
+            className="collection-detail__creator collection-detail__creator--link"
+            type="button"
+            aria-label={`Abrir artista ${collection.artist}`}
+            onClick={() => onArtistSelect(collection.artistId)}
+          >
+            {(collection.artistArtwork ?? collection.artwork) && <img src={collection.artistArtwork ?? collection.artwork} alt="" />}
+            <span>{collection.artist}</span>
+          </button>
+        ) : (
+          <span className="collection-detail__creator">
+            {(collection.artistArtwork ?? collection.artwork) && <img src={collection.artistArtwork ?? collection.artwork} alt="" />}
+            <span>{collection.artist}</span>
+          </span>
+        )}
         {collection.artwork ? (
           <img className="collection-detail__artwork" src={collection.artwork} alt="" />
         ) : (
@@ -343,25 +307,29 @@ function CollectionDetailView({
         )}
         <div className="collection-detail__identity">
           <h1 id="collection-detail-title">{collection.title}</h1>
-          {collection.description && <p>{collection.description}</p>}
-          <span>{collection.kind}{collection.year ? ` · ${collection.year}` : ''}</span>
-          <span>{songs.length} canciones · {formatCollectionLength(totalSeconds)}</span>
+          {!showsTrackArtwork && collection.description && <p>{collection.description}</p>}
+          {showsTrackArtwork ? (
+            <span>{collection.kind} · {songs.length} canciones · {formatCollectionLength(totalSeconds)}</span>
+          ) : (
+            <>
+              <span>{collection.kind}{collection.year ? ` · ${collection.year}` : ''}</span>
+              <span>{songs.length} canciones · {formatCollectionLength(totalSeconds)}</span>
+            </>
+          )}
         </div>
         <div className="collection-detail__controls">
           <button className="collection-detail__control" type="button" disabled={!songs.some((song) => song.audioUrl)} aria-label={`Descargar ${collection.title}`} title="Descargar" onClick={downloadCollection}>
             <Download size={22} strokeWidth={1.8} aria-hidden="true" />
           </button>
           {onTogglePinned ? (
-            <button
+            <HeartToggle
               className={`collection-detail__control${collectionIsSaved ? ' collection-detail__control--active' : ''}`}
-              type="button"
-              aria-label={collectionIsSaved ? `Quitar ${collection.title} de tu biblioteca` : `Guardar ${collection.title}`}
-              aria-pressed={collectionIsSaved}
-              title={collectionIsSaved ? 'Quitar de tu biblioteca' : 'Guardar'}
-              onClick={toggleSaved}
-            >
-              <Bookmark size={20} fill={collectionIsSaved ? 'currentColor' : 'none'} strokeWidth={1.8} aria-hidden="true" />
-            </button>
+              label={`Guardar ${collection.title}`}
+              liked={collectionIsSaved}
+              onToggle={onTogglePinned}
+              removeLabel={`Quitar ${collection.title} de tu biblioteca`}
+              size={20}
+            />
           ) : (
             <HeartToggle
               className={`collection-detail__control${collectionIsSaved ? ' collection-detail__control--active' : ''}`}
@@ -410,9 +378,12 @@ function CollectionDetailView({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+        {showsTrackArtwork && collection.description && (
+          <p className="collection-detail__description">{collection.description}</p>
+        )}
       </aside>
 
-      <div className="collection-detail__tracks">
+      <div className="collection-detail__tracks" ref={tracksRef}>
         {songs.length > 0 ? (
           <DndContext
             collisionDetection={closestCenter}
@@ -443,6 +414,21 @@ function CollectionDetailView({
           </div>
         )}
       </div>
+      {selectedSong && createPortal(
+        <button
+          className={`collection-detail__active-track-arrow${activeTrackDirection ? ' collection-detail__active-track-arrow--visible' : ''}`}
+          type="button"
+          aria-label="Ir a la posición de la canción seleccionada"
+          title="Ir a la canción seleccionada"
+          ref={activeTrackArrowRef}
+          onClick={scrollToActiveTrack}
+        >
+          {activeTrackDirection === 'down'
+            ? <ArrowDown size={21} strokeWidth={2.2} aria-hidden="true" />
+            : <ArrowUp size={21} strokeWidth={2.2} aria-hidden="true" />}
+        </button>,
+        document.body,
+      )}
     </section>
   )
 }

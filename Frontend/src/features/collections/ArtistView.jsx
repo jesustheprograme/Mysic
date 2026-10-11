@@ -8,6 +8,7 @@ const PORTRAIT_DURATION = 5600
 
 function getArtistTitleScale(title) {
   const length = Array.from(title.trim()).length
+  if (length < 6) return 'very-short'
   if (length > 32) return 'xlong'
   if (length > 22) return 'long'
   if (length > 13) return 'medium'
@@ -40,10 +41,6 @@ function collectAlbums(songs) {
     const secondYear = second.releaseDate ? new Date(second.releaseDate).getUTCFullYear() : 0
     return secondYear - firstYear || first.title.localeCompare(second.title)
   })
-}
-
-function isSingleRelease(release) {
-  return release.songCount === 1 || /^singles?$/i.test(release.title.trim())
 }
 
 function ReleaseCard({ onAlbumSelect, onPlay, playing, release }) {
@@ -109,8 +106,13 @@ function ArtistView({
     || song.artists?.some((songArtist) => songArtist.id === artist.artistId)
   )), [artist.artistId, songs])
   const albums = useMemo(() => collectAlbums(artistSongs), [artistSongs])
-  const albumReleases = albums.filter((release) => !isSingleRelease(release))
-  const singleReleases = albums.filter(isSingleRelease)
+  const albumReleases = albums.filter((release) => (
+    release.releaseType === 'album' || (!release.releaseType && release.songCount !== 1)
+  ))
+  const epReleases = albums.filter((release) => release.releaseType === 'ep')
+  const singleReleases = albums.filter((release) => (
+    release.releaseType === 'single' || (!release.releaseType && release.songCount === 1)
+  ))
   const featuredSongs = artistSongs.slice(0, 8)
   const portraits = artist.images?.length ? artist.images : [artist.artwork].filter(Boolean)
   const [portraitIndex, setPortraitIndex] = useState(0)
@@ -304,6 +306,25 @@ function ArtistView({
                 </div>
                 <div className="artist-profile__albums">
                   {albumReleases.map((release) => (
+                    <ReleaseCard
+                      key={release.id}
+                      onAlbumSelect={onAlbumSelect}
+                      onPlay={() => playAlbum(release)}
+                      playing={selectedSongPlaying && release.songs.some((song) => song.id === selectedSongId)}
+                      release={release}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {epReleases.length > 0 && (
+              <section className="artist-profile__release-group" aria-labelledby="artist-ep-releases-title">
+                <div className="artist-profile__release-heading">
+                  <h3 id="artist-ep-releases-title">EPs</h3>
+                </div>
+                <div className="artist-profile__albums">
+                  {epReleases.map((release) => (
                     <ReleaseCard
                       key={release.id}
                       onAlbumSelect={onAlbumSelect}

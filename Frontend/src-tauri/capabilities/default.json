@@ -14,6 +14,12 @@
     "core:window:allow-start-dragging",
     "oauth:allow-start",
     "oauth:allow-cancel",
-    "opener:default"
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "https://accounts.google.com/*" },
+        { "url": "https://myslc.duckdns.org/*" }
+      ]
+    }
   ]
 }

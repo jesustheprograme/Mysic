@@ -1,10 +1,11 @@
 import { isTauri } from '@tauri-apps/api/core'
 
 const isTauriRuntime = isTauri() || Boolean(window.__TAURI_INTERNALS__)
-const apiHost = isTauriRuntime ? 'localhost' : window.location.hostname
-const defaultApiUrl = import.meta.env.DEV || isTauriRuntime
-  ? `http://${apiHost}:4000/api`
-  : '/api'
+const desktopApiUrl = import.meta.env.VITE_DESKTOP_API_URL?.trim()
+  || 'https://myslc.duckdns.org/api'
+const defaultApiUrl = isTauriRuntime
+  ? desktopApiUrl
+  : import.meta.env.DEV ? `http://${window.location.hostname}:4000/api` : '/api'
 const API_URL = (import.meta.env.VITE_API_URL || defaultApiUrl).replace(/\/$/, '')
 
 export class ApiError extends Error {
@@ -72,21 +73,21 @@ export const favoritesApi = {
 export const playlistsApi = {
   list: async () => {
     const data = await request('/playlists')
-    return data.playlists
+    return data.playlists.map(mapPlaylist)
   },
   create: async (playlist) => {
     const data = await request('/playlists', {
       method: 'POST',
       body: JSON.stringify(playlist),
     })
-    return data.playlist
+    return mapPlaylist(data.playlist)
   },
   update: async (playlistId, changes) => {
     const data = await request(`/playlists/${encodeURIComponent(playlistId)}`, {
       method: 'PATCH',
       body: JSON.stringify(changes),
     })
-    return data.playlist
+    return mapPlaylist(data.playlist)
   },
   remove: (playlistId) => request(`/playlists/${encodeURIComponent(playlistId)}`, {
     method: 'DELETE',
@@ -104,7 +105,21 @@ export const playlistsApi = {
 
 function mapCatalogAsset(assetPath) {
   if (!assetPath || /^(?:https?:|data:|blob:)/i.test(assetPath)) return assetPath ?? null
-  return `${API_URL}${assetPath.startsWith('/') ? '' : '/'}${assetPath}`
+
+  const normalizedPath = assetPath.startsWith('/') ? assetPath : `/${assetPath}`
+  if (normalizedPath === '/api' || normalizedPath.startsWith('/api/')) {
+    if (!/^https?:\/\//i.test(API_URL)) return normalizedPath
+    return new URL(normalizedPath, new URL(API_URL).origin).href
+  }
+
+  return `${API_URL}${normalizedPath}`
+}
+
+function mapPlaylist(playlist) {
+  return {
+    ...playlist,
+    artwork: mapCatalogAsset(playlist.artwork),
+  }
 }
 
 function mapCatalogSong(song) {
@@ -122,7 +137,6 @@ function mapCatalogSong(song) {
     })) ?? [],
     artwork: mapCatalogAsset(song.artwork),
     audioUrl: song.audioPath ? `${API_URL}${song.audioPath}` : null,
-    plays: 'Biblioteca personal',
   }
 }
 
@@ -141,10 +155,14 @@ function mapCatalogArtist(artist) {
 }
 
 export const catalogApi = {
-  listSongs: async (search = '') => {
-    const query = search ? `?search=${encodeURIComponent(search)}` : ''
-    const data = await request(`/catalog/songs${query}`)
-    return data.songs.map(mapCatalogSong)
+  listSongs: async ({ limit = 250, page = 1, search = '' } = {}) => {
+    const query = new URLSearchParams({ limit: String(limit), page: String(page) })
+    if (search.trim()) query.set('search', search.trim())
+    const data = await request(`/catalog/songs?${query}`)
+    return {
+      songs: data.songs.map(mapCatalogSong),
+      pagination: data.pagination,
+    }
   },
   getArtist: async (artistId) => {
     const data = await request(`/catalog/artists/${encodeURIComponent(artistId)}`)

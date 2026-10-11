@@ -1812,6 +1812,67 @@ input:focus-visible {
   }
 }
 
+.desktop-auth-page {
+  width: 100vw;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: #f4f3ef;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(231, 80, 50, 0.18), transparent 38%),
+    #080a09;
+}
+
+.desktop-auth-card {
+  width: min(420px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  background: #141716;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
+  text-align: center;
+}
+
+.desktop-auth-card__brand {
+  width: 112px;
+  height: 38px;
+  margin-bottom: 10px;
+}
+
+.desktop-auth-card__google {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.desktop-auth-card h1 {
+  margin: 0;
+  font-size: 25px;
+}
+
+.desktop-auth-card > p {
+  max-width: 330px;
+  margin: 0;
+  color: #a5aeaa;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.desktop-auth-card__button {
+  min-height: 44px;
+  margin-top: 8px;
+}
+
+.desktop-auth-card .desktop-auth-card__error {
+  color: #ff8e78;
+  font-weight: 600;
+}
+
 /* Floating underline authentication inputs */
 .auth-fields {
   gap: 20px;

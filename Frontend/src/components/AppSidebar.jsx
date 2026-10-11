@@ -39,6 +39,7 @@ const libraryNavigationItems = [
 function AppSidebar({
   activePlaylistId,
   activeSection,
+  canImportMusic = false,
   collapsed,
   onCreatePlaylist,
   onEditPlaylist,
@@ -72,17 +73,19 @@ function AppSidebar({
     <aside className={`app-sidebar${collapsed ? ' app-sidebar--collapsed' : ''}`}>
       <nav className="app-sidebar__navigation" aria-label="Navegacion principal">
         {primaryNavigationItems.map(renderItem)}
-        <button
-          className={`app-sidebar__item${activeSection === 'import' ? ' app-sidebar__item--active' : ''}`}
-          type="button"
-          aria-current={activeSection === 'import' ? 'page' : undefined}
-          onClick={() => onImportNav?.()}
-          title={collapsed ? 'Importar música' : undefined}
-          key="import"
-        >
-          <Import size={19} strokeWidth={1.7} aria-hidden="true" />
-          <span>Importar música</span>
-        </button>
+        {canImportMusic && (
+          <button
+            className={`app-sidebar__item${activeSection === 'import' ? ' app-sidebar__item--active' : ''}`}
+            type="button"
+            aria-current={activeSection === 'import' ? 'page' : undefined}
+            onClick={() => onImportNav?.()}
+            title={collapsed ? 'Importar música' : undefined}
+            key="import"
+          >
+            <Import size={19} strokeWidth={1.7} aria-hidden="true" />
+            <span>Importar música</span>
+          </button>
+        )}
         {!collapsed && <p className="app-sidebar__label">Tu musica</p>}
         {libraryNavigationItems.map(renderItem)}
       </nav>

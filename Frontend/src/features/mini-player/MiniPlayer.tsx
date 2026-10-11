@@ -1,30 +1,26 @@
 import {
+  Disc3,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   ListMusic,
   Pause,
   Pin,
   PinOff,
   Play,
+  Search,
   SkipBack,
   SkipForward,
-  Volume2,
-  VolumeX,
+  Sparkles,
+  UserRound,
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { invoke, isTauri } from '@tauri-apps/api/core'
-import {
-  PhysicalPosition,
-  currentMonitor,
-  getCurrentWindow,
-  primaryMonitor,
-  type Monitor,
-} from '@tauri-apps/api/window'
+import { isTauri } from '@tauri-apps/api/core'
 import {
   listenToPlaybackState,
   readPlaybackSnapshot,
-  sendMiniPlayerCommand,
   type MiniPlayerCommand,
   type MiniSong,
   type PlaybackSnapshot,
@@ -33,374 +29,16 @@ import {
   MINI_PLAYER_COLLAPSED_HEIGHT,
   MINI_PLAYER_EXPANDED_HEIGHT,
   MINI_PLAYER_EXPANDED_KEY,
-  MINI_PLAYER_WIDTH,
 } from './miniPlayerConfig'
+import ControlVolumenMini from './componentes/ControlVolumenMini'
+import {
+  readStoredBoolean,
+  resizeWebMiniPlayer,
+  SURFACE_MOTION_MS,
+  useVentanaMiniReproductor,
+} from './ventana/useVentanaMiniReproductor'
+import { dispatchMiniPlayerCommand, formatTime } from './utilidades/utilidadesMiniReproductor'
 import './mini-player.css'
-
-const SURFACE_MOTION_MS = 180
-const ANCHOR_KEY = 'mysic-mini-player-anchor-v1'
-const PINNED_KEY = 'mysic-mini-player-pinned-v1'
-const POSITION_KEY = 'mysic-mini-player-position-v1'
-
-type Corner = 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'
-type StoredPosition = { x: number; y: number }
-
-async function getPlacementMonitor() {
-  return (await currentMonitor()) ?? (await primaryMonitor())
-}
-
-function readStoredBoolean(key: string, fallback: boolean) {
-  const storedValue = localStorage.getItem(key)
-  return storedValue === null ? fallback : storedValue === 'true'
-}
-
-function readStoredPosition(): StoredPosition | null {
-  try {
-    const position = JSON.parse(localStorage.getItem(POSITION_KEY) ?? 'null') as Partial<StoredPosition> | null
-    if (position && Number.isFinite(position.x) && Number.isFinite(position.y)) {
-      return { x: position.x as number, y: position.y as number }
-    }
-  } catch {
-    // Ignore malformed values from older development builds.
-  }
-  return null
-}
-
-function storePosition(position: StoredPosition) {
-  localStorage.setItem(POSITION_KEY, JSON.stringify({ x: Math.round(position.x), y: Math.round(position.y) }))
-}
-
-function resizeWebMiniPlayer(hostWindow: Window, targetInnerHeight: number) {
-  const frameHeight = Math.max(0, hostWindow.outerHeight - hostWindow.innerHeight)
-  const targetOuterHeight = targetInnerHeight + frameHeight
-  const targetOuterWidth = hostWindow.outerWidth || MINI_PLAYER_WIDTH
-  hostWindow.resizeTo(targetOuterWidth, targetOuterHeight)
-}
-
-function formatTime(seconds: number) {
-  const safeSeconds = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0
-  const minutes = Math.floor(safeSeconds / 60)
-  return `${minutes}:${String(safeSeconds % 60).padStart(2, '0')}`
-}
-
-function dispatchMiniPlayerCommand(command: Parameters<typeof sendMiniPlayerCommand>[0]) {
-  sendMiniPlayerCommand(command).catch(() => {})
-}
-
-type MiniVolumeControlProps = {
-  onVolumeChange: (volume: number) => void
-  onVolumeInteractionChange: (active: boolean) => void
-  volume: number
-}
-
-function MiniVolumeControl({ onVolumeChange, onVolumeInteractionChange, volume }: MiniVolumeControlProps) {
-  const [open, setOpen] = useState(false)
-  const VolumeIcon = volume === 0 ? VolumeX : Volume2
-
-  return (
-    <div
-      className={`mini-player__volume-popover${open ? ' mini-player__volume-popover--open' : ''}`}
-      onPointerEnter={() => setOpen(true)}
-      onPointerLeave={() => setOpen(false)}
-      onFocus={() => setOpen(true)}
-      onBlur={(event) => {
-        const nextTarget = event.relatedTarget as Node | null
-        if (!nextTarget || !event.currentTarget.contains(nextTarget)) setOpen(false)
-      }}
-    >
-      <label className="mini-player__volume-slider-shell" title={`Volumen ${volume}%`}>
-        <input
-          type="range"
-          min="0"
-          max="100"
-          value={volume}
-          tabIndex={open ? 0 : -1}
-          aria-label="Volumen"
-          onPointerDown={() => onVolumeInteractionChange(true)}
-          onPointerUp={() => onVolumeInteractionChange(false)}
-          onPointerCancel={() => onVolumeInteractionChange(false)}
-          onBlur={() => onVolumeInteractionChange(false)}
-          onChange={(event) => onVolumeChange(Number(event.target.value))}
-          style={{ background: `linear-gradient(90deg, #a78bfa 0%, #a78bfa ${volume}%, #313735 ${volume}%, #313735 100%)` }}
-        />
-      </label>
-      <button
-        className="mini-player__icon-button"
-        type="button"
-        aria-expanded={open}
-        aria-label={open ? 'Contraer control de volumen' : 'Mostrar control de volumen'}
-        title={`Volumen ${volume}%`}
-        onClick={() => setOpen(true)}
-      >
-        <VolumeIcon size={16} aria-hidden="true" />
-      </button>
-    </div>
-  )
-}
-
-function getNearestCorner(
-  position: { x: number; y: number },
-  size: { width: number; height: number },
-  monitor: Monitor,
-): Corner {
-  const workArea = monitor.workArea
-  const centerX = position.x + size.width / 2
-  const centerY = position.y + size.height / 2
-  const workCenterX = workArea.position.x + workArea.size.width / 2
-  const workCenterY = workArea.position.y + workArea.size.height / 2
-  const horizontal = centerX < workCenterX ? 'left' : 'right'
-  const vertical = centerY < workCenterY ? 'top' : 'bottom'
-  return `${vertical}-${horizontal}` as Corner
-}
-
-function getAnchorAfterMove(
-  position: StoredPosition,
-  size: { width: number; height: number },
-  monitor: Monitor,
-  currentAnchor: Corner,
-  previousPosition: StoredPosition | null,
-) {
-  const nearestAnchor = getNearestCorner(position, size, monitor)
-  if (!previousPosition) return nearestAnchor
-
-  const verticalTravel = Math.abs(position.y - previousPosition.y)
-  const changedVerticalAnchor = verticalTravel >= 24 * monitor.scaleFactor
-  const vertical = changedVerticalAnchor
-    ? (nearestAnchor.startsWith('top') ? 'top' : 'bottom')
-    : (currentAnchor.startsWith('top') ? 'top' : 'bottom')
-  const horizontal = nearestAnchor.endsWith('left') ? 'left' : 'right'
-  return `${vertical}-${horizontal}` as Corner
-}
-
-function clampToWorkArea(value: number, start: number, length: number, windowLength: number) {
-  return Math.min(Math.max(value, start), Math.max(start, start + length - windowLength))
-}
-
-function getSurfaceOffset(windowHeight: number, visibleHeight: number, expanded: boolean, anchor: Corner) {
-  return !expanded && anchor.startsWith('bottom') ? windowHeight - visibleHeight : 0
-}
-
-function getSurfacePosition(
-  windowPosition: StoredPosition,
-  windowHeight: number,
-  visibleHeight: number,
-  expanded: boolean,
-  anchor: Corner,
-) {
-  return {
-    x: windowPosition.x,
-    y: windowPosition.y + getSurfaceOffset(windowHeight, visibleHeight, expanded, anchor),
-  }
-}
-
-function useNativeMiniWindow(
-  windowExpanded: boolean,
-  hostWindow: Window,
-  reducedMotion: boolean,
-  onExpandedLayoutReady: () => void,
-) {
-  const [pinned, setPinned] = useState(() => readStoredBoolean(PINNED_KEY, true))
-  const [anchor, setAnchor] = useState<Corner>(() => (localStorage.getItem(ANCHOR_KEY) as Corner | null) ?? 'bottom-right')
-  const anchorRef = useRef<Corner>(anchor)
-  const windowExpandedRef = useRef(windowExpanded)
-  const animationTokenRef = useRef(0)
-  const layoutSequenceRef = useRef(0)
-  const hasNativeLayoutRef = useRef(false)
-  const lastPositionRef = useRef<StoredPosition | null>(null)
-  const positionTimerRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    if (!isTauri()) return undefined
-
-    const appWindow = getCurrentWindow()
-    let disposed = false
-    let unlistenMoved = () => {}
-
-    appWindow.onMoved(({ payload: position }) => {
-      if (animationTokenRef.current > 0) return
-      if (positionTimerRef.current !== null) window.clearTimeout(positionTimerRef.current)
-      positionTimerRef.current = window.setTimeout(async () => {
-        positionTimerRef.current = null
-        if (disposed || animationTokenRef.current > 0) return
-
-        const [monitor, size] = await Promise.all([
-          getPlacementMonitor().catch(() => null),
-          appWindow.outerSize().catch(() => null),
-        ])
-        if (disposed || !monitor || !size) return
-
-        const currentAnchor = anchorRef.current
-        const currentExpanded = windowExpandedRef.current
-        const visibleHeight = (currentExpanded ? MINI_PLAYER_EXPANDED_HEIGHT : MINI_PLAYER_COLLAPSED_HEIGHT) * monitor.scaleFactor
-        const visiblePosition = getSurfacePosition(position, size.height, visibleHeight, currentExpanded, currentAnchor)
-        const nextAnchor = getAnchorAfterMove(
-          visiblePosition,
-          { width: size.width, height: visibleHeight },
-          monitor,
-          currentAnchor,
-          lastPositionRef.current,
-        )
-        const anchorChangedVertically = currentAnchor.startsWith('top') !== nextAnchor.startsWith('top')
-
-        if (!currentExpanded && anchorChangedVertically) {
-          const token = ++layoutSequenceRef.current
-          animationTokenRef.current = token
-          const clipY = getSurfaceOffset(size.height, visibleHeight, false, nextAnchor)
-          const targetPosition = new PhysicalPosition(position.x, Math.round(visiblePosition.y - clipY))
-          await invoke('set_mini_player_bounds', {
-            clipHeight: Math.round(visibleHeight),
-            clipY: Math.round(clipY),
-            height: Math.round(size.height),
-            width: Math.round(size.width),
-            x: targetPosition.x,
-            y: targetPosition.y,
-          }).catch(() => {})
-          window.setTimeout(() => {
-            if (animationTokenRef.current === token) animationTokenRef.current = 0
-          }, 80)
-        }
-
-        storePosition(visiblePosition)
-        lastPositionRef.current = visiblePosition
-        anchorRef.current = nextAnchor
-        setAnchor(nextAnchor)
-        localStorage.setItem(ANCHOR_KEY, nextAnchor)
-      }, 100)
-    }).then((unlisten) => {
-      if (disposed) unlisten()
-      else unlistenMoved = unlisten
-    })
-
-    return () => {
-      disposed = true
-      if (positionTimerRef.current !== null) window.clearTimeout(positionTimerRef.current)
-      unlistenMoved()
-    }
-  }, [hostWindow])
-
-  useEffect(() => {
-    localStorage.setItem(PINNED_KEY, String(pinned))
-    if (isTauri()) getCurrentWindow().setAlwaysOnTop(pinned).catch(() => {})
-  }, [pinned])
-
-  useEffect(() => {
-    if (!isTauri()) return undefined
-
-    const appWindow = getCurrentWindow()
-    const isInitialLayout = !hasNativeLayoutRef.current
-    const previousWindowExpanded = windowExpandedRef.current
-    windowExpandedRef.current = windowExpanded
-    hasNativeLayoutRef.current = true
-    const token = ++layoutSequenceRef.current
-    let cancelled = false
-    let settleTimer: number | null = null
-
-    animationTokenRef.current = token
-    if (positionTimerRef.current !== null) {
-      window.clearTimeout(positionTimerRef.current)
-      positionTimerRef.current = null
-    }
-
-    const resizeAndAnchor = async () => {
-      const monitor = await getPlacementMonitor().catch(() => null)
-      if (cancelled) return
-      if (!monitor) {
-        animationTokenRef.current = 0
-        await appWindow.show()
-        if (windowExpanded) onExpandedLayoutReady()
-        return
-      }
-      const [currentPosition, currentSize] = await Promise.all([
-        appWindow.outerPosition(),
-        appWindow.outerSize(),
-      ])
-      if (cancelled) return
-
-      const targetSize = {
-        width: MINI_PLAYER_WIDTH * monitor.scaleFactor,
-        height: MINI_PLAYER_EXPANDED_HEIGHT * monitor.scaleFactor,
-      }
-      const previousVisibleHeight = (previousWindowExpanded ? MINI_PLAYER_EXPANDED_HEIGHT : MINI_PLAYER_COLLAPSED_HEIGHT) * monitor.scaleFactor
-      const currentVisiblePosition = getSurfacePosition(
-        currentPosition,
-        currentSize.height,
-        previousVisibleHeight,
-        previousWindowExpanded,
-        anchorRef.current,
-      )
-      const storedPosition = isInitialLayout ? readStoredPosition() : null
-      const nextAnchor = isInitialLayout
-        ? anchorRef.current
-        : getAnchorAfterMove(
-          currentVisiblePosition,
-          { width: currentSize.width, height: previousVisibleHeight },
-          monitor,
-          anchorRef.current,
-          lastPositionRef.current,
-        )
-      const targetVisibleHeight = (windowExpanded ? MINI_PLAYER_EXPANDED_HEIGHT : MINI_PLAYER_COLLAPSED_HEIGHT) * monitor.scaleFactor
-      const desiredVisiblePosition = storedPosition ?? {
-        x: currentVisiblePosition.x,
-        y: nextAnchor.startsWith('bottom')
-          ? currentVisiblePosition.y + previousVisibleHeight - targetVisibleHeight
-          : currentVisiblePosition.y,
-      }
-      const targetVisiblePosition = {
-        x: Math.round(clampToWorkArea(desiredVisiblePosition.x, monitor.workArea.position.x, monitor.workArea.size.width, targetSize.width)),
-        y: Math.round(clampToWorkArea(desiredVisiblePosition.y, monitor.workArea.position.y, monitor.workArea.size.height, targetVisibleHeight)),
-      }
-      const clipY = getSurfaceOffset(targetSize.height, targetVisibleHeight, windowExpanded, nextAnchor)
-      const targetPosition = new PhysicalPosition(
-        targetVisiblePosition.x,
-        Math.round(targetVisiblePosition.y - clipY),
-      )
-
-      anchorRef.current = nextAnchor
-      setAnchor(nextAnchor)
-      localStorage.setItem(ANCHOR_KEY, nextAnchor)
-
-      await invoke('set_mini_player_bounds', {
-        clipHeight: Math.round(targetVisibleHeight),
-        clipY: Math.round(clipY),
-        height: Math.round(targetSize.height),
-        width: Math.round(targetSize.width),
-        x: targetPosition.x,
-        y: targetPosition.y,
-      })
-      if (cancelled) return
-      await appWindow.show()
-      lastPositionRef.current = targetVisiblePosition
-      storePosition(targetVisiblePosition)
-      if (windowExpanded) onExpandedLayoutReady()
-
-      settleTimer = window.setTimeout(() => {
-        if (animationTokenRef.current === token) animationTokenRef.current = 0
-      }, windowExpanded && !reducedMotion ? SURFACE_MOTION_MS + 80 : 80)
-    }
-
-    const runResize = () => {
-      resizeAndAnchor().catch(() => {
-        if (animationTokenRef.current === token) animationTokenRef.current = 0
-        if (windowExpanded) onExpandedLayoutReady()
-      })
-    }
-
-    runResize()
-
-    return () => {
-      cancelled = true
-      if (settleTimer !== null) window.clearTimeout(settleTimer)
-      if (animationTokenRef.current === token) animationTokenRef.current = 0
-    }
-  }, [onExpandedLayoutReady, reducedMotion, windowExpanded])
-
-  const closeWindow = useCallback(() => {
-    if (isTauri()) getCurrentWindow().close().catch(() => {})
-    else hostWindow.close()
-  }, [hostWindow])
-
-  return { anchor, closeWindow, pinned, setPinned }
-}
 
 type MiniPlayerProps = {
   hostDocument?: Document
@@ -412,12 +50,20 @@ function MiniPlayer({ hostDocument = document, hostWindow = window }: MiniPlayer
   const [expanded, setExpanded] = useState(() => readStoredBoolean(MINI_PLAYER_EXPANDED_KEY, false))
   const [nativeExpanded, setNativeExpanded] = useState(expanded)
   const [renderQueue, setRenderQueue] = useState(expanded)
-  const [surfaceOpen, setSurfaceOpen] = useState(expanded)
+  // On reload, the native window must restore its clip and position before the
+  // expanded surface is revealed. Otherwise the CSS state can get ahead of the
+  // Tauri window bounds and leave the toggle visually out of sync.
+  const [surfaceOpen, setSurfaceOpen] = useState(() => expanded && !isTauri())
+  const [activeQueueTab, setActiveQueueTab] = useState<'up-next' | 'search' | 'related'>('up-next')
+  const [queueSearch, setQueueSearch] = useState('')
   const [clock, setClock] = useState(Date.now)
   const pendingCommandsRef = useRef<Partial<Record<'seek' | 'volume', MiniPlayerCommand>>>({})
   const commandTimerRef = useRef<number | null>(null)
   const motionTimerRef = useRef<number | null>(null)
   const revealFrameRef = useRef<number | null>(null)
+  const relatedSongsRef = useRef<HTMLDivElement | null>(null)
+  const relatedAlbumsRef = useRef<HTMLDivElement | null>(null)
+  const relatedArtistsRef = useRef<HTMLDivElement | null>(null)
   const expandedRef = useRef(expanded)
   const seekingRef = useRef(false)
   const changingVolumeRef = useRef(false)
@@ -433,7 +79,7 @@ function MiniPlayer({ hostDocument = document, hostWindow = window }: MiniPlayer
       })
     })
   }, [hostWindow])
-  const { anchor, closeWindow, pinned, setPinned } = useNativeMiniWindow(
+  const { anchor, closeWindow, pinned, setPinned } = useVentanaMiniReproductor(
     nativeExpanded,
     hostWindow,
     reducedMotion,
@@ -498,7 +144,42 @@ function MiniPlayer({ hostDocument = document, hostWindow = window }: MiniPlayer
   }, [clock, snapshot])
   const progress = snapshot?.duration ? Math.min(currentTime / snapshot.duration, 1) : 0
   const track = snapshot?.track ?? null
-  const queue = snapshot?.queue.slice(0, 10) ?? []
+  const queue = useMemo(() => snapshot?.queue.slice(0, 10) ?? [], [snapshot?.queue])
+  const relatedQueue = useMemo(() => snapshot?.queue.slice(0, 16) ?? [], [snapshot?.queue])
+  const visibleQueue = useMemo(() => {
+    if (activeQueueTab === 'search') {
+      const query = queueSearch.trim().toLocaleLowerCase()
+      if (!query) return queue
+      return queue.filter((song) => `${song.title} ${song.artist}`.toLocaleLowerCase().includes(query))
+    }
+
+    if (activeQueueTab === 'related') {
+      return track ? relatedQueue.filter((song) => song.id !== track.id) : relatedQueue
+    }
+
+    return queue
+  }, [activeQueueTab, queue, queueSearch, relatedQueue, track])
+  const relatedSongColumns = useMemo(() => {
+    const columns: MiniSong[][] = []
+    for (let index = 0; index < visibleQueue.length; index += 4) {
+      columns.push(visibleQueue.slice(index, index + 4))
+    }
+    return columns
+  }, [visibleQueue])
+  const relatedAlbums = useMemo(() => {
+    const albums = new Map<string, MiniSong>()
+    visibleQueue.forEach((song) => {
+      if (song.albumTitle && !albums.has(song.albumTitle)) albums.set(song.albumTitle, song)
+    })
+    return [...albums.entries()]
+  }, [visibleQueue])
+  const relatedArtists = useMemo(() => {
+    const artists = new Map<string, MiniSong>()
+    visibleQueue.forEach((song) => {
+      if (!artists.has(song.artist)) artists.set(song.artist, song)
+    })
+    return [...artists.entries()]
+  }, [visibleQueue])
 
   const flushPendingCommands = useCallback(() => {
     if (commandTimerRef.current !== null) {
@@ -622,6 +303,11 @@ function MiniPlayer({ hostDocument = document, hostWindow = window }: MiniPlayer
     dispatchMiniPlayerCommand({ type: 'select', songId: song.id })
   }
 
+  function scrollRelatedCarousel(container: HTMLDivElement | null, direction: -1 | 1) {
+    if (!container) return
+    container.scrollBy({ left: direction * container.clientWidth, behavior: 'smooth' })
+  }
+
   return (
     <main
       className={`mini-player${renderQueue ? ' mini-player--expanded' : ''}${surfaceOpen ? ' mini-player--surface-open' : ''}${visualAnchor.startsWith('top') ? ' mini-player--anchor-top' : ' mini-player--anchor-bottom'}`}
@@ -645,7 +331,7 @@ function MiniPlayer({ hostDocument = document, hostWindow = window }: MiniPlayer
           </div>
 
           <div className="mini-player__window-actions" data-tauri-drag-region="false">
-            <MiniVolumeControl
+            <ControlVolumenMini
               onVolumeChange={changeVolume}
               onVolumeInteractionChange={(active) => {
                 changingVolumeRef.current = active
@@ -701,7 +387,7 @@ function MiniPlayer({ hostDocument = document, hostWindow = window }: MiniPlayer
                 flushPendingCommands()
               }}
               onChange={(event) => seekTo(Number(event.target.value))}
-              style={{ background: `linear-gradient(90deg, #9b7bff 0%, #c8b8ff ${progress * 100}%, #313735 ${progress * 100}%, #313735 100%)` }}
+              style={{ background: `linear-gradient(90deg, #f4f3ef 0%, #f4f3ef ${progress * 100}%, #313735 ${progress * 100}%, #313735 100%)` }}
             />
             <span>{formatTime(currentTime)}</span>
             <span>{formatTime(snapshot?.duration ?? 0)}</span>
@@ -723,29 +409,164 @@ function MiniPlayer({ hostDocument = document, hostWindow = window }: MiniPlayer
 
         <div className="mini-player__queue-shell" aria-hidden={!expanded} inert={!expanded}>
           <section className="mini-player__queue" aria-labelledby="mini-player-queue-title">
-            <div className="mini-player__queue-heading">
-              <span><ListMusic size={16} aria-hidden="true" /><strong id="mini-player-queue-title">A continuación</strong></span>
-              <small>{queue.length} canciones</small>
+            <div className="mini-player__queue-tabs" role="tablist" aria-label="Opciones de la cola">
+              <button
+                className={activeQueueTab === 'up-next' ? 'mini-player__queue-tab mini-player__queue-tab--active' : 'mini-player__queue-tab'}
+                id="mini-player-tab-up-next"
+                type="button"
+                role="tab"
+                aria-controls="mini-player-queue-content"
+                aria-selected={activeQueueTab === 'up-next'}
+                onClick={() => setActiveQueueTab('up-next')}
+              >
+                <ListMusic size={15} aria-hidden="true" />
+                <span id="mini-player-queue-title">A continuación</span>
+              </button>
+              <button
+                className={activeQueueTab === 'search' ? 'mini-player__queue-tab mini-player__queue-tab--active' : 'mini-player__queue-tab'}
+                id="mini-player-tab-search"
+                type="button"
+                role="tab"
+                aria-controls="mini-player-queue-content"
+                aria-selected={activeQueueTab === 'search'}
+                onClick={() => setActiveQueueTab('search')}
+              >
+                <Search size={15} aria-hidden="true" />
+                <span>Buscar</span>
+              </button>
+              <button
+                className={activeQueueTab === 'related' ? 'mini-player__queue-tab mini-player__queue-tab--active' : 'mini-player__queue-tab'}
+                id="mini-player-tab-related"
+                type="button"
+                role="tab"
+                aria-controls="mini-player-queue-content"
+                aria-selected={activeQueueTab === 'related'}
+                onClick={() => setActiveQueueTab('related')}
+              >
+                <Sparkles size={15} aria-hidden="true" />
+                <span>Relacionado</span>
+              </button>
             </div>
-            {queue.length > 0 ? (
-              <ol className="mini-player__queue-list">
-                {queue.map((song, index) => (
-                  <li key={song.id}>
-                    <button type="button" onClick={() => selectQueueSong(song)}>
-                      <span className="mini-player__queue-index">{index + 1}</span>
-                      <img src={song.artwork} alt="" />
-                      <span className="mini-player__queue-copy">
-                        <strong>{song.title}</strong>
-                        <small>{song.artist}</small>
+            <div
+              className="mini-player__queue-content"
+              id="mini-player-queue-content"
+              role="tabpanel"
+              aria-labelledby={`mini-player-tab-${activeQueueTab}`}
+            >
+              {activeQueueTab === 'search' && (
+                <label className="mini-player__queue-search">
+                  <Search size={14} aria-hidden="true" />
+                  <input
+                    type="search"
+                    value={queueSearch}
+                    placeholder="Buscar en la cola"
+                    aria-label="Buscar en la cola"
+                    onChange={(event) => setQueueSearch(event.target.value)}
+                  />
+                </label>
+              )}
+              {activeQueueTab === 'related' ? (
+                <div className="mini-player__related">
+                  <section className="mini-player__related-section" aria-labelledby="mini-player-related-songs">
+                    <div className="mini-player__related-heading">
+                      <h3 id="mini-player-related-songs"><ListMusic size={13} aria-hidden="true" />Canciones</h3>
+                      <span className="mini-player__related-controls">
+                        <button type="button" aria-label="Canciones anteriores" onClick={() => scrollRelatedCarousel(relatedSongsRef.current, -1)}>
+                          <ChevronLeft size={14} aria-hidden="true" />
+                        </button>
+                        <button type="button" aria-label="Más canciones" onClick={() => scrollRelatedCarousel(relatedSongsRef.current, 1)}>
+                          <ChevronRight size={14} aria-hidden="true" />
+                        </button>
                       </span>
-                      <time>{formatTime(song.durationSeconds)}</time>
-                    </button>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="mini-player__empty">La cola aparecerá cuando reproduzcas una canción.</p>
-            )}
+                    </div>
+                    {visibleQueue.length > 0 ? (
+                      <div className="mini-player__related-grid mini-player__related-grid--songs" ref={relatedSongsRef}>
+                        {relatedSongColumns.map((songs) => (
+                          <div className="mini-player__related-song-column" key={songs[0].id}>
+                            {songs.map((song) => (
+                              <button type="button" key={song.id} onClick={() => selectQueueSong(song)}>
+                                <img src={song.artwork} alt="" />
+                                <span><strong>{song.title}</strong><small>{song.artist}</small></span>
+                              </button>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    ) : <p>No hay canciones relacionadas.</p>}
+                  </section>
+
+                  <section className="mini-player__related-section" aria-labelledby="mini-player-related-albums">
+                    <div className="mini-player__related-heading">
+                      <h3 id="mini-player-related-albums"><Disc3 size={13} aria-hidden="true" />Álbumes</h3>
+                      <span className="mini-player__related-controls">
+                        <button type="button" aria-label="Álbumes anteriores" onClick={() => scrollRelatedCarousel(relatedAlbumsRef.current, -1)}>
+                          <ChevronLeft size={14} aria-hidden="true" />
+                        </button>
+                        <button type="button" aria-label="Más álbumes" onClick={() => scrollRelatedCarousel(relatedAlbumsRef.current, 1)}>
+                          <ChevronRight size={14} aria-hidden="true" />
+                        </button>
+                      </span>
+                    </div>
+                    {relatedAlbums.length > 0 ? (
+                      <div className="mini-player__related-grid mini-player__related-grid--albums" ref={relatedAlbumsRef}>
+                        {relatedAlbums.map(([album, song]) => (
+                          <button type="button" key={album} onClick={() => selectQueueSong(song)}>
+                            <img src={song.artwork} alt="" />
+                            <span><strong>{album}</strong><small>{song.artist}</small></span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : <p>No hay álbumes relacionados.</p>}
+                  </section>
+
+                  <section className="mini-player__related-section" aria-labelledby="mini-player-related-artists">
+                    <div className="mini-player__related-heading">
+                      <h3 id="mini-player-related-artists"><UserRound size={13} aria-hidden="true" />Artistas</h3>
+                      <span className="mini-player__related-controls">
+                        <button type="button" aria-label="Artistas anteriores" onClick={() => scrollRelatedCarousel(relatedArtistsRef.current, -1)}>
+                          <ChevronLeft size={14} aria-hidden="true" />
+                        </button>
+                        <button type="button" aria-label="Más artistas" onClick={() => scrollRelatedCarousel(relatedArtistsRef.current, 1)}>
+                          <ChevronRight size={14} aria-hidden="true" />
+                        </button>
+                      </span>
+                    </div>
+                    {relatedArtists.length > 0 ? (
+                      <div className="mini-player__related-grid mini-player__related-grid--artists" ref={relatedArtistsRef}>
+                        {relatedArtists.map(([artist, song]) => (
+                          <button type="button" key={artist} onClick={() => selectQueueSong(song)}>
+                            <img className="mini-player__related-artist" src={song.artwork} alt="" />
+                            <span><strong>{artist}</strong><small>Artista</small></span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : <p>No hay artistas relacionados.</p>}
+                  </section>
+                </div>
+              ) : visibleQueue.length > 0 ? (
+                <ol className="mini-player__queue-list">
+                  {visibleQueue.map((song) => (
+                    <li key={song.id}>
+                      <button type="button" onClick={() => selectQueueSong(song)}>
+                        <span className="mini-player__queue-index">{queue.findIndex((item) => item.id === song.id) + 1}</span>
+                        <img src={song.artwork} alt="" />
+                        <span className="mini-player__queue-copy">
+                          <strong>{song.title}</strong>
+                          <small>{song.artist}</small>
+                        </span>
+                        <time>{formatTime(song.durationSeconds)}</time>
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="mini-player__empty">
+                  {activeQueueTab === 'search'
+                      ? 'No se encontraron canciones.'
+                      : 'La cola aparecerá cuando reproduzcas una canción.'}
+                </p>
+              )}
+            </div>
           </section>
         </div>
       </section>

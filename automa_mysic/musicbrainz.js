@@ -113,7 +113,8 @@ function releaseTrackNumber(release, recordingId) {
 function releaseKind(primaryType) {
   const normalized = String(primaryType || '').toLowerCase()
   if (normalized === 'single') return 'single'
-  if (normalized === 'album' || normalized === 'ep') return 'album'
+  if (normalized === 'ep') return 'ep'
+  if (normalized === 'album') return 'album'
   return null
 }
 
@@ -146,7 +147,7 @@ function buildMetadataFromMusicBrainz(recording, options = {}) {
 
 function validateRequiredMetadata(metadata) {
   const missing = []
-  if (!metadata.releaseName || !['album', 'single'].includes(metadata.kind)) missing.push('álbum/single')
+  if (!metadata.releaseName || !['album', 'ep', 'single'].includes(metadata.kind)) missing.push('álbum/EP/single')
   if (!metadata.artist) missing.push('autor(es)')
   if (!metadata.title) missing.push('nombre de la canción')
   if (!Number.isInteger(metadata.year) || metadata.year < 1) missing.push('año')

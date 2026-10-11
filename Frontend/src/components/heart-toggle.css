@@ -94,3 +94,33 @@
     transform: scale(1.4);
   }
 }
+
+.svg-celebrate--portal {
+  position: fixed;
+  z-index: 1000;
+  display: block;
+  width: 56px;
+  height: 56px;
+  fill: #4bd27b;
+  stroke: #4bd27b;
+  stroke-width: 2px;
+  pointer-events: none;
+  animation: heart-toggle-player-celebrate 500ms ease-out forwards;
+}
+
+@keyframes heart-toggle-player-celebrate {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+
+  50% {
+    opacity: 1;
+    filter: brightness(1.5);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+}

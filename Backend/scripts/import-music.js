@@ -68,7 +68,30 @@ async function collectMp3Files(directory) {
   return nestedFiles.flat()
 }
 
-function createCandidates(rootDirectory, files) {
+function normalizeGenres(values) {
+  const genres = Array.isArray(values) ? values : [values]
+  const unique = new Map()
+
+  for (const value of genres.flatMap((genre) => String(genre || '').split(/[;,]/))) {
+    const genre = value.trim()
+    const key = genre.toLocaleLowerCase('es')
+    if (genre && !unique.has(key)) unique.set(key, genre)
+  }
+
+  return [...unique.values()].slice(0, 2)
+}
+
+async function readTrackMetadata(filePath) {
+  const { parseFile } = require('music-metadata')
+  const metadata = await parseFile(filePath, { skipCovers: true, duration: true })
+  const duration = Number(metadata.format.duration)
+  return {
+    durationSec: Number.isFinite(duration) && duration > 0 ? Math.round(duration) : null,
+    genres: normalizeGenres(metadata.common.genre),
+  }
+}
+
+async function createCandidates(rootDirectory, files, getMetadata = readTrackMetadata) {
   const skipped = []
   const candidates = []
 
@@ -98,7 +121,7 @@ function createCandidates(rootDirectory, files) {
         : !isNewStructure
 
     if (!validNewStructure || (!isNewStructure && parts.length < 3)) {
-      skipped.push({ relativePath, reason: 'Usa Artistas/Artista/Albums/Album/cancion.mp3 o Artistas/Artista/Singles/cancion.mp3.' })
+      skipped.push({ relativePath, reason: 'Usa Artistas/Artista/Albums/Album, EPs/EP o Singles/Single antes del MP3.' })
       continue
     }
 
@@ -122,12 +145,16 @@ function createCandidates(rootDirectory, files) {
       relativePath,
       artistName,
       albumTitle,
+      releaseType: hasSingles ? 'single' : hasEps ? 'ep' : 'album',
       title,
       requestedDiscNo,
       requestedTrackNo,
     })
   }
 
+  await Promise.all(candidates.map(async (candidate) => {
+    Object.assign(candidate, await getMetadata(candidate.absolutePath))
+  }))
   assignTrackNumbers(candidates)
   return { candidates, skipped }
 }
@@ -179,8 +206,8 @@ async function importCandidate(prisma, candidate) {
     })
     const album = await database.album.upsert({
       where: { slug: albumSlug },
-      update: { title: candidate.albumTitle, releaseDate },
-      create: { title: candidate.albumTitle, slug: albumSlug, releaseDate },
+      update: { title: candidate.albumTitle, releaseType: candidate.releaseType || 'album', releaseDate },
+      create: { title: candidate.albumTitle, slug: albumSlug, releaseType: candidate.releaseType || 'album', releaseDate },
     })
     const [assetWithSong, songBySlug, trackAtPosition] = await Promise.all([
       database.mediaAsset.findFirst({
@@ -205,10 +232,19 @@ async function importCandidate(prisma, candidate) {
     const song = existingSong
       ? await database.song.update({
           where: { id: existingSong.id },
-          data: { title: candidate.title, durationSec: candidate.durationSec ?? undefined },
+          data: {
+            title: candidate.title,
+            durationSec: candidate.durationSec ?? undefined,
+            genres: candidate.genres?.length ? normalizeGenres(candidate.genres) : undefined,
+          },
         })
       : await database.song.create({
-          data: { title: candidate.title, slug: songSlug, durationSec: candidate.durationSec ?? null },
+          data: {
+            title: candidate.title,
+            slug: songSlug,
+            durationSec: candidate.durationSec ?? null,
+            genres: normalizeGenres(candidate.genres),
+          },
         })
 
     await database.albumArtist.upsert({
@@ -283,7 +319,7 @@ async function main() {
   if (!rootStats?.isDirectory()) throw new Error(`La carpeta no existe: ${rootDirectory}`)
 
   const files = await collectMp3Files(rootDirectory)
-  const { candidates, skipped } = createCandidates(rootDirectory, files)
+  const { candidates, skipped } = await createCandidates(rootDirectory, files)
   printPreview(rootDirectory, candidates, skipped)
 
   if (!apply) {
@@ -319,6 +355,8 @@ module.exports = {
   assignTrackNumbers,
   createCandidates,
   importCandidate,
+  normalizeGenres,
   parseTrackFileName,
+  readTrackMetadata,
   slugify,
 }

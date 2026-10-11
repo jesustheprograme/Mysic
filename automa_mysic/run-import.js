@@ -114,7 +114,7 @@ async function processImports(options = {}) {
         ? await (options.resolveMetadata || resolveMusicBrainzEntry)({ ...entry, filePath: sourcePath })
         : entry
       if (!resolvedEntry.artist || !resolvedEntry.title || !resolvedEntry.kind || !resolvedEntry.releaseName || !resolvedEntry.year || !resolvedEntry.trackNumber) {
-        throw new Error('Faltan metadatos obligatorios después de la identificación: álbum/single, autor(es), canción, año o pista.')
+        throw new Error('Faltan metadatos obligatorios después de la identificación: álbum/EP/single, autor(es), canción, año o pista.')
       }
       const cover = selectCoverForFolder(assets, resolvedEntry.cloudinaryFolder, folderMode)
       if (dryRun) {

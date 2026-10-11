@@ -1,35 +1,73 @@
 # Mysic
 
-Aplicacion React con autenticacion mediante correo/contrasena o Google y sesiones persistentes en MongoDB.
+Aplicación React/Vite con API Express, catálogo PostgreSQL, datos de usuario en MongoDB y autenticación por correo/contraseña o Google.
+
+## Inicio rápido
+
+No mezcles datos ni credenciales entre entornos. El repositorio es único, pero cada proceso debe usar el conjunto completo de un solo entorno:
+
+| Recurso | Local | Producción |
+| --- | --- | --- |
+| PostgreSQL | `mysic_bd_local` | `mysic_bd` |
+| MongoDB | `Mysic_local` | `Mysic` |
+| Google OAuth | cliente web de localhost | cliente web del dominio publicado |
+| Frontend | Vite en `http://localhost:5173` | archivos de `Frontend/dist` detrás de HTTPS |
+| API | Express en `http://localhost:4000` | Express en `127.0.0.1:4000` detrás de Nginx |
+
+Para levantar una copia nueva desde cero sigue, en orden, [la guía local](docs/local-development.md). Para publicar o actualizar el servidor sigue [la guía de producción](docs/production-deployment.md). Ambas incluyen comandos de verificación y criterios para detenerse si una dependencia falla.
+
+## Alcance actual de pruebas
+
+Mysic se ejecuta por ahora como entorno local de desarrollo. No necesita reverse proxy: Vite sirve el frontend en el puerto 5173 y Express expone la API en el puerto 4000. El catálogo y el streaming permanecen accesibles sin sesión para simplificar las pruebas de reproducción; antes de publicar el servicio en Internet se debe definir si esos endpoints serán públicos o requerirán autenticación.
+
+Antes de una sesión de prueba ejecuta las verificaciones de cada módulo:
+
+```powershell
+cd Frontend
+npm run check
+
+cd ..\Backend
+npm run check
+
+cd ..\automa_mysic
+npm run check
+```
+
+La aplicación Tauri todavía usa Node y la carpeta local `automa_mysic`; no se considera un instalador autónomo en esta etapa.
+
+La preparación para publicar la versión web está detallada en [docs/production-deployment.md](docs/production-deployment.md): R2, PostgreSQL, MongoDB, OAuth, systemd, Nginx, HTTPS y pruebas finales.
 
 ## Automatización local con n8n
 
-La pantalla **Importar música** permite preparar MP3 desde uno o varios enlaces autorizados mediante n8n, yt-dlp y FFmpeg. La adquisición se ejecuta localmente, una URL a la vez, y siempre deja los archivos pendientes de análisis y aprobación humana antes de cualquier subida. Consulta [n8n/README.md](n8n/README.md) para instalar dependencias, crear las dos credenciales Header Auth, importar el workflow y usar el iniciador único de Windows.
+La pantalla **Importar música** permite preparar MP3 desde uno o varios enlaces autorizados mediante n8n, yt-dlp y FFmpeg. El permiso se calcula en el backend a partir de `MUSIC_IMPORT_ADMIN_EMAIL` y una cuenta Google verificada; la opción no aparece para los demás usuarios y la ruta directa vuelve a Inicio. La adquisición se ejecuta localmente, una URL a la vez, y siempre deja los archivos pendientes de análisis y aprobación humana antes de cualquier subida. Consulta [n8n/README.md](n8n/README.md) para instalar dependencias, crear las dos credenciales Header Auth, importar el workflow y usar el iniciador único de Windows.
 
-## Configuracion
+## Configuración resumida
 
-1. Copia `Backend/.env.example` como `Backend/.env`.
+1. Copia `Backend/.env.example` como `Backend/.env`. El ejemplo apunta deliberadamente a `mysic_bd_local` y `Mysic_local`.
 2. Coloca un `MONGODB_URI` valido de Atlas y genera un `JWT_SECRET` de 32 caracteres o mas.
+   `MUSIC_IMPORT_ADMIN_EMAIL` identifica el correo Google verificado con acceso a Importar música.
 3. Copia `Frontend/.env.example` como `Frontend/.env`.
-4. Para Google, crea un cliente OAuth de tipo **Aplicacion web** y usa el mismo ID en:
-   - `Backend/.env`: `GOOGLE_CLIENT_ID`
-   - `Frontend/.env`: `VITE_GOOGLE_CLIENT_ID`
-   Para la aplicacion de escritorio crea tambien un cliente OAuth de tipo **Aplicacion de escritorio** y configura su ID en `VITE_GOOGLE_DESKTOP_CLIENT_ID`. Agregalo a `GOOGLE_CLIENT_IDS` en el backend junto al ID web.
+4. Para Google, crea clientes OAuth de tipo **Aplicacion web** separados para local y producción.
+   - En local, usa el cliente local en `Backend/.env`: `GOOGLE_CLIENT_ID` y en `Frontend/.env.development.local`: `VITE_GOOGLE_CLIENT_ID`.
+   - En producción, usa el cliente desplegado en `Backend/.env`: `GOOGLE_CLIENT_ID` y al compilar el frontend: `VITE_GOOGLE_CLIENT_ID`.
+   - `Backend/.env`: `GOOGLE_CLIENT_IDS` puede incluir ambos IDs separados por comas. El primero no reemplaza `GOOGLE_CLIENT_ID`; ambos se aceptan.
+   La aplicacion de escritorio abre el acceso seguro del dominio web y reutiliza el cliente OAuth web; no necesita un segundo cliente de escritorio.
 5. En Google Cloud agrega los origenes JavaScript que uses, por ejemplo:
    - `http://localhost:5173`
    - `http://127.0.0.1:5173`
    - `http://localhost:5174`
    - `http://127.0.0.1:5174`
    - `http://tauri.localhost` (aplicacion de escritorio instalada)
-   Para el flujo desktop con navegador del sistema, agrega tambien `http://127.0.0.1:14523` en **URIs de redireccionamiento autorizados** si reutilizas el cliente web. El cliente desktop de Google puede usar el mismo callback loopback sin registrar un puerto fijo.
+   El navegador vuelve a la aplicacion mediante un callback local en `http://127.0.0.1:14523`; la credencial viaja directamente desde la pagina de Mysic al proceso local y esa URL no se registra como redireccion OAuth en Google.
 
 No incluyas rutas como `/login` en los origenes autorizados. Si la contrasena de Atlas contiene caracteres especiales, codificalos en formato URL.
 
-## Ejecucion
+## Ejecución diaria local
 
 ```powershell
 cd Backend
-npm install
+npm ci
+npx prisma migrate deploy
 npm run dev
 ```
 
@@ -37,7 +75,7 @@ En otra terminal:
 
 ```powershell
 cd Frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -52,6 +90,8 @@ El backend usa por defecto `http://localhost:4000` y el frontend la URL que mues
 - `POST /api/auth/logout`
 
 La sesion se almacena en una cookie `HttpOnly`; las contrasenas se guardan con bcrypt y nunca se devuelven al navegador.
+
+La variable `MUSIC_IMPORT_ADMIN_EMAIL` define la cuenta autorizada para importar música. Esa cuenta debe autenticarse con Google y tener el correo verificado; el frontend no decide quién es administrador por un valor editable del navegador.
 
 ## Catálogo musical desde FileZilla
 
@@ -80,13 +120,13 @@ MUSIC_SSH_KEY_PATH=C:\\Users\\usuario\\.ssh\\id_ed25519
 MUSIC_SSH_ROOT=/music
 ```
 
-Referencia de la instancia Oracle Cloud usada por este proyecto:
+Configura la instancia remota únicamente mediante `Backend/.env`:
 
 ```text
-Host: 155.181.37.222
-Usuario SSH: ubuntu
-Instancia: instance-20260908-0948
-Clave local: C:\Users\JOSE.LAPTOP-SNQTVDID\Downloads\oraclekey.key
+Host: <servidor>
+Usuario SSH: <usuario>
+Instancia: <nombre-de-instancia>
+Clave local: <ruta-local-a-la-clave>
 Raíz musical remota: /music
 ```
 

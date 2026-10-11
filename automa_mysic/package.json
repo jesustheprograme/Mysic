@@ -6,6 +6,7 @@
   "main": "import-music.js",
   "scripts": {
     "test": "node --test *.test.js",
+    "check": "npm test",
     "preview": "node run-import.js --dry-run",
     "import": "node run-import.js",
     "acquisition:worker": "node acquisition-worker.js"

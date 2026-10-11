@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict')
+const path = require('node:path')
 const test = require('node:test')
-const { parseTrackFileName } = require('./import-music')
+const { createCandidates, normalizeGenres, parseTrackFileName } = require('./import-music')
 const { loadAlbumLinkManifests, resolveSourceSong } = require('./link-album-tracks')
 const { candidateFromNavidromeSong } = require('./sync-navidrome')
 const { parseRemoteImagePath } = require('./sync-images')
@@ -45,6 +46,25 @@ test('conserva archivos sin prefijo', () => {
   assert.equal(track.cleanTitle, 'Tot Musica')
 })
 
+test('incorpora la duración de cada MP3 durante el escaneo', async () => {
+  const root = path.join('C:', 'biblioteca')
+  const file = path.join(root, 'Artistas', 'Slowdown', 'Albums', 'Retrospectives', '01 - Motif d’Azur.mp3')
+  const inspected = []
+
+  const { candidates } = await createCandidates(root, [file], async (filePath) => {
+    inspected.push(filePath)
+    return { durationSec: 214, genres: ['Jazz', 'Bossa Nova'] }
+  })
+
+  assert.deepEqual(inspected, [file])
+  assert.equal(candidates[0].durationSec, 214)
+  assert.deepEqual(candidates[0].genres, ['Jazz', 'Bossa Nova'])
+})
+
+test('normaliza, separa y limita los géneros a dos', () => {
+  assert.deepEqual(normalizeGenres(['J-Pop; Rock', 'j-pop', 'Pop']), ['J-Pop', 'Rock'])
+})
+
 test('prioriza números válidos de metadata cuando no se fuerza FileZilla', () => {
   const candidate = candidateFromNavidromeSong({
     id: 'song-1',
@@ -55,6 +75,16 @@ test('prioriza números válidos de metadata cuando no se fuerza FileZilla', () 
 
   assert.equal(candidate.requestedDiscNo, 2)
   assert.equal(candidate.requestedTrackNo, 7)
+})
+
+test('incorpora los géneros que devuelve Navidrome', () => {
+  const candidate = candidateFromNavidromeSong({
+    id: 'song-with-genres',
+    path: 'Artistas/Ado/Singles/Show/01 - Show.mp3',
+    genre: 'J-Pop; Rock',
+  })
+
+  assert.deepEqual(candidate.genres, ['J-Pop', 'Rock'])
 })
 
 test('metadata válida prevalece cuando difiere del filename', () => {
@@ -78,6 +108,17 @@ test('usa cada subcarpeta de Singles como un lanzamiento independiente', () => {
   assert.equal(candidate.albumTitle, '綺羅 (KIRA)')
   assert.equal(candidate.title, '綺羅(KIRA)')
   assert.equal(candidate.requestedTrackNo, 1)
+  assert.equal(candidate.releaseType, 'single')
+})
+
+test('conserva EP como un tipo de lanzamiento independiente', () => {
+  const candidate = candidateFromNavidromeSong({
+    id: 'ep-1',
+    path: 'Artistas/Ado/EPs/Short Release/01 - Song.mp3',
+  }, { preferFilename: true })
+
+  assert.equal(candidate.albumTitle, 'Short Release')
+  assert.equal(candidate.releaseType, 'ep')
 })
 
 test('el Best Adobum tiene una secuencia única de cuarenta pistas con fuente para cada canción', async () => {
@@ -231,11 +272,11 @@ test('elimina retratos de perfil que ya no existen en Cloudinary', async () => {
   assert.equal(result.removed, 1)
 })
 
-test('incluye la versión de Cloudinary para invalidar portadas reemplazadas', () => {
+test('conserva la versión de Cloudinary que invalida portadas reemplazadas', () => {
   const image = {
     id: 'image-1',
     url: 'https://res.cloudinary.com/example/image/upload/v1790480000/cover.webp',
   }
 
-  assert.equal(mapImage(image), '/catalog/images/image-1?v=1790480000')
+  assert.equal(mapImage(image), image.url)
 })

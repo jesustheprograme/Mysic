@@ -1,0 +1,21 @@
+[Unit]
+Description=Mysic Node API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__SERVICE_USER__
+WorkingDirectory=__PROJECT_ROOT__/Backend
+Environment=NODE_ENV=production
+Environment=MYSIC_RUNTIME_ENV=__PROJECT_ROOT__/Backend/.env.production
+EnvironmentFile=__PROJECT_ROOT__/Backend/.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

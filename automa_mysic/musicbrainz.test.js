@@ -54,6 +54,21 @@ test('maps MusicBrainz recording data into import metadata', () => {
   })
 })
 
+test('classifies a MusicBrainz EP without converting it to album', () => {
+  const entry = buildMetadataFromMusicBrainz({
+    id: 'recording-id',
+    title: 'Track',
+    'artist-credit': [{ name: 'Artist' }],
+    releases: [{
+      title: 'Short Release',
+      date: '2024-01-01',
+      'release-group': { 'primary-type': 'EP' },
+      media: [{ tracks: [{ recording: { id: 'recording-id' }, position: 1 }] }],
+    }],
+  })
+  assert.equal(entry.kind, 'ep')
+})
+
 test('keeps only the first MusicBrainz artist credit', () => {
   assert.equal(formatArtistCredit([
     { name: 'Artist A', joinphrase: ' feat. ' },
@@ -134,7 +149,7 @@ test('rejects a release whose type is not album, EP, or single', () => {
     title: 'Song',
     'artist-credit': [{ name: 'Artist' }],
     releases: [{ title: 'Radio broadcast', date: '2022', 'release-group': { 'primary-type': 'Broadcast' } }],
-  }), /álbum\/single/)
+  }), /álbum\/EP\/single/)
 })
 
 test('resolves an entry from injected fingerprint and MusicBrainz responses', async () => {

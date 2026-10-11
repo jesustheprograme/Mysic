@@ -4,6 +4,7 @@ const { ObjectId } = require('mongodb')
 const { OAuth2Client } = require('google-auth-library')
 const { z } = require('zod')
 const { getUsersCollection } = require('./database')
+const { hasMusicImportAccess } = require('./music-import-access')
 
 const SESSION_COOKIE = 'mysic_session'
 const SESSION_DURATION = '12h'
@@ -35,42 +36,76 @@ function normalizeEmail(email) {
   return email.trim().toLowerCase()
 }
 
-function publicUser(user) {
+function publicUser(user, config) {
   return {
     id: user._id.toString(),
     username: user.username,
     email: user.email,
     avatarUrl: user.avatarUrl || null,
     providers: user.providers || [],
+    canImportMusic: hasMusicImportAccess(user, config.musicImportAdminEmail),
   }
 }
 
-function cookieOptions(config, remember = false) {
+function isDesktopRequest(req) {
+  try {
+    return new URL(req.get('origin')).hostname === 'tauri.localhost'
+  } catch {
+    return false
+  }
+}
+
+function cookieOptions(config, remember = false, desktop = false) {
   return {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: desktop ? 'none' : 'lax',
     secure: config.nodeEnv === 'production',
     path: '/',
     ...(remember ? { maxAge: 7 * 24 * 60 * 60 * 1000 } : {}),
   }
 }
 
-function startSession(res, user, config, remember) {
+function startSession(req, res, user, config, remember) {
   const token = jwt.sign(
     { sub: user._id.toString() },
     config.jwtSecret,
     { expiresIn: remember ? REMEMBERED_SESSION_DURATION : SESSION_DURATION },
   )
 
-  res.cookie(SESSION_COOKIE, token, cookieOptions(config, remember))
+  res.cookie(SESSION_COOKIE, token, cookieOptions(config, remember, isDesktopRequest(req)))
 }
 
-function clearSession(res, config) {
-  res.clearCookie(SESSION_COOKIE, cookieOptions(config))
+function clearSession(req, res, config) {
+  res.clearCookie(SESSION_COOKIE, cookieOptions(config, false, isDesktopRequest(req)))
 }
 
 function validationMessage(error) {
   return error.issues?.[0]?.message || 'Revisa los datos enviados.'
+}
+
+function googleVerificationMessage(error) {
+  const reason = error instanceof Error ? error.message : ''
+
+  if (/audience|recipient/i.test(reason)) {
+    return 'La credencial de Google corresponde a otro entorno de Mysic. Recarga la pagina e intenta de nuevo.'
+  }
+
+  if (/expired|too late/i.test(reason)) {
+    return 'La credencial de Google vencio. Intenta iniciar sesion nuevamente.'
+  }
+
+  return 'Google no pudo validar la credencial. Intenta de nuevo.'
+}
+
+function buildGoogleLinkChanges(user, payload, updatedAt = new Date()) {
+  const changes = {
+    googleSub: payload.sub,
+    providers: [...new Set([...(user.providers || []), 'google'])],
+    updatedAt,
+  }
+
+  if (!user.avatarUrl && payload.picture) changes.avatarUrl = payload.picture
+  return changes
 }
 
 async function getAuthenticatedUser(req, res, config) {
@@ -86,13 +121,13 @@ async function getAuthenticatedUser(req, res, config) {
   try {
     payload = jwt.verify(token, config.jwtSecret)
   } catch {
-    clearSession(res, config)
+    clearSession(req, res, config)
     res.status(401).json({ message: 'La sesion vencio.' })
     return null
   }
 
   if (!ObjectId.isValid(payload.sub)) {
-    clearSession(res, config)
+    clearSession(req, res, config)
     res.status(401).json({ message: 'La sesion no es valida.' })
     return null
   }
@@ -100,7 +135,7 @@ async function getAuthenticatedUser(req, res, config) {
   const user = await getUsersCollection().findOne({ _id: new ObjectId(payload.sub) })
 
   if (!user) {
-    clearSession(res, config)
+    clearSession(req, res, config)
     res.status(401).json({ message: 'La cuenta ya no existe.' })
     return null
   }
@@ -139,9 +174,9 @@ function createAuthHandlers(config) {
 
       const result = await users.insertOne(user)
       user._id = result.insertedId
-      startSession(res, user, config, false)
+      startSession(req, res, user, config, false)
 
-      return res.status(201).json({ user: publicUser(user) })
+      return res.status(201).json({ user: publicUser(user, config) })
     } catch (error) {
       if (error?.code === 11000) {
         return res.status(409).json({ message: 'Ya existe una cuenta con ese correo.' })
@@ -167,8 +202,8 @@ function createAuthHandlers(config) {
         return res.status(401).json({ message: 'Correo o contrasena incorrectos.' })
       }
 
-      startSession(res, user, config, parsed.data.remember)
-      return res.json({ user: publicUser(user) })
+      startSession(req, res, user, config, parsed.data.remember)
+      return res.json({ user: publicUser(user, config) })
     } catch (error) {
       return next(error)
     }
@@ -195,8 +230,9 @@ function createAuthHandlers(config) {
           idToken: parsed.data.credential,
           audience: config.googleClientIds?.length ? config.googleClientIds : config.googleClientId,
         })
-      } catch {
-        return res.status(401).json({ message: 'La credencial de Google vencio o no pertenece a Mysic.' })
+      } catch (verificationError) {
+        console.warn(`[auth/google] Google rechazó la credencial: ${verificationError.message}`)
+        return res.status(401).json({ message: googleVerificationMessage(verificationError) })
       }
       const payload = ticket.getPayload()
 
@@ -211,30 +247,35 @@ function createAuthHandlers(config) {
       if (!user) {
         const sameEmailUser = await users.findOne({ email })
 
+        if (sameEmailUser?.googleSub && sameEmailUser.googleSub !== payload.sub) {
+          return res.status(409).json({ message: 'Este correo ya esta vinculado a otra cuenta de Google.' })
+        }
+
         if (sameEmailUser) {
-          return res.status(409).json({
-            message: 'Ya existe una cuenta con este correo. Inicia sesion con tu contrasena.',
-          })
-        }
+          const changes = buildGoogleLinkChanges(sameEmailUser, payload)
 
-        const now = new Date()
-        user = {
-          username: payload.name?.trim() || email.split('@')[0],
-          email,
-          passwordHash: null,
-          googleSub: payload.sub,
-          avatarUrl: payload.picture || null,
-          providers: ['google'],
-          createdAt: now,
-          updatedAt: now,
-        }
+          await users.updateOne({ _id: sameEmailUser._id }, { $set: changes })
+          user = { ...sameEmailUser, ...changes }
+        } else {
+          const now = new Date()
+          user = {
+            username: payload.name?.trim() || email.split('@')[0],
+            email,
+            passwordHash: null,
+            googleSub: payload.sub,
+            avatarUrl: payload.picture || null,
+            providers: ['google'],
+            createdAt: now,
+            updatedAt: now,
+          }
 
-        const result = await users.insertOne(user)
-        user._id = result.insertedId
+          const result = await users.insertOne(user)
+          user._id = result.insertedId
+        }
       }
 
-      startSession(res, user, config, parsed.data.remember)
-      return res.json({ user: publicUser(user) })
+      startSession(req, res, user, config, parsed.data.remember)
+      return res.json({ user: publicUser(user, config) })
     } catch (error) {
       if (error?.code === 11000) {
         return res.status(409).json({ message: 'Ya existe una cuenta con ese correo.' })
@@ -249,18 +290,23 @@ function createAuthHandlers(config) {
       const user = await getAuthenticatedUser(req, res, config)
       if (!user) return undefined
 
-      return res.json({ user: publicUser(user) })
+      return res.json({ user: publicUser(user, config) })
     } catch (error) {
       return next(error)
     }
   }
 
-  function logout(_req, res) {
-    clearSession(res, config)
+  function logout(req, res) {
+    clearSession(req, res, config)
     return res.status(204).end()
   }
 
   return { google, login, logout, me, register }
 }
 
-module.exports = { createAuthHandlers, getAuthenticatedUser }
+module.exports = {
+  buildGoogleLinkChanges,
+  createAuthHandlers,
+  getAuthenticatedUser,
+  googleVerificationMessage,
+}

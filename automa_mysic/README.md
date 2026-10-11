@@ -76,7 +76,7 @@ MUSICBRAINZ_USER_AGENT=AutomaMysic/1.0 (tu-correo-o-url)
 
 Para utilizar directamente la selección de lanzamientos de Picard, cambia `METADATA_ENGINE=picard`. La automatización ejecuta `SCAN` y `SAVE_MATCHED` sobre una copia temporal, lee las etiquetas resultantes y descarta la copia. El MP3 original no se modifica durante el análisis.
 
-Los archivos importados se organizan bajo `MUSIC_LIBRARY_PATH` como `Artistas/Artista/Albums/Album/01 - Canción.mp3` o `Artistas/Artista/Singles/Single/01 - Canción.mp3`. El botón **Eliminar** de la tabla borra tanto la fila como la copia todavía preparada en `asignar_metadatos`; nunca borra una canción ya movida a la biblioteca.
+Picard y MusicBrainz conservan tres tipos de lanzamiento: `album`, `ep` y `single`. Los archivos importados se organizan bajo `MUSIC_LIBRARY_PATH` como `Artistas/Artista/Albums/Album/01 - Canción.mp3`, `Artistas/Artista/EPs/EP/01 - Canción.mp3` o `Artistas/Artista/Singles/Single/01 - Canción.mp3`. El botón **Eliminar** de la tabla borra tanto la fila como la copia todavía preparada en `asignar_metadatos`; nunca borra una canción ya movida a la biblioteca.
 
 La aplicación calcula automáticamente esa misma carpeta para Cloudinary y para `MUSIC_SSH_ROOT`. Al importar desde la interfaz, crea la carpeta remota si falta y transmite el MP3 por SSH a un archivo temporal `.part`. Después verifica SHA-256 y lo renombra de forma atómica. Si el destino ya existe, la operación se detiene sin sobrescribirlo; si la subida falla, conserva el MP3 de entrada para reintentar.
 

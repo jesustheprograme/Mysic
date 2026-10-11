@@ -6,6 +6,7 @@ export type MiniSong = {
   id: string
   title: string
   artist: string
+  albumTitle?: string
   artwork: string
   durationSeconds: number
 }

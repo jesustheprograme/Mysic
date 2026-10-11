@@ -6,6 +6,7 @@ const express = require('express')
 const { getAuthenticatedUser } = require('./auth')
 const { getArtistSpotlightViewsCollection } = require('./database')
 const { proxyNavidromeAudio } = require('./navidrome')
+const { createAudioDeliveryUrl } = require('./object-storage')
 const { prisma } = require('./prisma')
 
 const catalogImageDirectory = path.join(__dirname, '..', 'storage', 'catalog-images')
@@ -13,10 +14,12 @@ const catalogImageDirectory = path.join(__dirname, '..', 'storage', 'catalog-ima
 function mapImage(image) {
   if (!image) return null
 
-  const cloudinaryVersion = /^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/v(\d+)\//i.exec(image.url)?.[1]
-  const version = cloudinaryVersion ?? (image.url.startsWith('catalog-image:')
+  // Remote delivery URLs are stable across local and deployed PostgreSQL catalogs.
+  if (/^https?:\/\//i.test(image.url)) return image.url
+
+  const version = image.url.startsWith('catalog-image:')
     ? path.parse(image.url.slice('catalog-image:'.length)).name
-    : null)
+    : null
 
   return `/catalog/images/${image.id}${version ? `?v=${encodeURIComponent(version)}` : ''}`
 }
@@ -44,6 +47,7 @@ function mapSong(song, track = song.albums?.[0]) {
         title: track.album.title,
         slug: track.album.slug,
         artwork: mapImage(track.album.coverImage),
+        releaseType: track.album.releaseType,
         releaseDate: track.album.releaseDate,
       }
     : null
@@ -54,6 +58,7 @@ function mapSong(song, track = song.albums?.[0]) {
     slug: song.slug,
     title: song.title,
     durationSeconds: song.durationSec ?? 0,
+    genres: song.genres ?? [],
     discNo: track?.discNo ?? 1,
     trackNo: track?.trackNo ?? null,
     artists,
@@ -67,6 +72,7 @@ function mapSong(song, track = song.albums?.[0]) {
       title: membership.album.title,
       slug: membership.album.slug,
       artwork: mapImage(membership.album.coverImage),
+      releaseType: membership.album.releaseType,
       releaseDate: membership.album.releaseDate,
       discNo: membership.discNo,
       trackNo: membership.trackNo,
@@ -91,6 +97,7 @@ function mapArtist(artist) {
       title: album.title,
       slug: album.slug,
       artwork: mapImage(album.coverImage),
+      releaseType: album.releaseType,
       releaseDate: album.releaseDate,
     })),
     songs: artist.songs.map(({ song }) => mapSong(song)),
@@ -110,11 +117,33 @@ function parseByteRange(rangeHeader, fileSize) {
   const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader || '')
   if (!match) return null
 
-  const start = match[1] ? Number(match[1]) : 0
-  const end = match[2] ? Number(match[2]) : fileSize - 1
+  const [, startText, endText] = match
+  if (!startText && !endText) return null
+
+  if (!startText) {
+    const suffixLength = Number(endText)
+    if (!Number.isInteger(suffixLength) || suffixLength <= 0) return null
+    return {
+      start: Math.max(fileSize - suffixLength, 0),
+      end: fileSize - 1,
+    }
+  }
+
+  const start = Number(startText)
+  const end = endText ? Number(endText) : fileSize - 1
   if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || start >= fileSize) return null
 
   return { start, end: Math.min(end, fileSize - 1) }
+}
+
+function parseCatalogPagination(query) {
+  const page = Number(query.page || 1)
+  const limit = Number(query.limit || 250)
+
+  return {
+    page: Number.isInteger(page) && page > 0 ? page : 1,
+    limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, 250) : 250,
+  }
 }
 
 function createCatalogRouter(config) {
@@ -178,28 +207,40 @@ function createCatalogRouter(config) {
 
   router.get('/songs', asyncRoute(async (req, res) => {
     const search = String(req.query.search || '').trim()
-    const songs = await prisma.song.findMany({
-      where: search
-        ? {
+    if (search.length > 120) return res.status(400).json({ message: 'La búsqueda es demasiado larga.' })
+    const { page, limit } = parseCatalogPagination(req.query)
+    const where = search
+      ? {
           OR: [
             { title: { contains: search, mode: 'insensitive' } },
             { artists: { some: { artist: { name: { contains: search, mode: 'insensitive' } } } } },
             { albums: { some: { album: { title: { contains: search, mode: 'insensitive' } } } } },
           ],
         }
-        : {},
-      include: songRelations,
-      take: 1000,
-    })
+      : {}
+    const [songs, total] = await Promise.all([
+      prisma.song.findMany({
+        where,
+        include: songRelations,
+        orderBy: [{ title: 'asc' }, { id: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.song.count({ where }),
+    ])
     const catalogSongs = songs
       .map((song) => mapSong(song))
-      .sort((first, second) => (
-        first.albumTitle.localeCompare(second.albumTitle)
-        || first.discNo - second.discNo
-        || (first.trackNo ?? Number.MAX_SAFE_INTEGER) - (second.trackNo ?? Number.MAX_SAFE_INTEGER)
-      ))
 
-    res.json({ songs: catalogSongs })
+    res.json({
+      songs: catalogSongs,
+      pagination: {
+        page,
+        limit,
+        total,
+        pageCount: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+      },
+    })
   }))
 
   router.get('/songs/:id', asyncRoute(async (req, res) => {
@@ -256,6 +297,7 @@ function createCatalogRouter(config) {
         title: album.title,
         slug: album.slug,
         artwork: mapImage(album.coverImage),
+        releaseType: album.releaseType,
         artist: album.artists.map(({ artist }) => artist.name).join(', '),
         artistId: album.artists[0]?.artist.id ?? null,
         trackCount: album._count.tracks,
@@ -284,6 +326,7 @@ function createCatalogRouter(config) {
         title: album.title,
         slug: album.slug,
         artwork: mapImage(album.coverImage),
+        releaseType: album.releaseType,
         releaseDate: album.releaseDate,
         artists: album.artists.map(({ artist }) => ({ id: artist.id, name: artist.name })),
         songs: album.tracks.map((track) => mapSong(track.song, { ...track, album })),
@@ -327,6 +370,11 @@ function createCatalogRouter(config) {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
 
     if (/^https?:\/\//i.test(asset.url)) return res.redirect(asset.url)
+    if (asset.url.startsWith('r2:')) {
+      const deliveryUrl = await createAudioDeliveryUrl(config, asset.url.slice('r2:'.length))
+      res.setHeader('Cache-Control', 'private, no-store')
+      return res.redirect(307, deliveryUrl)
+    }
     if (asset.url.startsWith('navidrome:')) {
       return proxyNavidromeAudio(config, asset.url.slice('navidrome:'.length), req, res)
     }
@@ -361,4 +409,4 @@ function createCatalogRouter(config) {
   return router
 }
 
-module.exports = { createCatalogRouter, mapImage, mapSong, parseByteRange }
+module.exports = { createCatalogRouter, mapImage, mapSong, parseByteRange, parseCatalogPagination }

@@ -1,20 +1,41 @@
-import { useCallback, useEffect, useState } from 'react'
-import { songs } from './data/music.js'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { clearPlaylists, loadPlaylists } from './data/playlists.js'
-import { catalogApi, favoritesApi, playlistsApi } from './lib/api.js'
+import { favoritesApi, playlistsApi } from './lib/api.js'
+import useCatalogo from './estado/catalogo/useCatalogo.js'
 import AuthView from './features/auth/AuthView.jsx'
 import useAuth from './features/auth/useAuth.js'
 import DiscoveryView from './features/discovery/DiscoveryView.jsx'
-import NewArtistSpotlightDemo from './features/discovery/NewArtistSpotlightDemo.jsx'
-import MiniPlayer from './features/mini-player/MiniPlayer.tsx'
 import './styles/app.css'
 import './styles/home.css'
 
+const MiniPlayer = lazy(() => import('./features/mini-player/MiniPlayer.tsx'))
+const NewArtistSpotlightDemo = lazy(() => import('./features/discovery/NewArtistSpotlightDemo.jsx'))
+const DesktopGoogleAuth = lazy(() => import('./features/auth/DesktopGoogleAuth.jsx'))
+
+function AppLoading() {
+  return (
+    <main className="session-loading" aria-label="Cargando aplicación">
+      <span className="session-loading__disc" aria-hidden="true" />
+    </main>
+  )
+}
+
 function MainApp() {
   const auth = useAuth()
-  const [librarySongs, setLibrarySongs] = useState([])
-  const [libraryLoading, setLibraryLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
+  const {
+    catalogError,
+    catalogLoadingMore,
+    libraryLoading,
+    libraryPagination,
+    librarySongs,
+    loadMoreCatalogSongs,
+    refreshLibrary,
+    searchLoading,
+    searchPagination,
+    searchQuery,
+    searchSongs,
+    setSearchQuery,
+  } = useCatalogo()
   const [selectedSongId, setSelectedSongId] = useState(null)
   const [likedSongIds, setLikedSongIds] = useState(() => new Set())
   const [likedAlbumIds, setLikedAlbumIds] = useState(() => new Set())
@@ -24,51 +45,6 @@ function MainApp() {
   const [playlists, setPlaylists] = useState([])
   const [playlistsLoading, setPlaylistsLoading] = useState(true)
   const [playlistsError, setPlaylistsError] = useState('')
-  const [navidromeError, setNavidromeError] = useState(null)
-
-  const refreshLibrary = useCallback(async () => {
-    const catalogSongs = await catalogApi.listSongs()
-    const songsWithArtwork = catalogSongs.map((song, index) => ({
-      ...song,
-      artwork: song.artwork ?? songs[index % songs.length]?.artwork ?? null,
-    }))
-    setLibrarySongs(songsWithArtwork)
-    setNavidromeError(catalogSongs.length
-      ? null
-      : { kind: 'empty', message: 'El catálogo PostgreSQL todavía no contiene canciones.' })
-    return songsWithArtwork
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function loadLibrary() {
-      try {
-        const catalogSongs = await refreshLibrary()
-        if (cancelled) return
-        if (catalogSongs.length > 0) {
-          setLibraryLoading(false)
-          return
-        }
-      } catch (error) {
-        console.warn('El catálogo PostgreSQL todavía no está disponible:', error)
-      }
-
-      if (!cancelled) {
-        setLibrarySongs([])
-        setNavidromeError({ kind: 'empty', message: 'El catálogo PostgreSQL todavía no contiene canciones.' })
-      }
-
-      if (!cancelled) setLibraryLoading(false)
-    }
-
-    loadLibrary()
-
-    return () => {
-      cancelled = true
-    }
-  }, [refreshLibrary])
-
   useEffect(() => {
     let cancelled = false
 
@@ -142,7 +118,7 @@ function MainApp() {
     return () => {
       cancelled = true
     }
-  }, [auth.user, libraryLoading])
+  }, [auth.user, libraryLoading, librarySongs])
 
   function replacePlaylist(savedPlaylist) {
     setPlaylists((currentPlaylists) => currentPlaylists.map((playlist) => (
@@ -212,8 +188,26 @@ function MainApp() {
     })
   }
 
-  function reorderPlaylist(playlistId, songIds) {
-    return updatePlaylist(playlistId, { songIds })
+  async function reorderPlaylist(playlistId, songIds) {
+    const previousPlaylist = playlists.find((playlist) => playlist.id === playlistId)
+    if (!previousPlaylist) return false
+
+    setPlaylists((currentPlaylists) => currentPlaylists.map((playlist) => (
+      playlist.id === playlistId ? { ...playlist, songIds } : playlist
+    )))
+
+    try {
+      const savedPlaylist = await playlistsApi.update(playlistId, { songIds })
+      replacePlaylist(savedPlaylist)
+      setPlaylistsError('')
+      return true
+    } catch (error) {
+      setPlaylists((currentPlaylists) => currentPlaylists.map((playlist) => (
+        playlist.id === playlistId && playlist.songIds === songIds ? previousPlaylist : playlist
+      )))
+      setPlaylistsError(error.message || 'No se pudo actualizar la playlist.')
+      return false
+    }
   }
 
   async function setFavorite(type, itemId, liked) {
@@ -269,9 +263,9 @@ function MainApp() {
 
   return (
     <>
-      {navidromeError && (
+      {catalogError && (
         <div role="alert" style={{ background: '#3b1717', color: '#ffd6d6', padding: '10px 16px', textAlign: 'center' }}>
-          Catálogo: {navidromeError.message}
+          Catálogo: {catalogError.message}
         </div>
       )}
       {favoritesError && (
@@ -285,36 +279,49 @@ function MainApp() {
         </div>
       )}
       <DiscoveryView
-      onLogout={auth.logout}
-      onCatalogRefresh={refreshLibrary}
-      onDeletePlaylist={deletePlaylist}
-      onImportNav={() => { window.location.hash = '#/importar' }}
-      onSearchChange={setSearchQuery}
-      onSongSelect={setSelectedSongId}
-      addSongToPlaylist={addSongToPlaylist}
-      createPlaylist={createPlaylist}
-      likedSongIds={likedSongIds}
-      likedAlbumIds={likedAlbumIds}
-      likedArtistIds={likedArtistIds}
-      onToggleAlbumFavorite={(albumId, liked) => setFavorite('album', albumId, liked)}
-      onToggleArtistFavorite={(artistId, liked) => setFavorite('artist', artistId, liked)}
-      onToggleFavorite={(songId, liked) => setFavorite('song', songId, liked)}
-      onUpdatePlaylist={updatePlaylist}
-      onReorderPlaylist={reorderPlaylist}
-      onSetSongInPlaylist={setSongInPlaylist}
-      playlists={playlists}
-      searchQuery={searchQuery}
-      selectedSongId={selectedSongId}
-      songs={librarySongs}
-      user={auth.user}
+        addSongToPlaylist={addSongToPlaylist}
+        catalogHasMore={Boolean((searchQuery.trim() ? searchPagination : libraryPagination)?.hasNext)}
+        catalogLoadingMore={catalogLoadingMore || searchLoading}
+        createPlaylist={createPlaylist}
+        likedAlbumIds={likedAlbumIds}
+        likedArtistIds={likedArtistIds}
+        likedSongIds={likedSongIds}
+        onCatalogLoadMore={loadMoreCatalogSongs}
+        onCatalogRefresh={refreshLibrary}
+        onDeletePlaylist={deletePlaylist}
+        onImportNav={() => {
+          if (auth.user?.canImportMusic === true) window.location.hash = '#/importar'
+        }}
+        onLogout={auth.logout}
+        onReorderPlaylist={reorderPlaylist}
+        onSearchChange={setSearchQuery}
+        onSetSongInPlaylist={setSongInPlaylist}
+        onSongSelect={setSelectedSongId}
+        onToggleAlbumFavorite={(albumId, liked) => setFavorite('album', albumId, liked)}
+        onToggleArtistFavorite={(artistId, liked) => setFavorite('artist', artistId, liked)}
+        onToggleFavorite={(songId, liked) => setFavorite('song', songId, liked)}
+        onUpdatePlaylist={updatePlaylist}
+        playlists={playlists}
+        searchQuery={searchQuery}
+        searchSongs={searchSongs}
+        selectedSongId={selectedSongId}
+        songs={librarySongs}
+        user={auth.user}
       />
     </>
   )
 }
 
 function App() {
-  if (window.__MYSIC_MINI_PLAYER__ || window.location.hash === '#/mini-player') return <MiniPlayer />
-  if (window.location.hash === '#/demo/nuevo-artista') return <NewArtistSpotlightDemo />
+  if (window.location.hash.startsWith('#/desktop-auth')) {
+    return <Suspense fallback={<AppLoading />}><DesktopGoogleAuth /></Suspense>
+  }
+  if (window.__MYSIC_MINI_PLAYER__ || window.location.hash === '#/mini-player') {
+    return <Suspense fallback={<AppLoading />}><MiniPlayer /></Suspense>
+  }
+  if (window.location.hash === '#/demo/nuevo-artista') {
+    return <Suspense fallback={<AppLoading />}><NewArtistSpotlightDemo /></Suspense>
+  }
   return <MainApp />
 }
 

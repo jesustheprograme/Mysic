@@ -1,0 +1,10 @@
+[Unit]
+Description=Actualizar la IP pública de Mysic en DuckDNS
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/mysic/duckdns.env
+ExecStart=/usr/local/sbin/update-mysic-duckdns
+

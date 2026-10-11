@@ -1,5 +1,6 @@
 import { ArrowRight, Eye, EyeOff } from 'lucide-react'
 import { useCallback, useState } from 'react'
+import { primeAutoplay } from './autoplayUnlock.js'
 import BrandLogo from '../../components/BrandLogo.jsx'
 import GoogleSignInButton from './GoogleSignInButton.jsx'
 
@@ -105,6 +106,7 @@ function AuthView({ authError, clearError, isSubmitting, onGoogleLogin, onLogin,
 
   async function handleSubmit(event) {
     event.preventDefault()
+    primeAutoplay()
     setFormError('')
     clearError()
 
@@ -137,6 +139,7 @@ function AuthView({ authError, clearError, isSubmitting, onGoogleLogin, onLogin,
   }
 
   const handleGoogleCredential = useCallback(async (credential) => {
+    primeAutoplay()
     try {
       await onGoogleLogin(credential)
     } catch {
@@ -198,6 +201,7 @@ function AuthView({ authError, clearError, isSubmitting, onGoogleLogin, onLogin,
                 disabled={isSubmitting}
                 onCredential={handleGoogleCredential}
                 onError={handleGoogleError}
+                onInteraction={primeAutoplay}
               />
             </>
           )}

@@ -36,11 +36,7 @@ function mapPicardMetadata(metadata) {
   const releaseType = common.releasetype
     || nativeValue(metadata, ['TXXX:MusicBrainz Album Type', '----:com.apple.iTunes:MusicBrainz Album Type'])
   const normalizedType = String(Array.isArray(releaseType) ? releaseType[0] : releaseType || '').toLowerCase()
-  const kind = normalizedType.includes('single')
-    ? 'single'
-    : normalizedType.includes('album') || normalizedType.includes('ep')
-      ? 'album'
-      : null
+  const kind = musicBrainzKind(normalizedType)
   const artists = Array.isArray(common.artists) ? common.artists.filter(Boolean) : []
 
   return {
@@ -63,7 +59,8 @@ function mapPicardMetadata(metadata) {
 function musicBrainzKind(primaryType) {
   const normalized = String(primaryType || '').toLowerCase()
   if (normalized === 'single') return 'single'
-  if (normalized === 'album' || normalized === 'ep') return 'album'
+  if (normalized === 'ep') return 'ep'
+  if (normalized === 'album') return 'album'
   return null
 }
 
@@ -141,7 +138,7 @@ async function findTaggedMp3(directory) {
 
 function validatePicardMetadata(metadata) {
   const missing = []
-  if (!metadata.releaseName || !metadata.kind) missing.push('álbum/single')
+  if (!metadata.releaseName || !['album', 'ep', 'single'].includes(metadata.kind)) missing.push('álbum/EP/single')
   if (!metadata.artist) missing.push('autor(es)')
   if (!metadata.title) missing.push('nombre de la canción')
   if (!metadata.year) missing.push('año')

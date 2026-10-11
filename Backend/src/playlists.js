@@ -6,16 +6,23 @@ const multer = require('multer')
 const { z } = require('zod')
 const { getAuthenticatedUser } = require('./auth')
 const { getPlaylistsCollection } = require('./database')
+const { prisma } = require('./prisma')
 
 const PLAYLIST_ARTWORK_FOLDER = 'Mysic_playlist_usuarios/Playlist_imagenes'
 const acceptedArtworkTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const acceptedArtworkExtensions = new Set(['jpg', 'jpeg', 'png', 'webp'])
+
+function isAcceptedArtworkFile(file) {
+  const extension = file.originalname.split('.').pop()?.toLocaleLowerCase()
+  return acceptedArtworkTypes.has(file.mimetype.toLocaleLowerCase())
+    && acceptedArtworkExtensions.has(extension)
+}
+
 const artworkUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024, files: 1 },
   fileFilter(_req, file, callback) {
-    const extension = file.originalname.split('.').pop()?.toLocaleLowerCase()
-    if (!acceptedArtworkTypes.has(file.mimetype.toLocaleLowerCase()) && !acceptedArtworkExtensions.has(extension)) {
+    if (!isAcceptedArtworkFile(file)) {
       callback(new Error('La portada debe ser JPG, PNG o WEBP.'))
       return
     }
@@ -43,7 +50,7 @@ const updatePlaylistSchema = z.object({
   songIds: z.array(z.string().trim().min(1).max(128)).max(5000).optional(),
 }).strict().refine((changes) => Object.keys(changes).length > 0)
 
-function publicPlaylist(playlist) {
+function publicPlaylist(playlist, songIds = playlist.songIds || []) {
   return {
     id: playlist._id.toString(),
     title: playlist.title,
@@ -51,7 +58,95 @@ function publicPlaylist(playlist) {
     artwork: playlist.artwork || null,
     artworkPublicId: playlist.artworkPublicId || null,
     pinned: Boolean(playlist.pinned),
-    songIds: playlist.songIds || [],
+    songIds,
+  }
+}
+
+function normalizeSongIdentity(value) {
+  return String(value || '').trim().toLocaleLowerCase('es')
+}
+
+function songIdentityKey(song) {
+  const artist = song.artist ?? song.artists?.[0]?.artist?.name
+  return `${normalizeSongIdentity(song.title)}\u0000${normalizeSongIdentity(artist)}`
+}
+
+function resolveStoredSongIds(playlist, songs) {
+  const songById = new Map(songs.map((song) => [song.id, song.id]))
+  const songIdBySlug = new Map(songs.map((song) => [song.slug, song.id]))
+  const songIdByIdentity = new Map(songs.map((song) => [songIdentityKey(song), song.id]))
+  let storedReferences
+
+  if (Array.isArray(playlist.songRefs)) {
+    storedReferences = playlist.songRefs.map((songRef) => (
+      songIdBySlug.get(songRef.slug) ?? songIdByIdentity.get(songIdentityKey(songRef))
+    ))
+  } else if (Array.isArray(playlist.songSlugs)) {
+    storedReferences = playlist.songSlugs.map((slug) => songIdBySlug.get(slug))
+  } else {
+    storedReferences = (playlist.songIds || []).map((songId) => songById.get(songId))
+  }
+
+  return storedReferences.filter(Boolean)
+}
+
+async function mapPublicPlaylists(playlists) {
+  const songIds = playlists.flatMap((playlist) => playlist.songIds || [])
+  const songSlugs = playlists.flatMap((playlist) => playlist.songSlugs || [])
+  const songRefs = playlists.flatMap((playlist) => playlist.songRefs || [])
+  const songTitles = songRefs.map((songRef) => songRef.title).filter(Boolean)
+  const songs = songIds.length || songSlugs.length || songRefs.length
+    ? await prisma.song.findMany({
+        where: {
+          OR: [
+            ...(songIds.length ? [{ id: { in: [...new Set(songIds)] } }] : []),
+            ...(songSlugs.length || songRefs.length
+              ? [{ slug: { in: [...new Set([...songSlugs, ...songRefs.map((songRef) => songRef.slug).filter(Boolean)])] } }]
+              : []),
+            ...(songTitles.length ? [{ title: { in: [...new Set(songTitles)] } }] : []),
+          ],
+        },
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          artists: { select: { artist: { select: { name: true } } }, take: 1 },
+        },
+      })
+    : []
+
+  return playlists.map((playlist) => publicPlaylist(
+    playlist,
+    resolveStoredSongIds(playlist, songs),
+  ))
+}
+
+async function resolveSongReferences(songIds) {
+  const uniqueSongIds = [...new Set(songIds)]
+  if (!uniqueSongIds.length) return { songIds: [], songRefs: [] }
+
+  const songs = await prisma.song.findMany({
+    where: { id: { in: uniqueSongIds } },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      artists: { select: { artist: { select: { name: true } } }, take: 1 },
+    },
+  })
+  const songById = new Map(songs.map((song) => [song.id, song]))
+  const orderedSongs = uniqueSongIds.flatMap((songId) => {
+    const song = songById.get(songId)
+    return song ? [song] : []
+  })
+
+  return {
+    songIds: orderedSongs.map((song) => song.id),
+    songRefs: orderedSongs.map((song) => ({
+      slug: song.slug,
+      title: song.title,
+      artist: song.artists[0]?.artist.name || '',
+    })),
   }
 }
 
@@ -137,7 +232,7 @@ function createPlaylistsRouter(config) {
         .find({ userId: req.user._id })
         .sort({ pinned: -1, updatedAt: -1 })
         .toArray()
-      return res.json({ playlists: playlists.map(publicPlaylist) })
+      return res.json({ playlists: await mapPublicPlaylists(playlists) })
     } catch (error) {
       return next(error)
     }
@@ -166,17 +261,19 @@ function createPlaylistsRouter(config) {
         return res.status(400).json({ message: 'La portada indicada no pertenece a este usuario.' })
       }
 
+      const { songIds, ...playlistData } = parsed.data
+      const songReferences = await resolveSongReferences(songIds)
       const now = new Date()
       const playlist = {
-        ...parsed.data,
-        songIds: [...new Set(parsed.data.songIds)],
+        ...playlistData,
+        songRefs: songReferences.songRefs,
         userId: req.user._id,
         createdAt: now,
         updatedAt: now,
       }
       const result = await getPlaylistsCollection().insertOne(playlist)
       playlist._id = result.insertedId
-      return res.status(201).json({ playlist: publicPlaylist(playlist) })
+      return res.status(201).json({ playlist: publicPlaylist(playlist, songReferences.songIds) })
     } catch (error) {
       return next(error)
     }
@@ -194,14 +291,23 @@ function createPlaylistsRouter(config) {
       }
 
       const changes = { ...parsed.data, updatedAt: new Date() }
-      if (changes.songIds) changes.songIds = [...new Set(changes.songIds)]
+      const updatesSongIds = Object.prototype.hasOwnProperty.call(changes, 'songIds')
+      if (updatesSongIds) {
+        const songReferences = await resolveSongReferences(changes.songIds)
+        delete changes.songIds
+        changes.songRefs = songReferences.songRefs
+      }
       const replacesArtwork = Object.prototype.hasOwnProperty.call(changes, 'artworkPublicId')
       const previousPlaylist = replacesArtwork
         ? await getPlaylistsCollection().findOne({ _id: new ObjectId(req.params.playlistId), userId: req.user._id })
         : null
       const playlist = await getPlaylistsCollection().findOneAndUpdate(
         { _id: new ObjectId(req.params.playlistId), userId: req.user._id },
-        { $set: changes },
+        {
+          $set: changes,
+          // Keep legacy songIds during the rolling deployment; the new code prefers songRefs.
+          ...(updatesSongIds ? { $unset: { songSlugs: '' } } : {}),
+        },
         { returnDocument: 'after' },
       )
       if (!playlist) return res.status(404).json({ message: 'No encontramos esa playlist.' })
@@ -212,7 +318,8 @@ function createPlaylistsRouter(config) {
           // The playlist update succeeded even if the old remote image could not be removed.
         }
       }
-      return res.json({ playlist: publicPlaylist(playlist) })
+      const [mappedPlaylist] = await mapPublicPlaylists([playlist])
+      return res.json({ playlist: mappedPlaylist })
     } catch (error) {
       return next(error)
     }
@@ -242,4 +349,4 @@ function createPlaylistsRouter(config) {
   return router
 }
 
-module.exports = { createPlaylistsRouter }
+module.exports = { createPlaylistsRouter, isAcceptedArtworkFile, resolveStoredSongIds }

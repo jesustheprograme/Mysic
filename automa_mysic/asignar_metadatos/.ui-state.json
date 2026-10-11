@@ -1,3 +1,246 @@
 {
-  "entries": []
+  "entries": [
+    {
+      "file": "01 - Sadboy & Darkogirl [bHD77W_yLEA].mp3",
+      "status": "ready",
+      "metadata": {
+        "artist": "Blackthony Startano",
+        "title": "Sadboy & Darkogirl",
+        "album": "Guía Flamante",
+        "year": 2020,
+        "genres": [],
+        "trackNumber": 1,
+        "kind": "album",
+        "musicbrainzRecordingId": null,
+        "musicbrainzReleaseId": null,
+        "confidence": null,
+        "metadataSource": "source"
+      },
+      "cloudinaryFolder": "Artistas/Blackthony Startano/Albums/Guía Flamante",
+      "error": null,
+      "embeddedCover": false,
+      "lastModified": "2026-10-02T03:04:15.716Z",
+      "remoteDestination": "Artistas/Blackthony Startano/Albums/Guía Flamante/01 - Sadboy & Darkogirl.mp3"
+    },
+    {
+      "file": "02 - Jhon Mcclane [As3m8lAUDvQ].mp3",
+      "status": "ready",
+      "metadata": {
+        "artist": "Blackthony Startano",
+        "title": "Jhon Mcclane",
+        "album": "Guía Flamante",
+        "year": 2020,
+        "genres": [],
+        "trackNumber": 2,
+        "kind": "album",
+        "musicbrainzRecordingId": null,
+        "musicbrainzReleaseId": null,
+        "confidence": null,
+        "metadataSource": "source"
+      },
+      "cloudinaryFolder": "Artistas/Blackthony Startano/Albums/Guía Flamante",
+      "error": null,
+      "embeddedCover": false,
+      "lastModified": "2026-10-02T03:04:18.839Z",
+      "remoteDestination": "Artistas/Blackthony Startano/Albums/Guía Flamante/02 - Jhon Mcclane.mp3"
+    },
+    {
+      "file": "03 - Religión del Halcón [RM-slogt84Q].mp3",
+      "status": "ready",
+      "metadata": {
+        "artist": "Blackthony Startano",
+        "title": "Religión del Halcón",
+        "album": "Guía Flamante",
+        "year": 2020,
+        "genres": [],
+        "trackNumber": 3,
+        "kind": "album",
+        "musicbrainzRecordingId": null,
+        "musicbrainzReleaseId": null,
+        "confidence": null,
+        "metadataSource": "source"
+      },
+      "cloudinaryFolder": "Artistas/Blackthony Startano/Albums/Guía Flamante",
+      "error": null,
+      "embeddedCover": false,
+      "lastModified": "2026-10-02T03:04:22.359Z",
+      "remoteDestination": "Artistas/Blackthony Startano/Albums/Guía Flamante/03 - Religión del Halcón.mp3"
+    },
+    {
+      "file": "04 - Pez Luchador de Siam [ZmLUsryFMx8].mp3",
+      "status": "ready",
+      "metadata": {
+        "artist": "Blackthony Startano",
+        "title": "Pez Luchador de Siam",
+        "album": "Guía Flamante",
+        "year": 2020,
+        "genres": [],
+        "trackNumber": 4,
+        "kind": "album",
+        "musicbrainzRecordingId": null,
+        "musicbrainzReleaseId": null,
+        "confidence": null,
+        "metadataSource": "source"
+      },
+      "cloudinaryFolder": "Artistas/Blackthony Startano/Albums/Guía Flamante",
+      "error": null,
+      "embeddedCover": false,
+      "lastModified": "2026-10-02T03:04:26.043Z",
+      "remoteDestination": "Artistas/Blackthony Startano/Albums/Guía Flamante/04 - Pez Luchador de Siam.mp3"
+    },
+    {
+      "file": "05 - Club Social de los Fantasmas [M8FtGsd3PCA].mp3",
+      "status": "ready",
+      "metadata": {
+        "artist": "Blackthony Startano",
+        "title": "Club Social de los Fantasmas",
+        "album": "Guía Flamante",
+        "year": 2020,
+        "genres": [],
+        "trackNumber": 5,
+        "kind": "album",
+        "musicbrainzRecordingId": null,
+        "musicbrainzReleaseId": null,
+        "confidence": null,
+        "metadataSource": "source"
+      },
+      "cloudinaryFolder": "Artistas/Blackthony Startano/Albums/Guía Flamante",
+      "error": null,
+      "embeddedCover": false,
+      "lastModified": "2026-10-02T03:04:29.893Z",
+      "remoteDestination": "Artistas/Blackthony Startano/Albums/Guía Flamante/05 - Club Social de los Fantasmas.mp3"
+    },
+    {
+      "file": "06 - Reina del Subsuelo [KrAbF4E5AIw].mp3",
+      "status": "ready",
+      "metadata": {
+        "artist": "Blackthony Startano",
+        "title": "Reina del Subsuelo",
+        "album": "Guía Flamante",
+        "year": 2020,
+        "genres": [],
+        "trackNumber": 6,
+        "kind": "album",
+        "musicbrainzRecordingId": null,
+        "musicbrainzReleaseId": null,
+        "confidence": null,
+        "metadataSource": "source"
+      },
+      "cloudinaryFolder": "Artistas/Blackthony Startano/Albums/Guía Flamante",
+      "error": null,
+      "embeddedCover": false,
+      "lastModified": "2026-10-02T03:04:33.120Z",
+      "remoteDestination": "Artistas/Blackthony Startano/Albums/Guía Flamante/06 - Reina del Subsuelo.mp3"
+    },
+    {
+      "file": "07 - Mecanismos de Defensa en las Ligas Mayores [syvP7bjtMC0].mp3",
+      "status": "ready",
+      "metadata": {
+        "artist": "Blackthony Startano",
+        "title": "Mecanismos de Defensa en las Ligas Mayores",
+        "album": "Guía Flamante",
+        "year": 2020,
+        "genres": [],
+        "trackNumber": 7,
+        "kind": "album",
+        "musicbrainzRecordingId": null,
+        "musicbrainzReleaseId": null,
+        "confidence": null,
+        "metadataSource": "source"
+      },
+      "cloudinaryFolder": "Artistas/Blackthony Startano/Albums/Guía Flamante",
+      "error": null,
+      "embeddedCover": false,
+      "lastModified": "2026-10-02T03:04:36.646Z",
+      "remoteDestination": "Artistas/Blackthony Startano/Albums/Guía Flamante/07 - Mecanismos de Defensa en las Ligas Mayores.mp3"
+    },
+    {
+      "file": "08 - Observatorio de Aves [kZ8ZKWXt-io].mp3",
+      "status": "ready",
+      "metadata": {
+        "artist": "Blackthony Startano",
+        "title": "Observatorio de Aves",
+        "album": "Guía Flamante",
+        "year": 2020,
+        "genres": [],
+        "trackNumber": 8,
+        "kind": "album",
+        "musicbrainzRecordingId": null,
+        "musicbrainzReleaseId": null,
+        "confidence": null,
+        "metadataSource": "source"
+      },
+      "cloudinaryFolder": "Artistas/Blackthony Startano/Albums/Guía Flamante",
+      "error": null,
+      "embeddedCover": false,
+      "lastModified": "2026-10-02T03:04:40.054Z",
+      "remoteDestination": "Artistas/Blackthony Startano/Albums/Guía Flamante/08 - Observatorio de Aves.mp3"
+    },
+    {
+      "file": "09 - Federación Nacional del Hielo [TaCrE0RJ1Ug].mp3",
+      "status": "ready",
+      "metadata": {
+        "artist": "Blackthony Startano",
+        "title": "Federación Nacional del Hielo",
+        "album": "Guía Flamante",
+        "year": 2020,
+        "genres": [],
+        "trackNumber": 9,
+        "kind": "album",
+        "musicbrainzRecordingId": null,
+        "musicbrainzReleaseId": null,
+        "confidence": null,
+        "metadataSource": "source"
+      },
+      "cloudinaryFolder": "Artistas/Blackthony Startano/Albums/Guía Flamante",
+      "error": null,
+      "embeddedCover": false,
+      "lastModified": "2026-10-02T03:04:43.570Z",
+      "remoteDestination": "Artistas/Blackthony Startano/Albums/Guía Flamante/09 - Federación Nacional del Hielo.mp3"
+    },
+    {
+      "file": "10 - Surfer Rojas [GGMOWu4I8Gw].mp3",
+      "status": "ready",
+      "metadata": {
+        "artist": "Blackthony Startano",
+        "title": "Surfer Rojas",
+        "album": "Guía Flamante",
+        "year": 2020,
+        "genres": [],
+        "trackNumber": 10,
+        "kind": "album",
+        "musicbrainzRecordingId": null,
+        "musicbrainzReleaseId": null,
+        "confidence": null,
+        "metadataSource": "source"
+      },
+      "cloudinaryFolder": "Artistas/Blackthony Startano/Albums/Guía Flamante",
+      "error": null,
+      "embeddedCover": false,
+      "lastModified": "2026-10-02T03:04:46.736Z",
+      "remoteDestination": "Artistas/Blackthony Startano/Albums/Guía Flamante/10 - Surfer Rojas.mp3"
+    },
+    {
+      "file": "11 - Himno Universal de los Incendios [3coo694787w].mp3",
+      "status": "ready",
+      "metadata": {
+        "artist": "Blackthony Startano",
+        "title": "Himno Universal de los Incendios",
+        "album": "Guía Flamante",
+        "year": 2020,
+        "genres": [],
+        "trackNumber": 11,
+        "kind": "album",
+        "musicbrainzRecordingId": null,
+        "musicbrainzReleaseId": null,
+        "confidence": null,
+        "metadataSource": "source"
+      },
+      "cloudinaryFolder": "Artistas/Blackthony Startano/Albums/Guía Flamante",
+      "error": null,
+      "embeddedCover": false,
+      "lastModified": "2026-10-02T03:04:49.850Z",
+      "remoteDestination": "Artistas/Blackthony Startano/Albums/Guía Flamante/11 - Himno Universal de los Incendios.mp3"
+    }
+  ]
 }

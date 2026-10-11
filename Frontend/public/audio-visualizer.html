@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mysic Audio Visualizer</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #00ff00; }
+    canvas { width: 100%; height: 100%; display: block; }
+    .controls {
+      position: fixed; left: 50%; bottom: 20px; z-index: 2;
+      width: min(920px, calc(100vw - 32px)); padding: 12px;
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px;
+      border: 1px solid #3d4441; border-radius: 14px; color: #fff; background: #111614;
+      transition: opacity 180ms ease, transform 180ms ease;
+      transform: translateX(-50%);
+    }
+    .controls[hidden] { display: none; }
+    button, .file-button, select, input { font: inherit; }
+    button, .file-button, select {
+      min-height: 38px; padding: 8px 12px; border: 1px solid #4b5551; border-radius: 9px;
+      color: #fff; background: #202724; cursor: pointer;
+    }
+    button:hover, .file-button:hover, select:hover { background: #2b3430; }
+    .file-button input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+    label.range { display: grid; grid-template-columns: auto 110px; align-items: center; gap: 7px; font-size: 13px; }
+    input[type="range"] { accent-color: #fff; }
+    output { min-width: 38px; color: #bdc7c2; font-variant-numeric: tabular-nums; }
+    .status { min-width: 125px; color: #bdc7c2; font-size: 13px; text-align: center; }
+    .hint { position: fixed; right: 12px; bottom: 10px; color: rgba(0, 0, 0, .55); font-size: 12px; }
+    body.clean .hint { display: none; }
+  </style>
+</head>
+<body>
+  <canvas id="visualizer" aria-label="Visualizador de espectro de audio"></canvas>
+
+  <section class="controls" id="controls" aria-label="Controles del visualizador">
+    <label class="file-button">
+      Cargar audio o video
+      <input id="file" type="file" accept="audio/*,video/*" />
+    </label>
+    <button id="microphone" type="button">Usar micrófono</button>
+    <button id="simulation" type="button">Modo simulado</button>
+    <button id="play" type="button" disabled>Reproducir</button>
+    <label class="range">
+      Barras
+      <span><input id="bars" type="range" min="32" max="160" value="96" /><output id="barsValue">96</output></span>
+    </label>
+    <label class="range">
+      Sensibilidad
+      <span><input id="sensitivity" type="range" min="50" max="220" value="125" /><output id="sensitivityValue">125%</output></span>
+    </label>
+    <label class="range">
+      Suavizado
+      <span><input id="smoothing" type="range" min="50" max="96" value="84" /><output id="smoothingValue">84%</output></span>
+    </label>
+    <button id="fullscreen" type="button">Pantalla completa</button>
+    <button id="hide" type="button">Ocultar controles</button>
+    <span class="status" id="status">Simulación activa</span>
+  </section>
+
+  <span class="hint">H: controles · F: pantalla completa</span>
+  <audio id="audio" loop></audio>
+
+  <script>
+    const canvas = document.querySelector('#visualizer')
+    const painter = canvas.getContext('2d')
+    const audio = document.querySelector('#audio')
+    const controls = document.querySelector('#controls')
+    const status = document.querySelector('#status')
+    const fileInput = document.querySelector('#file')
+    const playButton = document.querySelector('#play')
+    const microphoneButton = document.querySelector('#microphone')
+    const simulationButton = document.querySelector('#simulation')
+    const barsInput = document.querySelector('#bars')
+    const sensitivityInput = document.querySelector('#sensitivity')
+    const smoothingInput = document.querySelector('#smoothing')
+
+    let audioContext
+    let analyser
+    let mediaElementSource
+    let microphoneSource
+    let microphoneStream
+    let objectUrl
+    let mode = 'simulation'
+    let frequencyData
+    let levels = new Float32Array(Number(barsInput.value))
+
+    function ensureAudioGraph() {
+      audioContext ??= new AudioContext()
+      analyser ??= audioContext.createAnalyser()
+      analyser.fftSize = 2048
+      analyser.smoothingTimeConstant = Number(smoothingInput.value) / 100
+      frequencyData ??= new Uint8Array(analyser.frequencyBinCount)
+      audioContext.resume()
+    }
+
+    function disconnectMicrophone() {
+      microphoneSource?.disconnect()
+      microphoneStream?.getTracks().forEach((track) => track.stop())
+      microphoneSource = null
+      microphoneStream = null
+    }
+
+    function useMediaElement() {
+      ensureAudioGraph()
+      disconnectMicrophone()
+      mediaElementSource ??= audioContext.createMediaElementSource(audio)
+      mediaElementSource.disconnect()
+      mediaElementSource.connect(analyser)
+      analyser.disconnect()
+      analyser.connect(audioContext.destination)
+      mode = 'audio'
+    }
+
+    function useSimulation() {
+      disconnectMicrophone()
+      audio.pause()
+      mode = 'simulation'
+      playButton.textContent = 'Reproducir'
+      status.textContent = 'Simulación activa'
+    }
+
+    async function useMicrophone() {
+      try {
+        ensureAudioGraph()
+        audio.pause()
+        disconnectMicrophone()
+        microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        microphoneSource = audioContext.createMediaStreamSource(microphoneStream)
+        analyser.disconnect()
+        microphoneSource.connect(analyser)
+        mode = 'microphone'
+        playButton.textContent = 'Reproducir'
+        status.textContent = 'Micrófono activo'
+      } catch {
+        status.textContent = 'No se pudo abrir el micrófono'
+      }
+    }
+
+    function resize() {
+      const ratio = Math.min(window.devicePixelRatio || 1, 2)
+      canvas.width = Math.round(innerWidth * ratio)
+      canvas.height = Math.round(innerHeight * ratio)
+      painter.setTransform(ratio, 0, 0, ratio, 0, 0)
+    }
+
+    function simulatedLevel(index, count, time) {
+      const position = index / Math.max(1, count - 1)
+      const bell = Math.exp(-(((position - 0.5) / 0.29) ** 2) / 2)
+      const wave = Math.sin(time * 2.2 + index * 0.47) * 0.16
+        + Math.sin(time * 3.7 - index * 0.19) * 0.1
+        + Math.cos(time * 1.1 + index * 0.08) * 0.07
+      const beat = Math.max(0, Math.sin(time * 3.05)) ** 7
+      return Math.max(0.025, bell * (0.24 + wave + beat * 0.5))
+    }
+
+    function audioLevel(index, count) {
+      const position = index / Math.max(1, count - 1)
+      const bell = 0.28 + 0.72 * Math.exp(-(((position - 0.5) / 0.31) ** 2) / 2)
+      const frequencyPosition = Math.abs(position - 0.5) * 2
+      const first = Math.floor((frequencyPosition ** 2) * frequencyData.length * 0.7)
+      const end = Math.min(frequencyData.length, first + Math.max(2, Math.floor(frequencyData.length / count)))
+      let total = 0
+      for (let bin = first; bin < end; bin += 1) total += frequencyData[bin]
+      const strength = total / Math.max(1, (end - first) * 255)
+      return Math.min(1, strength * bell * (Number(sensitivityInput.value) / 100))
+    }
+
+    function roundedBar(x, y, width, height) {
+      const radius = Math.min(width / 2, height / 2)
+      painter.beginPath()
+      painter.roundRect(x, y, width, height, radius)
+      painter.fill()
+    }
+
+    function draw(frameTime) {
+      requestAnimationFrame(draw)
+      const width = innerWidth
+      const height = innerHeight
+      painter.fillStyle = '#00ff00'
+      painter.fillRect(0, 0, width, height)
+
+      const count = levels.length
+      if (mode !== 'simulation' && analyser) analyser.getByteFrequencyData(frequencyData)
+      const totalWidth = Math.min(width * 0.82, 1100)
+      const gap = Math.max(2, Math.min(6, totalWidth / count * 0.42))
+      const barWidth = Math.max(2, Math.min(8, (totalWidth - gap * (count - 1)) / count))
+      const actualWidth = barWidth * count + gap * (count - 1)
+      const startX = (width - actualWidth) / 2
+      const centerY = height / 2
+      const maxBarHeight = Math.min(height * 0.48, 330)
+      const smoothing = Number(smoothingInput.value) / 100
+      const response = 1 - smoothing
+
+      painter.fillStyle = '#fff'
+      for (let index = 0; index < count; index += 1) {
+        const target = mode === 'simulation'
+          ? simulatedLevel(index, count, frameTime / 1000)
+          : audioLevel(index, count)
+        levels[index] += (target - levels[index]) * response
+        const barHeight = Math.max(barWidth, levels[index] * maxBarHeight)
+        roundedBar(startX + index * (barWidth + gap), centerY - barHeight / 2, barWidth, barHeight)
+      }
+    }
+
+    function toggleControls() {
+      controls.hidden = !controls.hidden
+      document.body.classList.toggle('clean', controls.hidden)
+    }
+
+    async function toggleFullscreen() {
+      if (document.fullscreenElement) await document.exitFullscreen()
+      else await document.documentElement.requestFullscreen()
+    }
+
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files?.[0]
+      if (!file) return
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+      objectUrl = URL.createObjectURL(file)
+      audio.src = objectUrl
+      useMediaElement()
+      playButton.disabled = false
+      await audio.play()
+      playButton.textContent = 'Pausar'
+      status.textContent = file.name
+    })
+
+    window.addEventListener('pagehide', () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }, { once: true })
+
+    playButton.addEventListener('click', async () => {
+      if (audio.paused) {
+        useMediaElement()
+        await audio.play()
+        playButton.textContent = 'Pausar'
+      } else {
+        audio.pause()
+        playButton.textContent = 'Reproducir'
+      }
+    })
+    microphoneButton.addEventListener('click', useMicrophone)
+    simulationButton.addEventListener('click', useSimulation)
+    smoothingInput.addEventListener('input', () => {
+      if (analyser) analyser.smoothingTimeConstant = Number(smoothingInput.value) / 100
+      document.querySelector('#smoothingValue').value = `${smoothingInput.value}%`
+    })
+    sensitivityInput.addEventListener('input', () => {
+      document.querySelector('#sensitivityValue').value = `${sensitivityInput.value}%`
+    })
+    barsInput.addEventListener('input', () => {
+      levels = new Float32Array(Number(barsInput.value))
+      document.querySelector('#barsValue').value = barsInput.value
+    })
+    document.querySelector('#fullscreen').addEventListener('click', toggleFullscreen)
+    document.querySelector('#hide').addEventListener('click', toggleControls)
+    window.addEventListener('keydown', (event) => {
+      if (event.key.toLowerCase() === 'h') toggleControls()
+      if (event.key.toLowerCase() === 'f') toggleFullscreen()
+      if (event.code === 'Space' && !playButton.disabled) {
+        event.preventDefault()
+        playButton.click()
+      }
+    })
+    window.addEventListener('resize', resize)
+    window.addEventListener('beforeunload', () => {
+      disconnectMicrophone()
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    })
+
+    resize()
+    requestAnimationFrame(draw)
+  </script>
+</body>
+</html>

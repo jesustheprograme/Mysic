@@ -1,12 +1,27 @@
-import { Search, X } from 'lucide-react'
+import { ListPlus, Search, X } from 'lucide-react'
 import { useState } from 'react'
+import VerticalSpectrum from '../../components/VerticalSpectrum.jsx'
 
-function PlaylistPickerModal({ onClose, onCreate, onManage, onToggle, playlists, song }) {
+function PlaylistPickerModal({ analyser, onAdd, onClose, onCreate, playing, playlists, song }) {
   const [query, setQuery] = useState('')
+  const [selectedPlaylistIds, setSelectedPlaylistIds] = useState(() => new Set(
+    playlists.filter((playlist) => playlist.songIds.includes(song.id)).map((playlist) => playlist.id),
+  ))
   const normalizedQuery = query.trim().toLocaleLowerCase('es')
   const visiblePlaylists = normalizedQuery
     ? playlists.filter((playlist) => playlist.title.toLocaleLowerCase('es').includes(normalizedQuery))
     : playlists
+  const albumTitle = song.albumTitle ?? song.album?.title ?? song.albumMemberships?.[0]?.title
+  const showSpectrum = Boolean(playing && analyser)
+
+  function togglePlaylist(playlistId, selected) {
+    setSelectedPlaylistIds((currentIds) => {
+      const nextIds = new Set(currentIds)
+      if (selected) nextIds.add(playlistId)
+      else nextIds.delete(playlistId)
+      return nextIds
+    })
+  }
 
   return (
     <dialog className="playlist-modal playlist-picker" open aria-labelledby="playlist-picker-title" aria-modal="true">
@@ -19,12 +34,21 @@ function PlaylistPickerModal({ onClose, onCreate, onManage, onToggle, playlists,
         </div>
 
         <div className="playlist-picker__content">
-          <div className="playlist-picker__song">
+          <div className={`playlist-picker__song${showSpectrum ? ' playlist-picker__song--spectrum' : ''}`}>
             <img src={song.artwork} alt="" />
-            <span>
+            <span className="playlist-picker__song-copy">
               <strong>{song.title}</strong>
-              <small>{song.artist}</small>
+              <span className="playlist-picker__song-meta">
+                <small className="playlist-picker__song-artist">{song.artist}</small>
+                {albumTitle && <small className="playlist-picker__song-separator" aria-hidden="true">·</small>}
+                {albumTitle && <small className="playlist-picker__song-album" title={albumTitle}>{albumTitle}</small>}
+              </span>
             </span>
+            {showSpectrum && (
+              <span className="playlist-picker__spectrum" aria-hidden="true">
+                <VerticalSpectrum analyser={analyser} playing width={30} span={0.82} pitch={2.6} minBars={14} maxBars={16} thickness={1} amplitude={0.42} />
+              </span>
+            )}
           </div>
 
           <label className="playlist-picker__search">
@@ -41,7 +65,7 @@ function PlaylistPickerModal({ onClose, onCreate, onManage, onToggle, playlists,
 
           <div className="playlist-picker__list">
             {visiblePlaylists.map((playlist) => {
-              const isAdded = playlist.songIds.includes(song.id)
+              const isAdded = selectedPlaylistIds.has(playlist.id)
               return (
                 <label
                   className="playlist-picker__item"
@@ -57,7 +81,7 @@ function PlaylistPickerModal({ onClose, onCreate, onManage, onToggle, playlists,
                     type="checkbox"
                     checked={isAdded}
                     aria-label={`${isAdded ? 'Quitar' : 'Añadir'} ${song.title} ${isAdded ? 'de' : 'a'} ${playlist.title}`}
-                    onChange={(event) => onToggle(playlist.id, event.target.checked)}
+                    onChange={(event) => togglePlaylist(playlist.id, event.target.checked)}
                   />
                 </label>
               )
@@ -69,8 +93,10 @@ function PlaylistPickerModal({ onClose, onCreate, onManage, onToggle, playlists,
         </div>
 
         <footer className="playlist-picker__footer">
-          <button className="playlist-picker__create" type="button" onClick={onCreate}>Nueva playlist</button>
-          <button className="playlist-picker__manage" type="button" onClick={onManage}>Gestionar</button>
+          <button className="playlist-picker__create" type="button" aria-label="Nueva playlist" title="Nueva playlist" onClick={onCreate}>
+            <ListPlus size={20} strokeWidth={1.8} aria-hidden="true" />
+          </button>
+          <button className="playlist-picker__add" type="button" onClick={() => onAdd([...selectedPlaylistIds])}>Agregar</button>
         </footer>
       </section>
     </dialog>

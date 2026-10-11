@@ -10,4 +10,8 @@ async function closePrisma() {
   await prisma.$disconnect()
 }
 
-module.exports = { closePrisma, connectPrisma, prisma }
+async function checkPrismaHealth() {
+  await prisma.$queryRaw`SELECT 1`
+}
+
+module.exports = { checkPrismaHealth, closePrisma, connectPrisma, prisma }

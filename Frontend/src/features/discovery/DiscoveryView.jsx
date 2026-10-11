@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import AppHeader from '../../components/AppHeader.jsx'
 import AppSidebar from '../../components/AppSidebar.jsx'
 import PlayerDock from '../../components/PlayerDock.jsx'
@@ -7,10 +7,8 @@ import ArtistView from '../collections/ArtistView.jsx'
 import PlaylistEditorModal from '../playlists/PlaylistEditorModal.jsx'
 import PlaylistPickerModal from '../playlists/PlaylistPickerModal.jsx'
 import PlaylistView from '../playlists/PlaylistView.jsx'
-import MusicImportView from '../music-import/MusicImportView.jsx'
 import HomeDiscoveryPrompt from './HomeDiscoveryPrompt.jsx'
 import HomeRail from './HomeRail.jsx'
-import NewArtistSpotlight from './NewArtistSpotlight.jsx'
 import SectionRoute from './SectionRoute.jsx'
 import SongList from './SongList.jsx'
 import {
@@ -19,136 +17,34 @@ import {
 } from '../mini-player/playerBridge.ts'
 import { openMiniPlayerWindow } from '../mini-player/openMiniPlayerWindow.tsx'
 import { catalogApi } from '../../lib/api.js'
+import { primeAutoplay } from '../auth/autoplayUnlock.js'
+import { canImportMusic } from '../music-import/musicImportAccess.js'
 
-const sectionHashes = {
-  home: '#/inicio',
-  explore: '#/explorar',
-  'for-you': '#/favoritas',
-  recent: '#/historial',
-  albums: '#/albumes',
-  artists: '#/artistas',
-  playlists: '#/playlists',
-  downloads: '#/descargas',
-  import: '#/importar',
-}
-
-const hashSections = Object.fromEntries(
-  Object.entries(sectionHashes).map(([section, hash]) => [hash, section]),
-)
-
-const albumTitles = {
-  afterglow: 'Afterglow',
-  'soft-static': 'Soft Static',
-  'parallel-lines': 'Parallel Lines',
-  'red-thread': 'Red Thread',
-  'low-tide': 'Low Tide',
-}
-
-function getPlaylistIdFromHash() {
-  return window.location.hash.startsWith('#playlist-') ? window.location.hash.slice('#playlist-'.length) : null
-}
-
-function getAlbumIdFromHash() {
-  return window.location.hash.startsWith('#album-') ? window.location.hash.slice(1) : null
-}
-
-function getArtistIdFromHash() {
-  return window.location.hash.startsWith('#artist-') ? window.location.hash.slice('#artist-'.length) : null
-}
-
-function getSectionFromHash() {
-  if (getPlaylistIdFromHash()) return 'playlist'
-  if (getAlbumIdFromHash()) return 'album'
-  if (getArtistIdFromHash()) return 'artist'
-  return hashSections[window.location.hash] ?? 'home'
-}
-
-function createAlbumItems(songs) {
-  const albums = new Map()
-
-  songs.forEach((song) => {
-    if (albums.has(song.albumId)) return
-
-    albums.set(song.albumId, {
-      id: `album-${song.albumId}`,
-      albumId: song.albumId,
-      title: song.albumTitle ?? albumTitles[song.albumId] ?? song.albumId,
-      artist: song.artist,
-      artistId: song.artistId,
-      artwork: song.artwork,
-      audioUrl: song.audioUrl,
-      year: song.releaseDate ? new Date(song.releaseDate).getUTCFullYear() : null,
-    })
-  })
-
-  return Array.from(albums.values())
-}
-
-function createArtistItems(songs) {
-  const artists = new Map()
-
-  songs.forEach((song) => {
-    const songArtists = song.artists?.length
-      ? song.artists
-      : [{ id: song.artistId ?? song.artist, name: song.artist }]
-
-    songArtists.forEach((songArtist) => {
-      const artist = artists.get(songArtist.id)
-
-      if (artist) {
-        artist.count += 1
-        return
-      }
-
-      artists.set(songArtist.id, {
-        id: `artist-${songArtist.id}`,
-        artistId: songArtist.id,
-        title: songArtist.name,
-        meta: '1 cancion',
-        artwork: songArtist.image ?? song.artwork,
-        images: songArtist.images ?? [],
-        count: 1,
-      })
-    })
-  })
-
-  return Array.from(artists.values()).map(({ count, ...artist }) => ({
-    ...artist,
-    meta: `${count} canciones`,
-  }))
-}
-
-function getFollowingSongs(songs, selectedSongId, count = 10) {
-  if (!songs.length || !selectedSongId) return []
-  const selectedIndex = songs.findIndex((song) => song.id === selectedSongId)
-  if (selectedIndex < 0) return []
-
-  return Array.from({ length: Math.min(count, Math.max(0, songs.length - 1)) }, (_, index) => (
-    songs[(selectedIndex + index + 1) % songs.length]
-  ))
-}
-
-function shuffleSongs(songs) {
-  const shuffledSongs = [...songs]
-
-  for (let index = shuffledSongs.length - 1; index > 0; index -= 1) {
-    const randomIndex = Math.floor(Math.random() * (index + 1))
-    const currentSong = shuffledSongs[index]
-    shuffledSongs[index] = shuffledSongs[randomIndex]
-    shuffledSongs[randomIndex] = currentSong
-  }
-
-  return shuffledSongs
-}
+const MusicImportView = lazy(() => import('../music-import/MusicImportView.jsx'))
+const NewArtistSpotlight = lazy(() => import('./NewArtistSpotlight.jsx'))
+import {
+  createAlbumItems,
+  createArtistItems,
+  getAlbumIdFromHash,
+  getArtistIdFromHash,
+  getFollowingSongs,
+  getPlaylistIdFromHash,
+  getSectionFromHash,
+  sectionHashes,
+  shuffleSongs,
+} from './utilidades/navegacionDescubrimiento.js'
 
 function DiscoveryView({
   addSongToPlaylist,
+  catalogHasMore,
+  catalogLoadingMore,
   createPlaylist,
   likedAlbumIds,
   likedArtistIds,
   likedSongIds,
   onImportNav,
   onCatalogRefresh,
+  onCatalogLoadMore,
   onLogout,
   onDeletePlaylist,
   onReorderPlaylist,
@@ -161,11 +57,16 @@ function DiscoveryView({
   onUpdatePlaylist,
   playlists,
   searchQuery,
+  searchSongs,
   selectedSongId,
   songs,
   user,
 }) {
-  const [activeSection, setActiveSection] = useState(getSectionFromHash)
+  const mayImportMusic = canImportMusic(user)
+  const [activeSection, setActiveSection] = useState(() => {
+    const requestedSection = getSectionFromHash()
+    return requestedSection === 'import' && !mayImportMusic ? 'home' : requestedSection
+  })
   const [activeAlbumId, setActiveAlbumId] = useState(getAlbumIdFromHash)
   const [activeArtistId, setActiveArtistId] = useState(getArtistIdFromHash)
   const [activeArtistProfile, setActiveArtistProfile] = useState(null)
@@ -179,26 +80,28 @@ function DiscoveryView({
   const [selectedSongContext, setSelectedSongContext] = useState(null)
   const [selectedSongPlaying, setSelectedSongPlaying] = useState(false)
   const [playerAnimationNonce, setPlayerAnimationNonce] = useState(0)
+  const [playerFadeInNonce, setPlayerFadeInNonce] = useState(0)
   const [playbackToggleNonce, setPlaybackToggleNonce] = useState(0)
+  const [playerAnalyser, setPlayerAnalyser] = useState(null)
   const [playlistEditor, setPlaylistEditor] = useState(null)
   const [playlistPickerSong, setPlaylistPickerSong] = useState(null)
+  const autoSpotlightBlockedRef = useRef(false)
   const playbackStateRef = useRef({ currentTime: 0, duration: 0, isPlaying: false, volume: 75 })
+  const contentRef = useRef(null)
   const discoveryLoadingTimerRef = useRef(null)
   const previewAudioRef = useRef(null)
   const previewAudioUnlockedRef = useRef(false)
   const previewItemIdRef = useRef(null)
   const previewTimerRef = useRef(null)
+  const scrollPositionsRef = useRef(new Map())
+  const activeRouteKey = `${activeSection}-${activePlaylistId ?? activeAlbumId ?? activeArtistId ?? ''}`
   const selectedSong = selectedSongContext?.id === selectedSongId
     ? selectedSongContext
     : songs.find((song) => song.id === selectedSongId) ?? null
   const playbackSongs = discoveryMix.length ? discoveryMix : songs
   const nextSongs = getFollowingSongs(playbackSongs, selectedSongId)
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase()
-  const filteredSongs = normalizedQuery
-    ? songs.filter((song) =>
-        [song.title, song.artist].some((value) => value.toLocaleLowerCase().includes(normalizedQuery)),
-      )
-    : songs
+  const filteredSongs = normalizedQuery ? searchSongs : songs
   const previewFallbackUrl = songs.find((song) => song.audioUrl)?.audioUrl
 
   function getShelfSongs(titles) {
@@ -231,7 +134,12 @@ function DiscoveryView({
   const albumItems = createAlbumItems(filteredSongs)
   const allAlbumItems = createAlbumItems(songs)
   const artistItems = createArtistItems(filteredSongs)
-  const playlistsWithArtwork = playlists.map((playlist) => {
+  const availableSongIds = new Set(songs.map((song) => song.id))
+  const resolvedPlaylists = playlists.map((playlist) => ({
+    ...playlist,
+    songIds: playlist.songIds.filter((songId) => availableSongIds.has(songId)),
+  }))
+  const playlistsWithArtwork = resolvedPlaylists.map((playlist) => {
     if (playlist.artwork) return playlist
     const firstSong = playlist.songIds
       .map((songId) => songs.find((song) => song.id === songId))
@@ -255,7 +163,13 @@ function DiscoveryView({
 
   useEffect(() => {
     function syncSectionFromHash() {
-      setActiveSection(getSectionFromHash)
+      const requestedSection = getSectionFromHash()
+      const nextSection = requestedSection === 'import' && !mayImportMusic ? 'home' : requestedSection
+      if (requestedSection === 'import' && !mayImportMusic) {
+        window.history.replaceState(window.history.state, '', sectionHashes.home)
+      }
+      if (nextSection !== 'home') autoSpotlightBlockedRef.current = true
+      setActiveSection(nextSection)
       setActiveAlbumId(getAlbumIdFromHash)
       setActiveArtistId(getArtistIdFromHash)
       setActivePlaylistId(getPlaylistIdFromHash)
@@ -263,12 +177,37 @@ function DiscoveryView({
 
     window.addEventListener('hashchange', syncSectionFromHash)
     window.addEventListener('popstate', syncSectionFromHash)
+    syncSectionFromHash()
 
     return () => {
       window.removeEventListener('hashchange', syncSectionFromHash)
       window.removeEventListener('popstate', syncSectionFromHash)
     }
-  }, [])
+  }, [mayImportMusic])
+
+  useLayoutEffect(() => {
+    const content = contentRef.current
+    if (!content) return undefined
+
+    const scrollTargets = [
+      content,
+      content.querySelector('.artist-profile__content'),
+      content.querySelector('.collection-detail__tracks'),
+    ].filter(Boolean)
+    const scrollPositions = scrollPositionsRef.current
+    const savedPositions = scrollPositions.get(activeRouteKey)
+
+    scrollTargets.forEach((target, index) => {
+      target.scrollTop = savedPositions?.[index] ?? 0
+    })
+
+    return () => {
+      scrollPositions.set(
+        activeRouteKey,
+        scrollTargets.map((target) => target.scrollTop),
+      )
+    }
+  }, [activeRouteKey])
 
   useEffect(() => () => clearTimeout(discoveryLoadingTimerRef.current), [])
 
@@ -289,14 +228,29 @@ function DiscoveryView({
     }
   }, [activeArtistId])
 
+  function presentArtistSpotlight(artist) {
+    setSpotlightArtist(artist)
+    setPlayerCollapsed(true)
+
+    const firstSong = artist?.songs?.[0]
+    if (!firstSong) return
+
+    selectSong(firstSong.id, {
+      animatePlayer: true,
+      contextSong: firstSong,
+      contextSongs: artist.songs,
+      fadeIn: true,
+    })
+  }
+
   useEffect(() => {
     let cancelled = false
 
-    if (activeSection !== 'home' || !user) return undefined
+    if (activeSection !== 'home' || !user || autoSpotlightBlockedRef.current) return undefined
 
     catalogApi.getArtistSpotlight()
       .then((artist) => {
-        if (!cancelled) setSpotlightArtist(artist)
+        if (!cancelled && !autoSpotlightBlockedRef.current) setSpotlightArtist(artist)
       })
       .catch(() => {})
 
@@ -404,8 +358,10 @@ function DiscoveryView({
     animatePlayer = true,
     contextSong = null,
     contextSongs = null,
+    fadeIn = false,
     preserveDiscoveryMix = false,
   } = {}) {
+    if (songId !== null) autoSpotlightBlockedRef.current = true
     clearTimeout(discoveryLoadingTimerRef.current)
     setDiscoveryLoading(false)
     if (contextSongs) setDiscoveryMix(contextSongs)
@@ -414,6 +370,7 @@ function DiscoveryView({
     stopPreview()
     setSelectedSongPlaying(false)
     if (songId !== null && animatePlayer) setPlayerAnimationNonce((nonce) => nonce + 1)
+    if (songId !== null && fadeIn) setPlayerFadeInNonce((nonce) => nonce + 1)
     onSongSelect(songId)
   }
 
@@ -421,6 +378,8 @@ function DiscoveryView({
     const weeklyMix = shuffleSongs(songs)
     const firstSong = weeklyMix[0]
     if (!firstSong) return
+
+    autoSpotlightBlockedRef.current = true
 
     clearTimeout(discoveryLoadingTimerRef.current)
     stopPreview()
@@ -502,8 +461,10 @@ function DiscoveryView({
   }, [playbackSongs, selectedSong])
 
   function navigateTo(section) {
+    if (section === 'import' && !mayImportMusic) return
     const nextHash = sectionHashes[section]
     if (!nextHash) return
+    autoSpotlightBlockedRef.current = true
     setActiveSection(section)
     setActiveAlbumId(null)
     setActiveArtistId(null)
@@ -515,6 +476,7 @@ function DiscoveryView({
 
   function navigateToPlaylist(playlistId) {
     const nextHash = `#playlist-${playlistId}`
+    autoSpotlightBlockedRef.current = true
     setActiveSection('playlist')
     setActiveAlbumId(null)
     setActiveArtistId(null)
@@ -526,6 +488,7 @@ function DiscoveryView({
 
   function navigateToAlbum(albumId) {
     const nextHash = `#${albumId}`
+    autoSpotlightBlockedRef.current = true
     setActiveSection('album')
     setActiveAlbumId(albumId)
     setActivePlaylistId(null)
@@ -538,6 +501,7 @@ function DiscoveryView({
   function navigateToArtist(artistId) {
     if (!artistId) return
     const nextHash = `#artist-${artistId}`
+    autoSpotlightBlockedRef.current = true
     setActiveSection('artist')
     setActiveArtistId(artistId)
     setActiveAlbumId(null)
@@ -554,12 +518,14 @@ function DiscoveryView({
   }
 
   function openLatestArtistSpotlight() {
+    primeAutoplay()
     catalogApi.getArtistSpotlight({ includeViewed: true })
-      .then(setSpotlightArtist)
+      .then(presentArtistSpotlight)
       .catch(() => {})
   }
 
   function navigateBack(fallbackSection) {
+    autoSpotlightBlockedRef.current = true
     if (window.history.state?.previousAppHash) {
       window.history.back()
       return
@@ -608,8 +574,10 @@ function DiscoveryView({
     return true
   }
 
+  const playerVisible = Boolean(selectedSong && !spotlightArtist)
+
   return (
-    <div className={`music-app${sidebarCollapsed ? ' music-app--sidebar-collapsed' : ''}${selectedSong ? ' music-app--player-open' : ''}${selectedSong && playerCollapsed ? ' music-app--player-collapsed' : ''}`} id="music-home">
+    <div className={`music-app${sidebarCollapsed ? ' music-app--sidebar-collapsed' : ''}${playerVisible ? ' music-app--player-open' : ''}${playerVisible && playerCollapsed ? ' music-app--player-collapsed' : ''}`} id="music-home">
       <AppHeader
         collapsed={sidebarCollapsed}
         glowArtwork={activeAlbum?.artwork ?? activePlaylist?.artwork ?? selectedSong?.artwork ?? null}
@@ -624,22 +592,28 @@ function DiscoveryView({
       <AppSidebar
         activePlaylistId={activePlaylistId}
         activeSection={activeSection}
+        canImportMusic={mayImportMusic}
         collapsed={sidebarCollapsed}
         onCreatePlaylist={() => openCreatePlaylist()}
         onEditPlaylist={openEditPlaylist}
-        onImportNav={onImportNav}
+        onImportNav={() => {
+          autoSpotlightBlockedRef.current = true
+          onImportNav?.()
+        }}
         onNavigate={navigateTo}
         onOpenPlaylist={navigateToPlaylist}
         onTogglePlaylistPinned={togglePlaylistPinned}
         playlists={orderedPlaylists}
       />
 
-      <div className="music-app__content">
-        {activeSection === 'import' ? (
-          <MusicImportView onCatalogRefresh={onCatalogRefresh} />
+      <div className="music-app__content" ref={contentRef}>
+        {activeSection === 'import' && mayImportMusic ? (
+          <Suspense fallback={<div className="collection-empty" role="status">Cargando importador…</div>}>
+            <MusicImportView onCatalogRefresh={onCatalogRefresh} />
+          </Suspense>
         ) : (
         <main className="music-app__main">
-          <div className="music-workspace" key={`${activeSection}-${activePlaylistId ?? activeAlbumId ?? activeArtistId ?? ''}`}>
+          <div className="music-workspace" key={activeRouteKey}>
             {activeSection === 'home' && (
               <div className="home-page">
                 <HomeDiscoveryPrompt
@@ -648,36 +622,19 @@ function DiscoveryView({
                   onDiscover={startWeeklyDiscovery}
                 />
 
-                {spotlightArtist && <NewArtistSpotlight
-                  artist={spotlightArtist}
-                  artistLiked={likedArtistIds?.has(spotlightArtist.artistId)}
-                  likedSongIds={likedSongIds}
-                  onAddToPlaylist={setPlaylistPickerSong}
-                  onAlbumSelect={(albumId) => navigateToAlbum(`album-${albumId}`)}
-                  onArtistSelect={navigateToArtist}
-                  onDismiss={dismissArtistSpotlight}
-                  onPlaybackToggle={() => setPlaybackToggleNonce((nonce) => nonce + 1)}
-                  onPreviewStart={startPreview}
-                  onPreviewStop={stopPreview}
-                  onSongSelect={selectSong}
-                  onToggleFavorite={onToggleFavorite}
-                  onToggleArtistFavorite={onToggleArtistFavorite}
-                  preview={preview}
-                  selectedSongId={selectedSongId}
-                  selectedSongPlaying={selectedSongPlaying}
-                  songs={spotlightArtist.songs}
-                />}
-
                 {orderedPlaylists.length > 0 && (
                   <HomeRail items={orderedPlaylists} onSelect={navigateToPlaylist} selectedId={activePlaylistId} title="Tus playlists" />
                 )}
 
                 <SongList
+                  hasMore={catalogHasMore}
                   key={normalizedQuery}
                   likedSongIds={likedSongIds}
+                  loadingMore={catalogLoadingMore}
                   onAddToPlaylist={setPlaylistPickerSong}
                   onAlbumSelect={(albumId) => navigateToAlbum(`album-${albumId}`)}
                   onArtistSelect={navigateToArtist}
+                  onLoadMore={onCatalogLoadMore}
                   onPlaybackToggle={() => setPlaybackToggleNonce((nonce) => nonce + 1)}
                   onPreviewStart={startPreview}
                   onPreviewStop={stopPreview}
@@ -799,6 +756,8 @@ function DiscoveryView({
               <PlaylistView
                 likedSongIds={likedSongIds}
                 onAddToPlaylist={setPlaylistPickerSong}
+                onAlbumSelect={(albumId) => navigateToAlbum(`album-${albumId}`)}
+                onArtistSelect={navigateToArtist}
                 onBack={() => navigateBack('playlists')}
                 onDelete={deletePlaylist}
                 onEdit={openEditPlaylist}
@@ -841,11 +800,37 @@ function DiscoveryView({
       )}
     </div>
 
+      {spotlightArtist && (
+        <Suspense fallback={null}>
+          <NewArtistSpotlight
+            artist={spotlightArtist}
+            artistLiked={likedArtistIds?.has(spotlightArtist.artistId)}
+            likedSongIds={likedSongIds}
+            onAddToPlaylist={setPlaylistPickerSong}
+            onAlbumSelect={(albumId) => navigateToAlbum(`album-${albumId}`)}
+            onArtistSelect={navigateToArtist}
+            onDismiss={dismissArtistSpotlight}
+            onPlaybackToggle={() => setPlaybackToggleNonce((nonce) => nonce + 1)}
+            onPreviewStart={startPreview}
+            onPreviewStop={stopPreview}
+            onSongSelect={selectSong}
+            onToggleFavorite={onToggleFavorite}
+            onToggleArtistFavorite={onToggleArtistFavorite}
+            preview={preview}
+            selectedSongId={selectedSongId}
+            selectedSongPlaying={selectedSongPlaying}
+            songs={spotlightArtist.songs}
+          />
+        </Suspense>
+      )}
+
       {selectedSong && (
         <PlayerDock
           animationNonce={playerAnimationNonce}
           collapsed={playerCollapsed}
+          fadeInNonce={playerFadeInNonce}
           isLoading={discoveryLoading}
+          onAnalyserChange={setPlayerAnalyser}
           onClose={() => selectSong(null)}
           onNext={() => selectRelativeSong(1)}
           onOpenMiniPlayer={() => openMiniPlayerWindow().catch(() => {})}
@@ -862,6 +847,7 @@ function DiscoveryView({
           onToggleCollapsed={() => setPlayerCollapsed((collapsed) => !collapsed)}
           playbackToggleNonce={playbackToggleNonce}
           queue={nextSongs}
+          suppressed={Boolean(spotlightArtist)}
           track={selectedSong}
         />
       )}
@@ -872,21 +858,25 @@ function DiscoveryView({
           mode={playlistEditor.mode}
           onClose={() => setPlaylistEditor(null)}
           onSave={savePlaylist}
-          playlists={playlists}
+          playlists={resolvedPlaylists}
           songs={songs}
         />
       )}
 
       {playlistPickerSong && (
         <PlaylistPickerModal
+          analyser={playerAnalyser}
+          onAdd={async (selectedPlaylistIds) => {
+            const selectedIds = new Set(selectedPlaylistIds)
+            const results = await Promise.all(playlists.map((playlist) => (
+              onSetSongInPlaylist(playlist.id, playlistPickerSong.id, selectedIds.has(playlist.id))
+            )))
+            if (results.every(Boolean)) setPlaylistPickerSong(null)
+          }}
           onClose={() => setPlaylistPickerSong(null)}
           onCreate={() => openCreatePlaylist(playlistPickerSong.id)}
-          onManage={() => {
-            setPlaylistPickerSong(null)
-            navigateTo('playlists')
-          }}
-          onToggle={(playlistId, included) => onSetSongInPlaylist(playlistId, playlistPickerSong.id, included)}
-          playlists={playlists}
+          playing={selectedSongPlaying && selectedSongId === playlistPickerSong.id}
+          playlists={resolvedPlaylists}
           song={playlistPickerSong}
         />
       )}

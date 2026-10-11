@@ -5,7 +5,6 @@ import PreviewIndicator from '../../components/PreviewIndicator.jsx'
 import { getAdjacentArtworkUrls, getVisiblePages } from './paginatedArtwork.js'
 
 const SONGS_PER_PAGE = 15
-const MAX_VISIBLE_PAGES = 10
 
 function formatDuration(seconds) {
   const minutes = Math.floor(seconds / 60)
@@ -14,11 +13,14 @@ function formatDuration(seconds) {
 
 function SongList({
   emptyMessage = 'No tienes canciones favoritas todavía.',
+  hasMore = false,
   headingAction,
   likedSongIds,
+  loadingMore = false,
   onAddToPlaylist,
   onAlbumSelect,
   onArtistSelect,
+  onLoadMore,
   onPlaybackToggle,
   onPreviewStart,
   onPreviewStop,
@@ -34,7 +36,7 @@ function SongList({
 }) {
   const [page, setPage] = useState(0)
   const [direction, setDirection] = useState('next')
-  const pageCount = Math.max(1, Math.min(MAX_VISIBLE_PAGES, Math.ceil(songs.length / SONGS_PER_PAGE)))
+  const pageCount = Math.max(1, Math.ceil(songs.length / SONGS_PER_PAGE))
   const currentPage = Math.min(page, pageCount - 1)
   const requestedArtworkUrls = useRef(new Set())
   const loadingArtwork = useRef(new Map())
@@ -68,6 +70,20 @@ function SongList({
     setPage(clampedPage)
   }
 
+  async function showNextPage() {
+    if (currentPage < pageCount - 1) {
+      showPage(currentPage + 1, 'next')
+      return
+    }
+    if (!hasMore || loadingMore || !onLoadMore) return
+
+    const loaded = await onLoadMore()
+    if (!loaded) return
+    onPreviewStop()
+    setDirection('next')
+    setPage(currentPage + 1)
+  }
+
   return (
     <section className="song-section" aria-labelledby="song-list-title">
       <div className="collection-heading">
@@ -80,6 +96,9 @@ function SongList({
           <div className="song-list-frame">
             <div className={`song-list song-list--slide-${direction}`} key={currentPage}>
               {visibleSongs.map((song, index) => {
+                const artistId = song.artistId ?? song.artists?.[0]?.id
+                const albumId = song.albumId ?? song.album?.id ?? song.albumMemberships?.[0]?.id
+                const albumTitle = song.albumTitle ?? song.album?.title ?? song.albumMemberships?.[0]?.title
                 const isSelected = selectedSongId === song.id
                 const isLiked = likedSongIds?.has(song.id)
                 const previewStatus = preview?.itemId === song.id ? preview.status : null
@@ -127,19 +146,19 @@ function SongList({
                           {song.title}
                         </button>
                         <span className="song-row__byline">
-                          <button className="song-row__catalog-link" type="button" disabled={!song.artistId} onClick={() => onArtistSelect?.(song.artistId)}>
+                          <button className="song-row__catalog-link" type="button" disabled={!artistId} onClick={() => onArtistSelect?.(artistId)}>
                             {song.artist}
                           </button>
-                          {song.albumId && (
+                          {albumId && albumTitle && (
                             <>
                               <span className="song-row__separator" aria-hidden="true">·</span>
                               <button
                                 className="song-row__catalog-link song-row__catalog-link--album"
                                 type="button"
-                                title={song.albumTitle}
-                                onClick={() => onAlbumSelect?.(song.albumId)}
+                                title={albumTitle}
+                                onClick={() => onAlbumSelect?.(albumId)}
                               >
-                                {song.albumTitle}
+                                {albumTitle}
                               </button>
                             </>
                           )}
@@ -211,10 +230,10 @@ function SongList({
               type="button"
               aria-label="Canciones siguientes"
               title="Canciones siguientes"
-              disabled={currentPage >= pageCount - 1}
-              onClick={() => showPage(currentPage + 1, 'next')}
+              disabled={loadingMore || (currentPage >= pageCount - 1 && !hasMore)}
+              onClick={showNextPage}
             >
-              <span>Siguiente</span>
+              <span>{loadingMore ? 'Cargando…' : 'Siguiente'}</span>
               <ChevronRight size={16} strokeWidth={2.4} aria-hidden="true" />
             </button>
           </nav>

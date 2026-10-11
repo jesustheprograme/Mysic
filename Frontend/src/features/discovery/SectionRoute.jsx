@@ -62,7 +62,7 @@ function SectionRoute({
     ))
     const favoriteSongs = songs.filter((song) => (
       likedSongIds?.has(song.id)
-      && matchesQuery(normalizedSongQuery, song.title, song.artist, song.albumTitle)
+      && matchesQuery(normalizedSongQuery, song.title, song.artist, song.albumTitle, ...(song.genres ?? []))
     ))
     const favoriteAlbums = albumItems.filter((album) => (
       likedAlbumIds?.has(album.albumId)

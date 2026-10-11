@@ -50,6 +50,18 @@ test('builds the final path inside the configured library', () => {
   assert.match(destination, /Artistas[\\/]Ado[\\/]Singles[\\/]Show[\\/]01 - Show\.mp3$/)
 })
 
+test('stores EP releases in their own folder', () => {
+  const destination = buildDestination('C:/Musica', {
+    artist: 'Artist',
+    title: 'Track',
+    kind: 'ep',
+    releaseName: 'Short Release',
+    trackNumber: 1,
+  })
+
+  assert.match(destination, /Artistas[\\/]Artist[\\/]EPs[\\/]Short Release[\\/]01 - Track\.mp3$/)
+})
+
 test('builds matching Cloudinary and remote destinations', () => {
   const entry = {
     artist: 'Ado',
