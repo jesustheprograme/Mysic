@@ -213,6 +213,15 @@
   opacity: 0.78;
 }
 
+.app-header__identity {
+  display: inline-flex;
+  align-items: center;
+}
+
+.app-header__context-title {
+  display: none;
+}
+
 .app-header__logo {
   width: 96px;
   height: 34px;
