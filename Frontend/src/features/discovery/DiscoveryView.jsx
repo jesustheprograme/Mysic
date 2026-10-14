@@ -174,6 +174,11 @@ function DiscoveryView({
         images: activeArtistProfile.images,
       }
     : activeArtistItem
+  let mobileContextTitle = null
+  if (activeSection === 'artist') mobileContextTitle = activeArtist?.title
+  if (activeSection === 'album') mobileContextTitle = activeAlbum?.title
+  if (activeSection === 'playlist') mobileContextTitle = activePlaylist?.title
+
   useEffect(() => {
     function syncSectionFromHash() {
       const requestedSection = getSectionFromHash()
@@ -623,6 +628,7 @@ function DiscoveryView({
         collapsed={sidebarCollapsed}
         glowArtwork={activeAlbum?.artwork ?? activePlaylist?.artwork ?? selectedSong?.artwork ?? null}
         mobileBrandHidden={mobileBrandHidden}
+        mobileContextTitle={mobileContextTitle}
         mobileMenuOpen={mobileMenuOpen}
         onArtistSpotlightOpen={openLatestArtistSpotlight}
         onHome={() => navigateTo('home')}
