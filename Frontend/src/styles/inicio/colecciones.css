@@ -2409,8 +2409,8 @@
     width: 100%;
   }
 
-  .music-app__main:has(.collection-detail),
-  .music-app__main:has(.artist-profile) {
+  .music-app:has(.collection-detail) .music-app__main,
+  .music-app:has(.artist-profile) .music-app__main {
     padding: 0;
   }
 
