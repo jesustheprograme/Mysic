@@ -3,9 +3,24 @@ import { useEffect, useRef, useState } from 'react'
 import BrandLogo from './BrandLogo.jsx'
 import { DesktopAppHeaderLink } from './DesktopAppDownload.jsx'
 
-function AppHeader({ collapsed, glowArtwork, onArtistSpotlightOpen, onHome, onLogout, onSearchChange, onSidebarToggle, searchQuery, user }) {
+function AppHeader({
+  collapsed,
+  glowArtwork,
+  mobileMenuOpen,
+  onArtistSpotlightOpen,
+  onHome,
+  onLogout,
+  onMobileMenuClose,
+  onMobileMenuToggle,
+  onSearchChange,
+  onSidebarToggle,
+  searchQuery,
+  user,
+}) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const menuRef = useRef(null)
+  const searchInputRef = useRef(null)
   const searchStyle = glowArtwork ? { '--search-glow-image': `url("${glowArtwork}")` } : undefined
 
   useEffect(() => {
@@ -14,7 +29,10 @@ function AppHeader({ collapsed, glowArtwork, onArtistSpotlightOpen, onHome, onLo
     }
 
     function closeFromKeyboard(event) {
-      if (event.key === 'Escape') setMenuOpen(false)
+      if (event.key === 'Escape') {
+        setMenuOpen(false)
+        setSearchOpen(false)
+      }
     }
 
     document.addEventListener('pointerdown', closeFromOutside)
@@ -26,8 +44,18 @@ function AppHeader({ collapsed, glowArtwork, onArtistSpotlightOpen, onHome, onLo
     }
   }, [])
 
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus()
+  }, [searchOpen])
+
+  function toggleMobileSearch() {
+    const nextOpen = !searchOpen
+    setSearchOpen(nextOpen)
+    if (nextOpen) onMobileMenuClose?.()
+  }
+
   return (
-    <header className="app-header">
+    <header className={`app-header${searchOpen ? ' app-header--search-open' : ''}`}>
       <div className="app-header__inner">
         <div className="app-header__leading">
           <button
@@ -37,6 +65,21 @@ function AppHeader({ collapsed, glowArtwork, onArtistSpotlightOpen, onHome, onLo
             aria-label={collapsed ? 'Mostrar sidebar' : 'Ocultar sidebar'}
             title={collapsed ? 'Mostrar sidebar' : 'Ocultar sidebar'}
             onClick={onSidebarToggle}
+          >
+            <Menu size={23} strokeWidth={1.8} aria-hidden="true" />
+          </button>
+
+          <button
+            className="app-header__mobile-menu-toggle"
+            type="button"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-navigation"
+            aria-label={mobileMenuOpen ? 'Cerrar menú de navegación' : 'Abrir menú de navegación'}
+            title={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+            onClick={() => {
+              setSearchOpen(false)
+              onMobileMenuToggle?.()
+            }}
           >
             <Menu size={23} strokeWidth={1.8} aria-hidden="true" />
           </button>
@@ -54,11 +97,16 @@ function AppHeader({ collapsed, glowArtwork, onArtistSpotlightOpen, onHome, onLo
           </a>
         </div>
 
-        <label className={`music-search${glowArtwork ? ' music-search--themed' : ''}`} style={searchStyle}>
+        <label
+          className={`music-search${glowArtwork ? ' music-search--themed' : ''}${searchOpen ? ' music-search--open' : ''}`}
+          id="mobile-catalog-search"
+          style={searchStyle}
+        >
           <span className="sr-only">Buscar albumes o artistas</span>
           <Search className="music-search__icon" size={16} strokeWidth={1.8} aria-hidden="true" />
           <input
             className="music-search__input"
+            ref={searchInputRef}
             value={searchQuery}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="Buscar albumes o artistas"
@@ -67,6 +115,18 @@ function AppHeader({ collapsed, glowArtwork, onArtistSpotlightOpen, onHome, onLo
           />
           <span className="music-search__border" aria-hidden="true" />
         </label>
+
+        <button
+          className="app-header__search-toggle"
+          type="button"
+          aria-controls="mobile-catalog-search"
+          aria-expanded={searchOpen}
+          aria-label={searchOpen ? 'Ocultar buscador' : 'Abrir buscador'}
+          title={searchOpen ? 'Ocultar buscador' : 'Buscar'}
+          onClick={toggleMobileSearch}
+        >
+          <Search size={21} strokeWidth={1.8} aria-hidden="true" />
+        </button>
 
         <div className="app-header__actions">
           <DesktopAppHeaderLink />

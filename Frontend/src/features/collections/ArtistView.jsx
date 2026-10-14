@@ -116,12 +116,9 @@ function ArtistView({
   const featuredSongs = artistSongs.slice(0, 8)
   const portraits = artist.images?.length ? artist.images : [artist.artwork].filter(Boolean)
   const [portraitIndex, setPortraitIndex] = useState(0)
+  const activePortraitIndex = portraits.length ? portraitIndex % portraits.length : 0
   const selectedSongBelongsToArtist = artistSongs.some((song) => song.id === selectedSongId)
   const artistIsPlaying = selectedSongBelongsToArtist && selectedSongPlaying
-
-  useEffect(() => {
-    setPortraitIndex(0)
-  }, [artist.artistId, portraits.length])
 
   useEffect(() => {
     if (portraits.length < 2) return undefined
@@ -165,7 +162,7 @@ function ArtistView({
         <div className="artist-profile__portraits" aria-hidden="true">
           {portraits.map((portrait, index) => (
             <img
-              className={`artist-profile__portrait artist-profile__portrait--${portraitDirections[index % portraitDirections.length]}${index === portraitIndex ? ' artist-profile__portrait--active' : ''}`}
+              className={`artist-profile__portrait artist-profile__portrait--${portraitDirections[index % portraitDirections.length]}${index === activePortraitIndex ? ' artist-profile__portrait--active' : ''}`}
               src={portrait}
               alt=""
               loading={index < 2 ? 'eager' : 'lazy'}
@@ -180,6 +177,14 @@ function ArtistView({
           </button>
         )}
         <div className="artist-profile__hero-copy">
+          {portraits[activePortraitIndex] && (
+            <img
+              className="artist-profile__mobile-portrait"
+              src={portraits[activePortraitIndex]}
+              alt=""
+              aria-hidden="true"
+            />
+          )}
           <h1
             className={`artist-profile__title artist-profile__title--${getArtistTitleScale(artist.title)}`}
             id="artist-profile-title"
@@ -207,9 +212,9 @@ function ArtistView({
           </div>
         </div>
         {portraits.length > 1 && (
-          <div className="artist-profile__portrait-progress" aria-label={`Imagen ${portraitIndex + 1} de ${portraits.length}`}>
+          <div className="artist-profile__portrait-progress" aria-label={`Imagen ${activePortraitIndex + 1} de ${portraits.length}`}>
             {portraits.map((portrait, index) => {
-              const isActive = index === portraitIndex
+              const isActive = index === activePortraitIndex
 
               return (
                 <button
@@ -223,7 +228,7 @@ function ArtistView({
                   <span
                     className="artist-profile__portrait-progress-fill"
                     style={{ animationDuration: `${PORTRAIT_DURATION}ms` }}
-                    key={`${portraitIndex}-${index}`}
+                    key={`${activePortraitIndex}-${index}`}
                   />
                 </button>
               )

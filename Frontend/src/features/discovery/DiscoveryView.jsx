@@ -73,6 +73,7 @@ function DiscoveryView({
   const [spotlightArtist, setSpotlightArtist] = useState(null)
   const [activePlaylistId, setActivePlaylistId] = useState(getPlaylistIdFromHash)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [playerCollapsed, setPlayerCollapsed] = useState(false)
   const [preview, setPreview] = useState(null)
   const [discoveryLoading, setDiscoveryLoading] = useState(false)
@@ -103,6 +104,17 @@ function DiscoveryView({
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase()
   const filteredSongs = normalizedQuery ? searchSongs : songs
   const previewFallbackUrl = songs.find((song) => song.audioUrl)?.audioUrl
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return undefined
+
+    function closeMobileMenu(event) {
+      if (event.key === 'Escape') setMobileMenuOpen(false)
+    }
+
+    document.addEventListener('keydown', closeMobileMenu)
+    return () => document.removeEventListener('keydown', closeMobileMenu)
+  }, [mobileMenuOpen])
 
   function getShelfSongs(titles) {
     const selectedSongs = titles.reduce((selected, title) => {
@@ -581,9 +593,12 @@ function DiscoveryView({
       <AppHeader
         collapsed={sidebarCollapsed}
         glowArtwork={activeAlbum?.artwork ?? activePlaylist?.artwork ?? selectedSong?.artwork ?? null}
+        mobileMenuOpen={mobileMenuOpen}
         onArtistSpotlightOpen={openLatestArtistSpotlight}
         onHome={() => navigateTo('home')}
         onLogout={onLogout}
+        onMobileMenuClose={() => setMobileMenuOpen(false)}
+        onMobileMenuToggle={() => setMobileMenuOpen((open) => !open)}
         onSearchChange={onSearchChange}
         onSidebarToggle={() => setSidebarCollapsed((collapsed) => !collapsed)}
         searchQuery={searchQuery}
@@ -594,14 +609,26 @@ function DiscoveryView({
         activeSection={activeSection}
         canImportMusic={mayImportMusic}
         collapsed={sidebarCollapsed}
-        onCreatePlaylist={() => openCreatePlaylist()}
+        mobileOpen={mobileMenuOpen}
+        onCreatePlaylist={() => {
+          setMobileMenuOpen(false)
+          openCreatePlaylist()
+        }}
         onEditPlaylist={openEditPlaylist}
         onImportNav={() => {
+          setMobileMenuOpen(false)
           autoSpotlightBlockedRef.current = true
           onImportNav?.()
         }}
-        onNavigate={navigateTo}
-        onOpenPlaylist={navigateToPlaylist}
+        onMobileClose={() => setMobileMenuOpen(false)}
+        onNavigate={(section) => {
+          setMobileMenuOpen(false)
+          navigateTo(section)
+        }}
+        onOpenPlaylist={(playlistId) => {
+          setMobileMenuOpen(false)
+          navigateToPlaylist(playlistId)
+        }}
         onTogglePlaylistPinned={togglePlaylistPinned}
         playlists={orderedPlaylists}
       />

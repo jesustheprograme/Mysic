@@ -2396,6 +2396,514 @@
   }
 }
 
+/* Mobile collection pages use a full-bleed, thumb-friendly listening layout. */
+.artist-profile__mobile-portrait {
+  display: none;
+}
+
+@media (max-width: 620px) {
+  .music-app:has(.collection-detail) .music-app__content,
+  .music-app:has(.artist-profile) .music-app__content {
+    grid-column: 1;
+    grid-row: 2;
+    width: 100%;
+  }
+
+  .music-app__main:has(.collection-detail),
+  .music-app__main:has(.artist-profile) {
+    padding: 0;
+  }
+
+  .collection-detail {
+    width: 100%;
+    max-width: none;
+    min-height: 100%;
+    gap: 0;
+    margin: 0;
+    padding: 0 0 calc(28px + env(safe-area-inset-bottom));
+    background: #050606;
+  }
+
+  .collection-detail__ambient {
+    inset: 0 0 auto;
+    height: min(112vw, 520px);
+    background:
+      linear-gradient(180deg, rgba(5, 6, 6, 0.08) 44%, #050606 100%),
+      var(--collection-artwork) center top / cover no-repeat;
+    filter: blur(30px) saturate(0.82);
+    opacity: 0.3;
+    transform: scale(1.08);
+  }
+
+  .collection-detail__back {
+    position: absolute;
+    top: calc(12px + env(safe-area-inset-top));
+    left: 12px;
+    z-index: 12;
+    width: 44px;
+    height: 44px;
+    color: #fff;
+    background: rgba(5, 6, 6, 0.5);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(16px);
+  }
+
+  .collection-detail__summary {
+    width: 100%;
+    display: grid;
+    justify-items: stretch;
+    gap: 0;
+  }
+
+  .collection-detail__creator,
+  .collection-detail__creator--link {
+    position: absolute;
+    top: calc(18px + env(safe-area-inset-top));
+    right: 18px;
+    z-index: 3;
+    max-width: calc(100% - 90px);
+    min-height: 36px;
+    justify-self: end;
+    justify-content: flex-end;
+    padding: 5px 9px;
+    color: #fff;
+    background: rgba(5, 6, 6, 0.48);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(16px);
+  }
+
+  .collection-detail__creator img {
+    width: 26px;
+    height: 26px;
+  }
+
+  .collection-detail__creator span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .collection-detail__artwork {
+    width: 100%;
+    max-width: none;
+    aspect-ratio: 1 / 1.04;
+    border-radius: 0;
+    box-shadow: none;
+    object-position: center;
+  }
+
+  .collection-detail__artwork--empty {
+    min-height: min(104vw, 500px);
+  }
+
+  .collection-detail__identity {
+    position: relative;
+    z-index: 2;
+    justify-items: center;
+    gap: 4px;
+    margin-top: -96px;
+    padding: 30px 22px 20px;
+    background: linear-gradient(180deg, transparent 0%, rgba(5, 6, 6, 0.88) 38%, #050606 78%);
+    text-align: center;
+  }
+
+  .collection-detail__identity h1 {
+    display: -webkit-box;
+    max-width: 100%;
+    max-height: 2.12em;
+    margin: 0 0 8px;
+    overflow: hidden;
+    color: #fff;
+    font-size: clamp(28px, 8vw, 38px);
+    line-height: 1.06;
+    overflow-wrap: anywhere;
+    text-overflow: ellipsis;
+    text-wrap: wrap;
+    text-shadow: 0 3px 20px rgba(0, 0, 0, 0.68);
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .collection-detail__identity p {
+    display: -webkit-box;
+    max-width: 34rem;
+    overflow: hidden;
+    color: #bdc3c0;
+    font-size: 13px;
+    line-height: 1.45;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .collection-detail__identity > span {
+    color: #a7afac;
+    font-size: 12px;
+  }
+
+  .collection-detail__controls {
+    width: 100%;
+    gap: clamp(8px, 3vw, 14px);
+    margin: 0;
+    padding: 2px 16px 22px;
+  }
+
+  .collection-detail__control {
+    width: 46px;
+    height: 46px;
+    flex-basis: 46px;
+    color: #eef1ef;
+    background: #202322;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035);
+  }
+
+  .collection-detail__play {
+    width: 64px;
+    height: 64px;
+    flex: 0 0 64px;
+    color: #070908;
+    background: #f5f6f3;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
+  }
+
+  .collection-detail__description {
+    display: -webkit-box;
+    max-width: none;
+    margin: 0 22px 12px;
+    overflow: hidden;
+    color: #929a97;
+    font-size: 13px;
+    line-height: 1.5;
+    text-align: center;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .collection-detail__tracks {
+    width: 100%;
+    padding: 8px 8px 28px;
+  }
+
+  .collection-detail__track-list,
+  .collection-detail__disc-tracks {
+    gap: 2px;
+  }
+
+  .collection-detail__track,
+  .collection-detail--playlist .collection-detail__track {
+    min-height: 64px;
+    gap: 9px;
+    padding: 7px 8px;
+    border-radius: 10px;
+  }
+
+  .collection-detail__track {
+    grid-template-columns: 34px minmax(0, 1fr) 38px;
+  }
+
+  .collection-detail--playlist .collection-detail__track {
+    grid-template-columns: 24px 46px minmax(0, 1fr) 38px;
+  }
+
+  .collection-detail__track-artwork {
+    width: 46px;
+    height: 46px;
+    border-radius: 8px;
+  }
+
+  .collection-detail__track--active {
+    background: #171a19;
+    box-shadow: none;
+  }
+
+  .collection-detail__track-main strong {
+    font-size: 14px;
+  }
+
+  .collection-detail__track-main small {
+    margin-top: 3px;
+    font-size: 11px;
+  }
+
+  .collection-detail__track time {
+    justify-self: end;
+    color: #79817e;
+    font-size: 11px;
+  }
+
+  .collection-detail__disc > h2 {
+    margin: 14px 10px 6px 42px;
+  }
+
+  .artist-profile {
+    width: 100%;
+    max-width: none;
+    min-height: 100%;
+    margin: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: #050606;
+  }
+
+  .artist-profile__hero {
+    min-height: clamp(330px, 46dvh, 420px);
+    height: clamp(330px, 46dvh, 420px);
+    display: block;
+    padding: 0;
+    overflow: hidden;
+    background: #0b0d0c;
+  }
+
+  .artist-profile__portraits,
+  .artist-profile__shade {
+    display: block;
+  }
+
+  .artist-profile__portraits {
+    position: absolute;
+    inset: 0;
+  }
+
+  .artist-profile__portrait {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    object-fit: cover;
+    object-position: center 24%;
+  }
+
+  .artist-profile__shade {
+    background:
+      linear-gradient(180deg, rgba(4, 6, 6, 0.42) 0%, transparent 34%, rgba(4, 6, 6, 0.2) 56%, #050606 100%),
+      linear-gradient(90deg, rgba(4, 6, 6, 0.48) 0%, transparent 64%);
+  }
+
+  .artist-profile__hero-copy {
+    position: absolute;
+    right: 18px;
+    bottom: 20px;
+    left: 18px;
+    width: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    align-items: end;
+    column-gap: 16px;
+    row-gap: 5px;
+  }
+
+  .artist-profile__mobile-portrait {
+    display: none;
+  }
+
+  .artist-profile__hero h1.artist-profile__title {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: end;
+    max-width: 100%;
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: clamp(30px, 9vw, 46px);
+    font-weight: 760;
+    letter-spacing: -0.045em;
+    line-height: 1.02;
+    overflow-wrap: anywhere;
+    text-shadow: 0 4px 24px rgba(0, 0, 0, 0.48);
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .artist-profile__hero-copy > p {
+    grid-column: 1;
+    grid-row: 2;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    color: rgba(237, 242, 239, 0.72);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .artist-profile__hero-actions {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    align-self: end;
+    justify-self: end;
+    gap: 8px;
+    margin: 0;
+  }
+
+  .artist-profile__play,
+  .artist-profile__shuffle,
+  .artist-profile__hero-actions .heart-container--artist {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  .artist-profile__play span,
+  .artist-profile__shuffle span {
+    display: none;
+  }
+
+  .artist-profile__play svg,
+  .artist-profile__shuffle svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .artist-profile__portrait-progress {
+    position: absolute;
+    z-index: 3;
+    top: calc(20px + env(safe-area-inset-top));
+    right: 18px;
+    bottom: auto;
+    display: flex;
+    flex-direction: row;
+    gap: 5px;
+  }
+
+  .artist-profile__portrait-progress-item,
+  .artist-profile__portrait-progress-item.is-active {
+    width: 18px;
+    height: 3px;
+    transition: width 380ms cubic-bezier(0.22, 1, 0.36, 1), transform 160ms ease;
+    will-change: width;
+  }
+
+  .artist-profile__portrait-progress-item.is-active {
+    width: 34px;
+  }
+
+  .artist-profile__portrait-progress-item::before {
+    inset: 0;
+    width: 100%;
+    transform: none;
+  }
+
+  .artist-profile__portrait-progress-fill {
+    inset: 0;
+    width: 100%;
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+
+  .artist-profile__portrait-progress-item.is-active .artist-profile__portrait-progress-fill {
+    animation-name: artist-portrait-progress-mobile;
+  }
+
+  @keyframes artist-portrait-progress-mobile {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+
+  .artist-profile__content {
+    gap: 48px;
+    padding: 28px 14px 54px;
+  }
+
+  .artist-profile__section {
+    gap: 14px;
+  }
+
+  .artist-profile__section-heading {
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 10px;
+    padding: 0 5px 12px;
+  }
+
+  .artist-profile__section-heading > svg {
+    width: 21px;
+    height: 21px;
+  }
+
+  .artist-profile__section-heading h2 {
+    font-size: 21px;
+  }
+
+  .artist-profile__song {
+    min-height: 62px;
+    padding: 6px 4px;
+  }
+
+  .artist-profile__song .song-row__main {
+    grid-template-columns: 46px minmax(0, 1fr);
+  }
+
+  .artist-profile__song .song-row__artwork {
+    width: 46px;
+    border-radius: 8px;
+  }
+
+  .artist-profile__song .song-row__actions {
+    display: none;
+  }
+
+  .artist-profile__albums,
+  .music-app--player-open:not(.music-app--player-collapsed) .artist-profile__albums {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px 12px;
+  }
+
+  .artist-profile__album-meta-button {
+    margin-top: 8px;
+  }
+}
+
+@media (max-width: 380px) {
+  .collection-detail__controls {
+    gap: 7px;
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .collection-detail__control {
+    width: 42px;
+    height: 42px;
+    flex-basis: 42px;
+  }
+
+  .collection-detail__play {
+    width: 58px;
+    height: 58px;
+    flex-basis: 58px;
+  }
+
+  .artist-profile__hero {
+    min-height: 320px;
+    height: clamp(320px, 46dvh, 390px);
+  }
+
+  .artist-profile__hero-copy {
+    right: 16px;
+    bottom: 18px;
+    left: 16px;
+    column-gap: 12px;
+  }
+
+  .artist-profile__hero h1.artist-profile__title {
+    font-size: clamp(27px, 8.5vw, 38px);
+  }
+
+  .artist-profile__play,
+  .artist-profile__shuffle,
+  .artist-profile__hero-actions .heart-container--artist {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .artist-profile__hero-actions {
+    gap: 6px;
+  }
+}
+
 /* Compact playlist editor using the same neutral palette as the application. */
 .playlist-editor-modal.playlist-modal {
   padding: 24px;
