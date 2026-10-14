@@ -7,8 +7,6 @@ function AppHeader({
   collapsed,
   glowArtwork,
   mobileMenuOpen,
-  mobileContextTitle,
-  mobileContextVisible,
   onArtistSpotlightOpen,
   onHome,
   onLogout,
@@ -57,7 +55,7 @@ function AppHeader({
   }
 
   return (
-    <header className={`app-header${searchOpen ? ' app-header--search-open' : ''}${mobileContextVisible ? ' app-header--context-visible' : ''}`}>
+    <header className={`app-header${searchOpen ? ' app-header--search-open' : ''}`}>
       <div className="app-header__inner">
         <div className="app-header__leading">
           <button
@@ -86,22 +84,17 @@ function AppHeader({
             <Menu size={23} strokeWidth={1.8} aria-hidden="true" />
           </button>
 
-          <div className="app-header__identity">
-            <a
-              className="app-header__brand"
-              href="#music-home"
-              aria-label="Inicio de Mysic"
-              onClick={(event) => {
-                event.preventDefault()
-                onHome()
-              }}
-            >
-              <BrandLogo className="app-header__logo" tone="light" />
-            </a>
-            <strong className="app-header__context-title" aria-hidden={!mobileContextVisible}>
-              {mobileContextTitle}
-            </strong>
-          </div>
+          <a
+            className="app-header__brand"
+            href="#music-home"
+            aria-label="Inicio de Mysic"
+            onClick={(event) => {
+              event.preventDefault()
+              onHome()
+            }}
+          >
+            <BrandLogo className="app-header__logo" tone="light" />
+          </a>
         </div>
 
         <label

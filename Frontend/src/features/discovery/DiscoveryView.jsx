@@ -74,7 +74,6 @@ function DiscoveryView({
   const [activePlaylistId, setActivePlaylistId] = useState(getPlaylistIdFromHash)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [mobileContextVisible, setMobileContextVisible] = useState(false)
   const [playerCollapsed, setPlayerCollapsed] = useState(false)
   const [preview, setPreview] = useState(null)
   const [discoveryLoading, setDiscoveryLoading] = useState(false)
@@ -96,7 +95,6 @@ function DiscoveryView({
   const previewItemIdRef = useRef(null)
   const previewTimerRef = useRef(null)
   const scrollPositionsRef = useRef(new Map())
-  const mobileContextVisibleRef = useRef(false)
   const activeRouteKey = `${activeSection}-${activePlaylistId ?? activeAlbumId ?? activeArtistId ?? ''}`
   const selectedSong = selectedSongContext?.id === selectedSongId
     ? selectedSongContext
@@ -174,14 +172,6 @@ function DiscoveryView({
         images: activeArtistProfile.images,
       }
     : activeArtistItem
-  const mobileContextTitle = activeSection === 'album'
-    ? activeAlbum?.title
-    : activeSection === 'artist'
-      ? activeArtist?.title
-      : activeSection === 'playlist'
-        ? activePlaylist?.title
-        : null
-
   useEffect(() => {
     function syncSectionFromHash() {
       const requestedSection = getSectionFromHash()
@@ -222,30 +212,13 @@ function DiscoveryView({
       target.scrollTop = savedPositions?.[index] ?? 0
     })
 
-    const mobileViewport = window.matchMedia('(max-width: 760px)')
-
-    function syncMobileContext() {
-      const threshold = mobileContextVisibleRef.current ? 44 : 72
-      const nextVisible = Boolean(mobileContextTitle) && mobileViewport.matches && content.scrollTop > threshold
-
-      if (nextVisible === mobileContextVisibleRef.current) return
-      mobileContextVisibleRef.current = nextVisible
-      setMobileContextVisible(nextVisible)
-    }
-
-    syncMobileContext()
-    content.addEventListener('scroll', syncMobileContext, { passive: true })
-    mobileViewport.addEventListener('change', syncMobileContext)
-
     return () => {
       scrollPositions.set(
         activeRouteKey,
         scrollTargets.map((target) => target.scrollTop),
       )
-      content.removeEventListener('scroll', syncMobileContext)
-      mobileViewport.removeEventListener('change', syncMobileContext)
     }
-  }, [activeRouteKey, mobileContextTitle])
+  }, [activeRouteKey])
 
   useEffect(() => () => clearTimeout(discoveryLoadingTimerRef.current), [])
 
@@ -619,8 +592,6 @@ function DiscoveryView({
       <AppHeader
         collapsed={sidebarCollapsed}
         glowArtwork={activeAlbum?.artwork ?? activePlaylist?.artwork ?? selectedSong?.artwork ?? null}
-        mobileContextTitle={mobileContextTitle}
-        mobileContextVisible={mobileContextVisible}
         mobileMenuOpen={mobileMenuOpen}
         onArtistSpotlightOpen={openLatestArtistSpotlight}
         onHome={() => navigateTo('home')}
