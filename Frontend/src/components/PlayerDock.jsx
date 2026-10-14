@@ -516,13 +516,21 @@ function PlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoad
     }
   }, [])
 
+  const mobileProgress = duration > 0
+    ? `${Math.min(Math.max((currentTime / duration) * 100, 0), 100)}%`
+    : '0%'
+  const playerStyle = {
+    '--mobile-player-progress': mobileProgress,
+    ...(collapsed && track.artwork ? { '--compact-artwork': `url(${track.artwork})` } : {}),
+  }
+
   return (
     <aside
       className={`player-dock player-dock--animated${collapsed ? ' player-dock--collapsed' : ''}${trackChangeAnimationEnabled ? ' player-dock--track-changing' : ''}${suppressed ? ' player-dock--suppressed' : ''}`}
       aria-label={`Reproductor de ${track.title}`}
       aria-hidden={suppressed || undefined}
       inert={suppressed || undefined}
-      style={collapsed && track.artwork ? { '--compact-artwork': `url(${track.artwork})` } : undefined}
+      style={playerStyle}
     >
       <button
         className="player-dock__collapse"
