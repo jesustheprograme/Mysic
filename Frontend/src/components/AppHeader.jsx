@@ -6,6 +6,7 @@ import { DesktopAppHeaderLink } from './DesktopAppDownload.jsx'
 function AppHeader({
   collapsed,
   glowArtwork,
+  mobileBrandHidden,
   mobileMenuOpen,
   onArtistSpotlightOpen,
   onHome,
@@ -55,7 +56,7 @@ function AppHeader({
   }
 
   return (
-    <header className={`app-header${searchOpen ? ' app-header--search-open' : ''}`}>
+    <header className={`app-header${searchOpen ? ' app-header--search-open' : ''}${mobileBrandHidden ? ' app-header--brand-hidden' : ''}`}>
       <div className="app-header__inner">
         <div className="app-header__leading">
           <button
