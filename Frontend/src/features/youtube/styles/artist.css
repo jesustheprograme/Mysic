@@ -1,0 +1,303 @@
+/* Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera. */
+/* Página de artista a dos columnas (views/ArtistView.jsx, components/ArtistHero.jsx) */
+.yt-app .artist-page {
+  display: grid;
+  grid-template-columns: minmax(300px, 44%) minmax(0, 1fr);
+  gap: 36px;
+  align-items: start;
+}
+
+/* ---------- Panel de fotos ---------- */
+.yt-app .hero {
+  position: sticky;
+  top: 16px;
+  height: min(calc(100vh - var(--player-height) - 32px), 780px);
+  min-height: 520px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #0d0d0d;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  isolation: isolate;
+}
+
+.yt-app .hero-media {
+  position: absolute;
+  inset: 0;
+}
+
+.yt-app .hero-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 22%;
+  opacity: 0;
+  transform: scale(1.06);
+  transition: opacity 1.1s ease, transform 7s linear;
+  user-select: none;
+}
+
+.yt-app .hero-image--active {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.yt-app .hero-image--empty {
+  display: grid;
+  place-items: center;
+  color: #444;
+  background: #1a1a1a;
+}
+
+/* Degradado inferior para que el texto se lea sobre cualquier foto */
+.yt-app .hero-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to top, rgba(12, 12, 12, 0.96) 0%, rgba(12, 12, 12, 0.72) 26%, rgba(12, 12, 12, 0.18) 52%, transparent 72%),
+    linear-gradient(to right, rgba(12, 12, 12, 0.35), transparent 35%);
+  pointer-events: none;
+}
+
+.yt-app .hero-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 20px 24px 28px;
+}
+
+.yt-app .hero-back {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: background 0.15s, transform 0.1s;
+}
+
+.yt-app .hero-back:hover {
+  background: rgba(0, 0, 0, 0.7);
+  transform: scale(1.05);
+}
+
+.yt-app .hero-info {
+  min-width: 0;
+}
+
+.yt-app .hero-kind {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.yt-app .hero-name {
+  margin: 0;
+  font-size: clamp(44px, 6.2vw, 92px);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  text-shadow: 0 6px 30px rgba(0, 0, 0, 0.6);
+  overflow-wrap: anywhere;
+}
+
+.yt-app .hero-meta {
+  margin: 14px 0 0;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.yt-app .hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+/* Botones píldora */
+.yt-app .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 22px 12px 18px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(8px);
+  transition: background 0.15s, transform 0.1s, border-color 0.15s;
+}
+
+.yt-app .pill:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.6);
+  transform: scale(1.03);
+}
+
+.yt-app .pill--primary {
+  color: #000;
+  background: #f4f7f5;
+  border-color: #f4f7f5;
+}
+
+.yt-app .pill--primary:hover:not(:disabled) {
+  background: #ffffff;
+  border-color: #ffffff;
+}
+
+.yt-app .hero-actions .download-all {
+  margin-top: 0;
+  padding: 12px 20px 12px 16px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.45);
+  border-color: rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(8px);
+}
+
+.yt-app .hero-dots {
+  position: absolute;
+  right: 20px;
+  top: 26px;
+  display: flex;
+  gap: 6px;
+  z-index: 2;
+}
+
+.yt-app .hero-dot {
+  width: 18px;
+  height: 5px;
+  padding: 0;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.35);
+  transition: background 0.2s, width 0.2s;
+}
+
+.yt-app .hero-dot:hover {
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.yt-app .hero-dot--active {
+  width: 30px;
+  background: var(--accent);
+}
+
+/* ---------- Columna de contenido ---------- */
+.yt-app .artist-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.yt-app .catalog-section {
+  min-width: 0;
+}
+
+.yt-app .catalog-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 16px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.yt-app .catalog-header--plain {
+  padding-left: 0;
+}
+
+.yt-app .catalog-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  color: var(--text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  flex-shrink: 0;
+}
+
+.yt-app .catalog-eyebrow {
+  margin: 0 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.yt-app .catalog-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+.yt-app .catalog-group + .catalog-group {
+  margin-top: 24px;
+}
+
+.yt-app .catalog-group-title {
+  margin: 12px 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.yt-app .artist-bio {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  white-space: pre-line;
+}
+
+/* En la página de artista las filas de canciones van más compactas y sin fondo */
+.yt-app .artist-content .song {
+  background: transparent;
+  padding: 8px 8px 8px 4px;
+}
+
+.yt-app .artist-content .song:hover,
+.yt-app .artist-content .song:focus-visible,
+.yt-app .artist-content .song--current {
+  background: var(--bg-hover);
+}
+
+/* ---------- Pantallas estrechas: una columna ---------- */
+@media (max-width: 900px) {
+  .yt-app .artist-page {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .yt-app .hero {
+    position: relative;
+    top: 0;
+    height: 62vh;
+    min-height: 420px;
+  }
+
+  .yt-app .hero-name {
+    font-size: clamp(40px, 12vw, 72px);
+  }
+
+  .yt-app .hero-overlay {
+    padding: 16px 18px 22px;
+  }
+}

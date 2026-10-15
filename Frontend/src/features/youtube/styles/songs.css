@@ -1,0 +1,101 @@
+/* Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera. */
+/* Lista de canciones (components/SongList.jsx) */
+.yt-app .song-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.yt-app .song {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 12px 8px 8px;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  cursor: pointer;
+  transition: background 0.15s;
+  outline: none;
+}
+
+.yt-app .song:hover,
+.yt-app .song:focus-visible,
+.yt-app .song--current {
+  background: var(--bg-hover);
+}
+
+.yt-app .song--current .song-title {
+  color: var(--accent);
+}
+
+.yt-app .song-index {
+  width: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.yt-app .song-cover {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #333;
+}
+
+.yt-app .song-cover-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.yt-app .song:hover .song-cover-overlay,
+.yt-app .song:focus-visible .song-cover-overlay,
+.yt-app .song--current .song-cover-overlay {
+  opacity: 1;
+}
+
+.yt-app .song-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.yt-app .song-title {
+  margin: 0 0 3px;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yt-app .song-sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yt-app .song-album {
+  color: var(--text-dim);
+}
+
+.yt-app .song-duration {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 40px;
+  text-align: right;
+}

@@ -1,0 +1,144 @@
+/* Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera. */
+/* Estructura general, título, pestañas, mensajes y enlaces */
+.yt-app .app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.yt-app .content {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 16px calc(var(--player-height) + 32px);
+  flex: 1;
+  transition: max-width 0.25s ease;
+}
+
+/* La página de artista usa dos columnas y necesita más anchura */
+.yt-app .content--wide {
+  max-width: 1240px;
+}
+
+.yt-app .title {
+  text-align: center;
+  color: var(--accent);
+  font-size: 2rem;
+  margin: 8px 0 24px;
+}
+
+.yt-app .message {
+  text-align: center;
+  color: var(--text-muted);
+  margin: 32px 0;
+}
+
+.yt-app .message.error {
+  color: var(--danger);
+}
+
+.yt-app .message svg {
+  vertical-align: middle;
+}
+
+.yt-app .tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.yt-app .tab {
+  padding: 6px 16px;
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-input);
+  transition: background 0.15s, color 0.15s;
+}
+
+.yt-app .tab:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.yt-app .tab--active {
+  color: #000;
+  background: var(--accent);
+}
+
+.yt-app .back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: var(--text-muted);
+  transition: color 0.15s;
+}
+
+.yt-app .back:hover {
+  color: var(--text);
+}
+
+.yt-app .link {
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+  text-decoration: none;
+}
+
+.yt-app .link:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.yt-app .section-title {
+  font-size: 18px;
+  margin: 28px 0 12px;
+}
+
+.yt-app .section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.yt-app .section-header .section-title {
+  margin-bottom: 12px;
+}
+
+.yt-app .show-all {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 4px 12px;
+  border: 1px solid #3a3a3a;
+  border-radius: 14px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.yt-app .show-all:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.yt-app .offline-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #ffd166;
+  background: rgba(255, 209, 102, 0.12);
+  border: 1px solid rgba(255, 209, 102, 0.3);
+}
+
+@media (max-width: 640px) {
+  .yt-app .title {
+    font-size: 1.5rem;
+  }
+}

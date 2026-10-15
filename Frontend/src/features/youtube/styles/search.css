@@ -1,0 +1,182 @@
+/* Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera. */
+/* Buscador y desplegable de sugerencias (components/SearchBox.jsx) */
+.yt-app .searchbox {
+  position: relative;
+  margin-bottom: 20px;
+  z-index: 20;
+}
+
+.yt-app .search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 4px 4px 14px;
+  border-radius: 24px;
+  border: 1px solid transparent;
+  background: var(--bg-input);
+  transition: border-color 0.15s, border-radius 0.1s;
+}
+
+.yt-app .search:focus-within {
+  border-color: var(--accent);
+}
+
+.yt-app .search--open {
+  border-radius: 20px 20px 0 0;
+  border-bottom-color: transparent;
+}
+
+.yt-app .search-icon {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.yt-app .search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 6px;
+  font-size: 16px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  outline: none;
+}
+
+.yt-app .search-clear {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--text-muted);
+}
+
+.yt-app .search-clear:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.yt-app .search-button {
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 700;
+  background: var(--accent);
+  color: #000;
+  border-radius: 24px;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.yt-app .search-button:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: scale(1.03);
+}
+
+.yt-app .suggestions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin: 0;
+  padding: 6px 0 8px;
+  list-style: none;
+  background: var(--bg-input);
+  border: 1px solid var(--accent);
+  border-top: none;
+  border-radius: 0 0 20px 20px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+}
+
+.yt-app .suggestion {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 16px;
+  cursor: pointer;
+}
+
+.yt-app .suggestion--active {
+  background: var(--bg-hover);
+}
+
+.yt-app .suggestion-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.yt-app .suggestion-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yt-app .suggestion-text b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.yt-app .suggestion-remove {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.yt-app .suggestion-remove:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.yt-app .suggestion--entity {
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+.yt-app .suggestion--entity:first-child,
+.yt-app .suggestion--text + .suggestion--entity,
+.yt-app .suggestion--history + .suggestion--entity {
+  margin-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 12px;
+}
+
+.yt-app .suggestion-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: #333;
+  flex-shrink: 0;
+}
+
+.yt-app .suggestion-body {
+  min-width: 0;
+}
+
+.yt-app .suggestion-title {
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yt-app .suggestion-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

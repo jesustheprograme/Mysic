@@ -1,0 +1,68 @@
+/* Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera. */
+/* Cabeceras de álbum y descargas (views/AlbumView.jsx, DownloadsView.jsx) */
+.yt-app .detail {
+  display: flex;
+  gap: 20px;
+  align-items: flex-end;
+  margin-bottom: 8px;
+}
+
+.yt-app .detail-cover {
+  width: 180px;
+  height: 180px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #333;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.yt-app .detail-meta {
+  min-width: 0;
+}
+
+.yt-app .detail-kind {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.yt-app .detail-title {
+  margin: 0 0 6px;
+  font-size: 32px;
+  line-height: 1.1;
+}
+
+.yt-app .detail-sub {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.yt-app .detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.yt-app .play-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 10px 22px 10px 16px;
+  border-radius: 24px;
+  font-weight: 700;
+  color: #000;
+  background: var(--accent);
+  transition: background 0.15s, transform 0.1s;
+}
+
+.yt-app .play-all:hover {
+  background: var(--accent-hover);
+  transform: scale(1.03);
+}

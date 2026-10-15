@@ -1,0 +1,146 @@
+/* Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera. */
+/* Resultado principal y rejilla de tarjetas (views/SearchResults.jsx, components/Card.jsx) */
+.yt-app .top-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.yt-app .top-card:hover,
+.yt-app .top-card:focus-visible {
+  background: var(--bg-hover);
+  outline: none;
+}
+
+.yt-app .top-card-image {
+  width: 96px;
+  height: 96px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #333;
+  flex-shrink: 0;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.yt-app .top-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.yt-app .top-card-title {
+  font-size: 22px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yt-app .top-card-sub {
+  font-size: 14px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yt-app .top-card-action {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  color: #000;
+  background: var(--accent);
+  flex-shrink: 0;
+  transition: transform 0.1s;
+}
+
+.yt-app .top-card:hover .top-card-action {
+  transform: scale(1.06);
+}
+
+.yt-app .grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+}
+
+.yt-app .card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.yt-app .card:hover,
+.yt-app .card:focus-visible {
+  background: var(--bg-hover);
+  outline: none;
+}
+
+.yt-app .card-image {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #333;
+}
+
+.yt-app .card--round .card-image {
+  border-radius: 50%;
+}
+
+.yt-app .card-play {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: #000;
+  background: var(--accent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.yt-app .card:hover .card-play,
+.yt-app .card:focus-visible .card-play {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.yt-app .card-title {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yt-app .card-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yt-app .card--round .card-title,
+.yt-app .card--round .card-sub {
+  text-align: center;
+}
