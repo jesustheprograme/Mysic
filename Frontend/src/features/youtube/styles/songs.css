@@ -1,52 +1,62 @@
 /* Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera. */
-/* Lista de canciones (components/SongList.jsx) */
+/* Filas reutilizan el ritmo, contraste y microinteracciones de Mysic. */
 .yt-app .song-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .yt-app .song {
-  display: flex;
+  position: relative;
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 48px 38px;
   align-items: center;
-  gap: 14px;
-  padding: 8px 12px 8px 8px;
-  border-radius: 8px;
-  background: var(--bg-elevated);
-  cursor: pointer;
-  transition: background 0.15s;
+  gap: 13px;
+  padding: 7px 10px 7px 7px;
+  border: 1px solid transparent;
+  border-radius: 7px;
   outline: none;
+  background: #090b0a;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.yt-app .song:has(.song-index) {
+  grid-template-columns: 28px 48px minmax(0, 1fr) 48px 38px;
 }
 
 .yt-app .song:hover,
-.yt-app .song:focus-visible,
+.yt-app .song:focus-within,
 .yt-app .song--current {
-  background: var(--bg-hover);
+  border-color: rgba(255, 255, 255, 0.07);
+  background: #111412;
 }
 
-.yt-app .song--current .song-title {
-  color: var(--accent);
-}
+.yt-app .song:hover { transform: translateY(-1px); }
+.yt-app .song--current { box-shadow: inset 2px 0 0 rgba(31, 197, 101, 0.65); }
+.yt-app .song--current .song-title { color: var(--accent); }
 
 .yt-app .song-index {
-  width: 24px;
-  text-align: center;
-  font-size: 13px;
+  width: 28px;
   color: var(--text-dim);
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .yt-app .song-cover {
   position: relative;
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
+  display: block;
   flex-shrink: 0;
-  border-radius: 4px;
   overflow: hidden;
-  background: #333;
+  padding: 0;
+  border-radius: 5px;
+  background: #252a28;
 }
 
 .yt-app .song-cover-overlay {
@@ -54,48 +64,65 @@
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  background: rgba(7, 9, 8, 0.58);
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity 160ms ease;
 }
 
 .yt-app .song:hover .song-cover-overlay,
-.yt-app .song:focus-visible .song-cover-overlay,
-.yt-app .song--current .song-cover-overlay {
-  opacity: 1;
-}
+.yt-app .song:focus-within .song-cover-overlay,
+.yt-app .song--current .song-cover-overlay { opacity: 1; }
 
-.yt-app .song-meta {
-  flex: 1;
-  min-width: 0;
-}
+.yt-app .song-meta { min-width: 0; }
 
 .yt-app .song-title {
-  margin: 0 0 3px;
-  font-size: 15px;
-  font-weight: 600;
-  white-space: nowrap;
+  display: block;
+  max-width: 100%;
   overflow: hidden;
+  padding: 0;
+  margin: 0 0 3px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 620;
+  text-align: left;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
+.yt-app .song-title:hover,
+.yt-app .song-title:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
 
 .yt-app .song-sub {
   margin: 0;
-  font-size: 13px;
-  color: var(--text-muted);
-  white-space: nowrap;
   overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.yt-app .song-album {
-  color: var(--text-dim);
-}
+.yt-app .song-album { color: var(--text-dim); }
 
 .yt-app .song-duration {
-  font-size: 13px;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
   min-width: 40px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
   text-align: right;
+}
+
+@media (max-width: 560px) {
+  .yt-app .song,
+.yt-app .song:has(.song-index) {
+    grid-template-columns: 46px minmax(0, 1fr) 34px;
+    gap: 10px;
+    min-height: 62px;
+    padding: 7px;
+  }
+
+  .yt-app .song-index,
+.yt-app .song-duration { display: none; }
+  .yt-app .song-cover { width: 46px; height: 46px; }
+  .yt-app .song-album { display: none; }
 }

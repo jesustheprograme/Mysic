@@ -1,19 +1,19 @@
 /* Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera. */
 /* Variables de color, tipografía y reset mínimo */
 .yt-app {
-  --bg: #121212;
-  --bg-elevated: #181818;
-  --bg-hover: #282828;
-  --bg-input: #242424;
-  --text: #ffffff;
-  --text-muted: #b3b3b3;
-  --text-dim: #7a7a7a;
-  --accent: #1db954;
-  --accent-hover: #1ed760;
+  --bg: #070908;
+  --bg-elevated: #0d100f;
+  --bg-hover: #171b1a;
+  --bg-input: #171a19;
+  --text: #f4f3ef;
+  --text-muted: #9aa29f;
+  --text-dim: #68716e;
+  --accent: #1fc565;
+  --accent-hover: #28d872;
   --danger: #f15e6c;
   --player-height: 96px;
 
-  font-family: system-ui, 'Segoe UI', Roboto, Arial, sans-serif;
+  font-family: Inter, system-ui, 'Segoe UI', Roboto, Arial, sans-serif;
   font-size: 16px;
   line-height: 1.4;
   color: var(--text);

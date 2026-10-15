@@ -25,9 +25,27 @@ export function SearchResults({ results, loading, error, songListProps, onOpenAr
       />
     );
   }
-  if (results.type === 'song') return <SongList songs={results.items} {...songListProps} />;
-  if (results.type === 'artist') return <ArtistGrid artists={results.items} onOpenArtist={onOpenArtist} />;
-  return <AlbumGrid albums={results.items} onOpenAlbum={onOpenAlbum} />;
+  const labels = { song: 'Canciones', artist: 'Artistas', album: 'Álbumes' };
+  return (
+    <section className="result-collection">
+      <div className="section-heading">
+        <div>
+          <p className="section-eyebrow">Resultados</p>
+          <h2 className="section-title">{labels[results.type]}</h2>
+        </div>
+        <span className="section-count">{results.items.length}</span>
+      </div>
+      {results.items.length === 0 ? (
+        <p className="message message--surface">No encontramos resultados en esta categoría.</p>
+      ) : results.type === 'song' ? (
+        <SongList songs={results.items} {...songListProps} />
+      ) : results.type === 'artist' ? (
+        <ArtistGrid artists={results.items} onOpenArtist={onOpenArtist} />
+      ) : (
+        <AlbumGrid albums={results.items} onOpenAlbum={onOpenAlbum} />
+      )}
+    </section>
+  );
 }
 
 function AllResults({ results, songListProps, onOpenArtist, onOpenAlbum, onShowAll }) {
@@ -43,15 +61,23 @@ function AllResults({ results, songListProps, onOpenArtist, onOpenAlbum, onShowA
       else onPlay([top.song, ...songs.filter((s) => s.id !== top.id)], 0);
     }
   };
+  const topKind = top?.kind === 'artist' ? 'Artista' : top?.kind === 'album' ? 'Álbum' : 'Canción';
 
   return (
     <div className="all-results">
       {top && (
         <>
-          <h3 className="section-title">Resultado principal</h3>
-          <button className="top-card" onClick={openTop}>
+          <div className="section-heading">
+            <div>
+              <p className="section-eyebrow">Mejor coincidencia</p>
+              <h3 className="section-title">Resultado principal</h3>
+            </div>
+          </div>
+          <button className="top-card" onClick={openTop} style={{ '--top-artwork': `url("${top.thumbnail || ''}")` }}>
+            <span className="top-card-ambient" aria-hidden="true" />
             <Cover className="top-card-image" round={top.kind === 'artist'} src={top.thumbnail} />
             <div className="top-card-body">
+              <span className="top-card-kind">{topKind}</span>
               <div className="top-card-title">{top.title}</div>
               <div className="top-card-sub">{top.subtitle}</div>
             </div>

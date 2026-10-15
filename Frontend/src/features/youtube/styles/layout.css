@@ -1,5 +1,5 @@
 /* Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera. */
-/* Estructura general, título, pestañas, mensajes y enlaces */
+/* Estructura y jerarquía visual alineadas con Mysic. */
 .yt-app .app {
   min-height: 100vh;
   display: grid;
@@ -8,77 +8,146 @@
 
 .yt-app .content {
   width: 100%;
-  max-width: 760px;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 24px 16px 48px;
+  padding: 28px clamp(20px, 3.2vw, 44px) 56px;
   transition: max-width 0.25s ease;
 }
 
-/* La página de artista usa dos columnas y necesita más anchura */
-.yt-app .content--wide {
-  max-width: 1240px;
+.yt-app .content--wide { max-width: 1320px; }
+
+.yt-app .browse-intro {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 22px;
 }
 
-.yt-app .title {
-  text-align: center;
-  color: var(--accent);
-  font-size: 2rem;
-  margin: 8px 0 24px;
+.yt-app .browse-intro__eyebrow,
+.yt-app .section-eyebrow {
+  margin: 0 0 5px;
+  color: #79827f;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.yt-app .browse-intro__title {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(28px, 3vw, 40px);
+  font-weight: 760;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+
+.yt-app .browse-intro__copy {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.yt-app .browse-intro__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  color: #a9b1ae;
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.yt-app .browse-intro__status > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(31, 197, 101, 0.1);
+}
+
+.yt-app .search-stage {
+  position: relative;
+  z-index: 4;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018));
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.15);
 }
 
 .yt-app .message {
-  text-align: center;
-  color: var(--text-muted);
   margin: 32px 0;
+  color: var(--text-muted);
+  text-align: center;
 }
 
-.yt-app .message.error {
-  color: var(--danger);
-}
+.yt-app .message.error { color: var(--danger); }
+.yt-app .message svg { vertical-align: middle; }
 
-.yt-app .message svg {
-  vertical-align: middle;
+.yt-app .message--surface,
+.yt-app .all-results > .message {
+  padding: 40px 24px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.018);
 }
 
 .yt-app .tabs {
   display: flex;
   gap: 8px;
-  margin-bottom: 20px;
+  margin: 18px 0 26px;
+  padding-bottom: 1px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
+.yt-app .tabs::-webkit-scrollbar { display: none; }
+.yt-app .tabs--detail { margin: 0 0 18px; }
+
 .yt-app .tab {
-  padding: 6px 16px;
-  border-radius: 16px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-muted);
-  background: var(--bg-input);
-  transition: background 0.15s, color 0.15s;
+  min-height: 35px;
+  padding: 7px 15px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  color: #9da6a3;
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease, transform 160ms ease;
 }
 
 .yt-app .tab:hover {
+  border-color: rgba(255, 255, 255, 0.13);
   color: var(--text);
-  background: var(--bg-hover);
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .yt-app .tab--active {
-  color: #000;
-  background: var(--accent);
+  border-color: #f2f4f1;
+  color: #080a09;
+  background: #f2f4f1;
 }
+
+.yt-app .tab:active { transform: scale(0.96); }
 
 .yt-app .back {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   margin-bottom: 16px;
-  font-size: 14px;
   color: var(--text-muted);
+  font-size: 13px;
   transition: color 0.15s;
 }
 
-.yt-app .back:hover {
-  color: var(--text);
-}
+.yt-app .back:hover { color: var(--text); }
 
 .yt-app .link {
   padding: 0;
@@ -90,37 +159,54 @@
 .yt-app .link:hover {
   color: var(--text);
   text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .yt-app .section-title {
-  font-size: 18px;
-  margin: 28px 0 12px;
+  margin: 0;
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 680;
+  letter-spacing: -0.02em;
 }
 
-.yt-app .section-header {
+.yt-app .section-header,
+.yt-app .section-heading {
   display: flex;
-  align-items: baseline;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
+  margin: 34px 0 13px;
 }
 
-.yt-app .section-header .section-title {
-  margin-bottom: 12px;
+.yt-app .section-heading--compact { margin-top: 0; }
+
+.yt-app .section-count {
+  min-width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #7f8985;
+  background: rgba(255, 255, 255, 0.055);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .yt-app .show-all {
-  font-size: 13px;
-  font-weight: 600;
+  padding: 6px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
   color: var(--text-muted);
-  padding: 4px 12px;
-  border: 1px solid #3a3a3a;
-  border-radius: 14px;
-  transition: color 0.15s, border-color 0.15s;
+  font-size: 12px;
+  font-weight: 650;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
 .yt-app .show-all:hover {
+  border-color: rgba(255, 255, 255, 0.2);
   color: var(--text);
-  border-color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .yt-app .offline-banner {
@@ -129,25 +215,22 @@
   gap: 8px;
   margin: 0 0 16px;
   padding: 10px 14px;
+  border: 1px solid rgba(255, 209, 102, 0.3);
   border-radius: 8px;
-  font-size: 14px;
   color: #ffd166;
   background: rgba(255, 209, 102, 0.12);
-  border: 1px solid rgba(255, 209, 102, 0.3);
+  font-size: 14px;
 }
 
 @media (max-width: 900px) {
-  .yt-app .app {
-    display: block;
-  }
-
-  .yt-app .content {
-    padding-bottom: calc(var(--player-height) + 32px);
-  }
+  .yt-app .app { display: block; }
+  .yt-app .content { padding-bottom: calc(var(--player-height) + 32px); }
 }
 
 @media (max-width: 640px) {
-  .yt-app .title {
-    font-size: 1.5rem;
-  }
+  .yt-app .content { padding: 20px 14px calc(var(--player-height) + 28px); }
+  .yt-app .browse-intro { align-items: flex-start; }
+  .yt-app .browse-intro__status { padding: 6px 8px; font-size: 0; }
+  .yt-app .browse-intro__status > span { margin: 1px; }
+  .yt-app .search-stage { padding: 8px; }
 }

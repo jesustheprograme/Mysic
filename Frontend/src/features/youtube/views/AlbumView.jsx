@@ -8,7 +8,8 @@ import { SongList } from '../components/SongList.jsx';
 
 export function AlbumView({ album, songListProps, onOpenArtist }) {
   return (
-    <section>
+    <section className="detail-page" style={{ '--detail-artwork': `url("${album.thumbnail || ''}")` }}>
+      <div className="detail-ambient" aria-hidden="true" />
       <header className="detail">
         <Cover className="detail-cover" src={album.thumbnail} />
         <div className="detail-meta">
@@ -35,7 +36,16 @@ export function AlbumView({ album, songListProps, onOpenArtist }) {
           )}
         </div>
       </header>
-      <SongList songs={album.tracks} {...songListProps} hideAlbum showIndex />
+      <div className="detail-tracklist">
+        <div className="section-heading section-heading--compact">
+          <div>
+            <p className="section-eyebrow">Lista de reproducción</p>
+            <h3 className="section-title">Canciones</h3>
+          </div>
+          <span className="section-count">{album.tracks.length}</span>
+        </div>
+        <SongList songs={album.tracks} {...songListProps} hideAlbum showIndex />
+      </div>
     </section>
   );
 }

@@ -1,146 +1,180 @@
 /* Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera. */
-/* Resultado principal y rejilla de tarjetas (views/SearchResults.jsx, components/Card.jsx) */
+/* Resultado principal y tarjetas con la misma densidad visual de Mysic. */
 .yt-app .top-card {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  min-height: 156px;
   display: flex;
   align-items: center;
-  gap: 18px;
-  width: 100%;
-  padding: 16px;
-  border-radius: 10px;
-  background: var(--bg-elevated);
+  gap: 22px;
+  overflow: hidden;
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 13px;
+  background: #0c0f0e;
   text-align: left;
-  transition: background 0.15s;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
 }
 
 .yt-app .top-card:hover,
 .yt-app .top-card:focus-visible {
-  background: var(--bg-hover);
+  border-color: rgba(255, 255, 255, 0.13);
   outline: none;
+  background: #111513;
+  transform: translateY(-1px);
+}
+
+.yt-app .top-card-ambient {
+  position: absolute;
+  z-index: -1;
+  inset: -80px -20px -80px 36%;
+  background:
+    linear-gradient(90deg, #0c0f0e 0%, rgba(12, 15, 14, 0.7) 50%, rgba(12, 15, 14, 0.2) 100%),
+    var(--top-artwork) center / cover no-repeat;
+  filter: blur(30px) saturate(0.7);
+  opacity: 0.38;
+  transform: scale(1.15);
 }
 
 .yt-app .top-card-image {
-  width: 96px;
-  height: 96px;
-  border-radius: 6px;
-  object-fit: cover;
-  background: #333;
+  width: 112px;
+  height: 112px;
   flex-shrink: 0;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  border-radius: 8px;
+  object-fit: cover;
+  background: #252a28;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.42);
 }
 
-.yt-app .top-card-body {
-  flex: 1;
-  min-width: 0;
+.yt-app .top-card-body { flex: 1; min-width: 0; }
+
+.yt-app .top-card-kind {
+  display: block;
+  margin-bottom: 5px;
+  color: #89928f;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
 .yt-app .top-card-title {
-  font-size: 22px;
-  font-weight: 700;
-  white-space: nowrap;
   overflow: hidden;
+  color: var(--text);
+  font-size: clamp(22px, 3vw, 32px);
+  font-weight: 760;
+  letter-spacing: -0.03em;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .yt-app .top-card-sub {
-  font-size: 14px;
-  color: var(--text-muted);
-  white-space: nowrap;
+  margin-top: 5px;
   overflow: hidden;
+  color: var(--text-muted);
+  font-size: 13px;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .yt-app .top-card-action {
+  width: 46px;
+  height: 46px;
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  color: #000;
-  background: var(--accent);
   flex-shrink: 0;
-  transition: transform 0.1s;
+  border-radius: 50%;
+  color: #080a09;
+  background: #f2f4f1;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.25);
+  transition: transform 160ms ease;
 }
 
-.yt-app .top-card:hover .top-card-action {
-  transform: scale(1.06);
-}
+.yt-app .top-card:hover .top-card-action { transform: scale(1.06); }
 
 .yt-app .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(142px, 1fr));
+  gap: 14px;
 }
 
 .yt-app .card {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px;
-  border-radius: 8px;
-  background: var(--bg-elevated);
+  padding: 9px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
   text-align: left;
-  transition: background 0.15s;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
 }
 
 .yt-app .card:hover,
 .yt-app .card:focus-visible {
-  background: var(--bg-hover);
+  border-color: rgba(255, 255, 255, 0.06);
   outline: none;
+  background: rgba(255, 255, 255, 0.04);
+  transform: translateY(-2px);
 }
 
 .yt-app .card-image {
   position: relative;
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 6px;
   overflow: hidden;
-  background: #333;
+  border-radius: 7px;
+  background: #252a28;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.24);
 }
 
-.yt-app .card--round .card-image {
-  border-radius: 50%;
-}
+.yt-app .card--round .card-image { border-radius: 50%; }
 
 .yt-app .card-play {
   position: absolute;
   right: 8px;
   bottom: 8px;
+  width: 38px;
+  height: 38px;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
   border-radius: 50%;
-  color: #000;
-  background: var(--accent);
+  color: #080a09;
+  background: #f2f4f1;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   opacity: 0;
   transform: translateY(6px);
-  transition: opacity 0.15s, transform 0.15s;
+  transition: opacity 160ms ease, transform 160ms ease;
 }
 
 .yt-app .card:hover .card-play,
-.yt-app .card:focus-visible .card-play {
-  opacity: 1;
-  transform: translateY(0);
-}
+.yt-app .card:focus-visible .card-play { opacity: 1; transform: translateY(0); }
 
 .yt-app .card-title {
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
   overflow: hidden;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 640;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .yt-app .card-sub {
-  font-size: 12px;
-  color: var(--text-muted);
-  white-space: nowrap;
   overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .yt-app .card--round .card-title,
-.yt-app .card--round .card-sub {
-  text-align: center;
+.yt-app .card--round .card-sub { text-align: center; }
+
+@media (max-width: 560px) {
+  .yt-app .top-card { min-height: 128px; gap: 15px; padding: 15px; }
+  .yt-app .top-card-image { width: 88px; height: 88px; }
+  .yt-app .top-card-action { width: 40px; height: 40px; }
+  .yt-app .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

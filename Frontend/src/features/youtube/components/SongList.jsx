@@ -28,37 +28,33 @@ export function SongList({
   const downloadProps = { downloadedIds, jobs, onDownload, onDeleteDownload, online };
 
   return (
-    <ul className="song-list">
+    <ol className="song-list">
       {visible.map((song, index) => {
         const isCurrent = song.id === currentId;
         const activate = () => (isCurrent ? onTogglePlay() : onPlay(songs, index));
         return (
           <li
-            key={`${song.id}-${index}`}
+            key={song.id}
             className={`song${isCurrent ? ' song--current' : ''}`}
-            onClick={activate}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') activate();
-            }}
-            role="button"
-            tabIndex={0}
-            aria-label={`${isCurrent && isPlaying ? 'Pausar' : 'Reproducir'} ${song.title}`}
           >
             {showIndex && <span className="song-index">{song.index ?? index + 1}</span>}
-            <div className="song-cover">
+            <button
+              className="song-cover"
+              onClick={activate}
+              aria-label={`${isCurrent && isPlaying ? 'Pausar' : 'Reproducir'} ${song.title}`}
+            >
               <Cover className="cover-fill" src={song.thumbnail} lazy />
               <span className="song-cover-overlay">{isCurrent && isPlaying ? <PauseIcon /> : <PlayIcon />}</span>
-            </div>
+            </button>
             <div className="song-meta">
-              <h4 className="song-title">{song.title}</h4>
+              <button className="song-title" onClick={activate}>
+                {song.title}
+              </button>
               <p className="song-sub">
                 {song.artistId ? (
                   <button
                     className="link"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenArtist(song.artistId);
-                    }}
+                    onClick={() => onOpenArtist(song.artistId)}
                   >
                     {song.artist}
                   </button>
@@ -71,10 +67,7 @@ export function SongList({
                     {song.albumId ? (
                       <button
                         className="link song-album"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenAlbum(song.albumId);
-                        }}
+                        onClick={() => onOpenAlbum(song.albumId)}
                       >
                         {song.album}
                       </button>
@@ -90,6 +83,6 @@ export function SongList({
           </li>
         );
       })}
-    </ul>
+    </ol>
   );
 }

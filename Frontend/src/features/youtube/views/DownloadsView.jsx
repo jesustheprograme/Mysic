@@ -11,8 +11,9 @@ export function DownloadsView({ downloads, songListProps }) {
   const totalSize = items.reduce((sum, item) => sum + (item.size || 0), 0);
 
   return (
-    <section>
+    <section className="downloads-page">
       <header className="detail">
+        <span className="downloads-page__icon"><DownloadIcon /></span>
         <div className="detail-meta">
           <p className="detail-kind">Sin conexión</p>
           <h2 className="detail-title">Descargas</h2>

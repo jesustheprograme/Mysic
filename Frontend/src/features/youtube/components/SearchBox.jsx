@@ -121,6 +121,7 @@ export function SearchBox({ value, onChange, onSubmit, onPickEntity, history, on
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
           placeholder="Buscar canciones, artistas, álbumes..."
+          aria-label="Buscar en YouTube Music"
           className="search-input"
           role="combobox"
           aria-expanded={showDropdown}

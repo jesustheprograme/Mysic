@@ -1,17 +1,37 @@
 /* Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera. */
 /* Cabeceras de álbum y descargas (views/AlbumView.jsx, DownloadsView.jsx) */
+.yt-app .detail-page {
+  position: relative;
+  isolation: isolate;
+}
+
+.yt-app .detail-ambient {
+  position: absolute;
+  z-index: -1;
+  top: -70px;
+  right: -30px;
+  left: -30px;
+  height: 360px;
+  background:
+    linear-gradient(0deg, var(--bg) 2%, rgba(7, 9, 8, 0.42) 66%, rgba(7, 9, 8, 0.14)),
+    var(--detail-artwork) center 34% / cover no-repeat;
+  filter: blur(30px) saturate(0.64);
+  opacity: 0.3;
+  transform: scale(1.08);
+}
 .yt-app .detail {
   display: flex;
-  gap: 20px;
+  gap: 26px;
   align-items: flex-end;
-  margin-bottom: 8px;
+  min-height: 214px;
+  margin-bottom: 34px;
 }
 
 .yt-app .detail-cover {
   width: 180px;
   height: 180px;
   flex-shrink: 0;
-  border-radius: 8px;
+  border-radius: 11px;
   object-fit: cover;
   background: #333;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
@@ -32,7 +52,9 @@
 
 .yt-app .detail-title {
   margin: 0 0 6px;
-  font-size: 32px;
+  font-size: clamp(30px, 4vw, 48px);
+  font-weight: 770;
+  letter-spacing: -0.04em;
   line-height: 1.1;
 }
 
@@ -57,12 +79,43 @@
   padding: 10px 22px 10px 16px;
   border-radius: 24px;
   font-weight: 700;
-  color: #000;
-  background: var(--accent);
+  color: #080a09;
+  background: #f2f4f1;
   transition: background 0.15s, transform 0.1s;
 }
 
 .yt-app .play-all:hover {
-  background: var(--accent-hover);
+  background: #fff;
   transform: scale(1.03);
+}
+
+.yt-app .detail-tracklist { min-width: 0; }
+
+.yt-app .downloads-page .detail {
+  align-items: center;
+  min-height: 160px;
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 13px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018));
+}
+
+.yt-app .downloads-page__icon {
+  width: 92px;
+  height: 92px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 92px;
+  border-radius: 12px;
+  color: #0a0c0b;
+  background: #f2f4f1;
+}
+
+.yt-app .downloads-page__icon svg { width: 34px; height: 34px; }
+
+@media (max-width: 640px) {
+  .yt-app .detail { align-items: center; gap: 16px; min-height: auto; }
+  .yt-app .detail-cover { width: 112px; height: 112px; }
+  .yt-app .detail-title { font-size: 28px; }
+  .yt-app .downloads-page__icon { width: 72px; height: 72px; flex-basis: 72px; }
 }

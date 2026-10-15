@@ -2,27 +2,29 @@
 /* Buscador y desplegable de sugerencias (components/SearchBox.jsx) */
 .yt-app .searchbox {
   position: relative;
-  margin-bottom: 20px;
+  margin-bottom: 0;
   z-index: 20;
 }
 
 .yt-app .search {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 4px 4px 14px;
-  border-radius: 24px;
-  border: 1px solid transparent;
-  background: var(--bg-input);
-  transition: border-color 0.15s, border-radius 0.1s;
+  gap: 8px;
+  min-height: 52px;
+  padding: 4px 5px 4px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px;
+  background: #101312;
+  transition: border-color 160ms ease, background 160ms ease, border-radius 100ms ease;
 }
 
 .yt-app .search:focus-within {
-  border-color: var(--accent);
+  border-color: rgba(255, 255, 255, 0.24);
+  background: #131716;
 }
 
 .yt-app .search--open {
-  border-radius: 20px 20px 0 0;
+  border-radius: 9px 9px 0 0;
   border-bottom-color: transparent;
 }
 
@@ -35,8 +37,8 @@
 .yt-app .search-input {
   flex: 1;
   min-width: 0;
-  padding: 10px 6px;
-  font-size: 16px;
+  padding: 10px 5px;
+  font-size: 15px;
   border: none;
   background: transparent;
   color: var(--text);
@@ -58,18 +60,19 @@
 }
 
 .yt-app .search-button {
-  padding: 12px 24px;
-  font-size: 16px;
-  font-weight: 700;
-  background: var(--accent);
-  color: #000;
-  border-radius: 24px;
+  min-height: 42px;
+  padding: 10px 22px;
+  border-radius: 7px;
+  color: #080a09;
+  background: #f2f4f1;
+  font-size: 14px;
+  font-weight: 720;
   transition: background 0.15s, transform 0.1s;
 }
 
 .yt-app .search-button:hover:not(:disabled) {
-  background: var(--accent-hover);
-  transform: scale(1.03);
+  background: #fff;
+  transform: translateY(-1px);
 }
 
 .yt-app .suggestions {
@@ -80,10 +83,10 @@
   margin: 0;
   padding: 6px 0 8px;
   list-style: none;
-  background: var(--bg-input);
-  border: 1px solid var(--accent);
+  background: #151817;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-top: none;
-  border-radius: 0 0 20px 20px;
+  border-radius: 0 0 9px 9px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
   max-height: min(70vh, 560px);
   overflow-y: auto;

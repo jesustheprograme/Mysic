@@ -2,15 +2,15 @@
 // frontend/src/components/Card.jsx
 // Tarjeta de artista (redonda) o álbum, y las rejillas que las agrupan.
 import { Cover } from './Cover.jsx';
-import { PlayIcon } from './icons.jsx';
+import { ArrowIcon } from './icons.jsx';
 
 export function Card({ image, title, subtitle, round, onClick }) {
   return (
     <button className={`card${round ? ' card--round' : ''}`} onClick={onClick} title={title}>
       <div className="card-image">
         <Cover className="cover-fill" src={image} lazy />
-        <span className="card-play">
-          <PlayIcon />
+        <span className="card-play" aria-hidden="true">
+          <ArrowIcon />
         </span>
       </div>
       <div className="card-title">{title}</div>
