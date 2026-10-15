@@ -110,7 +110,6 @@ function DiscoveryView({
   const nextSongs = getFollowingSongs(playbackSongs, selectedSongId)
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase()
   const filteredSongs = normalizedQuery ? searchSongs : songs
-  const previewFallbackUrl = songs.find((song) => song.audioUrl)?.audioUrl
 
   useEffect(() => {
     if (!mobileMenuOpen) return undefined
@@ -344,7 +343,6 @@ function DiscoveryView({
     }
 
     previewAudio.preload = 'metadata'
-    if (previewFallbackUrl) previewAudio.src = previewFallbackUrl
     previewAudio.addEventListener('ended', clearFinishedPreview)
     document.addEventListener('click', unlockPreviewAudio, true)
     document.addEventListener('keydown', unlockPreviewAudio, true)
@@ -357,9 +355,10 @@ function DiscoveryView({
       previewAudio.removeEventListener('ended', clearFinishedPreview)
       removeUnlockListeners()
       previewAudio.removeAttribute('src')
+      previewAudio.load()
       previewAudioRef.current = null
     }
-  }, [previewFallbackUrl])
+  }, [])
 
   function selectRelativeSong(offset) {
     const currentIndex = playbackSongs.findIndex((song) => song.id === selectedSongId)
@@ -381,13 +380,15 @@ function DiscoveryView({
 
     clearTimeout(previewTimerRef.current)
     audio.pause()
-    if (audio.src !== new URL(item.audioUrl, window.location.href).href) audio.src = item.audioUrl
-    audio.currentTime = 0
     previewItemIdRef.current = item.id
     setPreview({ itemId: item.id, status: 'loading' })
 
     previewTimerRef.current = setTimeout(async () => {
       if (previewItemIdRef.current !== item.id) return
+      if (audio.src !== new URL(item.audioUrl, window.location.href).href) {
+        audio.src = item.audioUrl
+        audio.load()
+      }
       audio.currentTime = 0
       audio.volume = 0.35
 
@@ -410,7 +411,8 @@ function DiscoveryView({
     setPreview(null)
     if (!audio) return
     audio.pause()
-    audio.currentTime = 0
+    audio.removeAttribute('src')
+    audio.load()
   }
 
   function selectSong(songId, {

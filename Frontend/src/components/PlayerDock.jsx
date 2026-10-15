@@ -36,8 +36,10 @@ function PlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoad
   const fadeInNonceRef = useRef(0)
   const fadeInPendingRef = useRef(false)
   const pauseFadeRef = useRef({ frameId: null, resolve: null, promise: null, waveSurfer: null })
+  const onPlaybackChangeRef = useRef(onPlaybackChange)
   const onPlaybackStateChangeRef = useRef(onPlaybackStateChange)
   const onNextRef = useRef(onNext)
+  const hasNextTrackRef = useRef(Boolean(queue[0]?.audioUrl))
   const lastProgressUpdateRef = useRef(0)
   const playbackStateRef = useRef({
     currentTime: 0,
@@ -53,7 +55,6 @@ function PlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoad
   const [trackChangeAnimationEnabled, setTrackChangeAnimationEnabled] = useState(false)
   const [analyser, setAnalyser] = useState(null)
   const hasAudio = Boolean(track.audioUrl)
-  const hasNextTrack = Boolean(queue[0]?.audioUrl)
   const notifyAnalyserChange = useEffectEvent((nextAnalyser) => onAnalyserChange?.(nextAnalyser))
 
   const notifyPlaybackState = useCallback((patch) => {
@@ -64,13 +65,17 @@ function PlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoad
 
   const updatePlaybackState = useCallback((nextIsPlaying) => {
     setIsPlaying(nextIsPlaying)
-    onPlaybackChange(nextIsPlaying)
+    onPlaybackChangeRef.current(nextIsPlaying)
     notifyPlaybackState({ isPlaying: nextIsPlaying })
-  }, [notifyPlaybackState, onPlaybackChange])
+  }, [notifyPlaybackState])
 
   useEffect(() => {
     trackDurationRef.current = track.durationSeconds ?? 0
   }, [track.durationSeconds])
+
+  useEffect(() => {
+    onPlaybackChangeRef.current = onPlaybackChange
+  }, [onPlaybackChange])
 
   useEffect(() => {
     onPlaybackStateChangeRef.current = onPlaybackStateChange
@@ -79,6 +84,10 @@ function PlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoad
   useEffect(() => {
     onNextRef.current = onNext
   }, [onNext])
+
+  useEffect(() => {
+    hasNextTrackRef.current = Boolean(queue[0]?.audioUrl)
+  }, [queue])
 
   const setOutputVolume = useCallback((nextVolume) => {
     const normalizedVolume = Math.min(Math.max(nextVolume / 100, 0), 1)
@@ -289,7 +298,7 @@ function PlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoad
         setCurrentTime(finishedAt)
         notifyPlaybackState({ currentTime: finishedAt })
         updatePlaybackState(false)
-        if (hasNextTrack) onNextRef.current?.()
+        if (hasNextTrackRef.current) onNextRef.current?.()
       }),
       waveSurfer.on('error', () => updatePlaybackState(false)),
     ]
@@ -311,7 +320,7 @@ function PlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoad
       media.remove()
       if (waveSurferRef.current === waveSurfer) waveSurferRef.current = null
     }
-  }, [fadeInNonce, hasAudio, hasNextTrack, isLoading, notifyPlaybackState, setOutputVolume, startFadeIn, stopPauseFade, track.audioUrl, track.durationSeconds, track.id, updatePlaybackState])
+  }, [fadeInNonce, hasAudio, isLoading, notifyPlaybackState, setOutputVolume, startFadeIn, stopPauseFade, track.audioUrl, track.durationSeconds, track.id, updatePlaybackState])
 
   useEffect(() => {
     const previousTrack = previousTrackRef.current
