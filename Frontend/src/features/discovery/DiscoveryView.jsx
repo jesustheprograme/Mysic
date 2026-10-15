@@ -22,6 +22,7 @@ import { canImportMusic } from '../music-import/musicImportAccess.js'
 
 const MusicImportView = lazy(() => import('../music-import/MusicImportView.jsx'))
 const NewArtistSpotlight = lazy(() => import('./NewArtistSpotlight.jsx'))
+const YoutubeView = lazy(() => import('../youtube/YoutubeView.jsx'))
 import {
   createAlbumItems,
   createArtistItems,
@@ -67,6 +68,9 @@ function DiscoveryView({
     const requestedSection = getSectionFromHash()
     return requestedSection === 'import' && !mayImportMusic ? 'home' : requestedSection
   })
+  // YouTube Music se monta la primera vez que se visita y ya no se desmonta (la música sigue al cambiar de sección)
+  const [youtubeVisited, setYoutubeVisited] = useState(false)
+  if (activeSection === 'youtube' && !youtubeVisited) setYoutubeVisited(true)
   const [activeAlbumId, setActiveAlbumId] = useState(getAlbumIdFromHash)
   const [activeArtistId, setActiveArtistId] = useState(getArtistIdFromHash)
   const [activeArtistProfile, setActiveArtistProfile] = useState(null)
@@ -117,6 +121,14 @@ function DiscoveryView({
     document.addEventListener('keydown', closeMobileMenu)
     return () => document.removeEventListener('keydown', closeMobileMenu)
   }, [mobileMenuOpen])
+
+  // Si empieza a sonar YouTube Music, se pausa el reproductor de Mysic
+  useEffect(() => {
+    if (!selectedSongPlaying) return undefined
+    const pauseMysicPlayer = () => setPlaybackToggleNonce((nonce) => nonce + 1)
+    window.addEventListener('yotubei:play', pauseMysicPlayer)
+    return () => window.removeEventListener('yotubei:play', pauseMysicPlayer)
+  }, [selectedSongPlaying])
 
   function getShelfSongs(titles) {
     const selectedSongs = titles.reduce((selected, title) => {
@@ -674,7 +686,7 @@ function DiscoveryView({
           <Suspense fallback={<div className="collection-empty" role="status">Cargando importador…</div>}>
             <MusicImportView onCatalogRefresh={onCatalogRefresh} />
           </Suspense>
-        ) : (
+        ) : activeSection === 'youtube' ? null : (
         <main className="music-app__main">
           <div className="music-workspace" key={activeRouteKey}>
             {activeSection === 'home' && (
@@ -735,7 +747,7 @@ function DiscoveryView({
               </div>
             )}
 
-            {activeSection !== 'home' && activeSection !== 'downloads' && activeSection !== 'radio' && activeSection !== 'playlists' && activeSection !== 'playlist' && activeSection !== 'album' && activeSection !== 'artist' && (
+            {activeSection !== 'home' && activeSection !== 'downloads' && activeSection !== 'radio' && activeSection !== 'playlists' && activeSection !== 'playlist' && activeSection !== 'album' && activeSection !== 'artist' && activeSection !== 'youtube' && (
               <SectionRoute
                 albumItems={albumItems}
                 artistItems={artistItems}
@@ -861,6 +873,13 @@ function DiscoveryView({
           </div>
         </main>
       )}
+        {youtubeVisited && (
+          <div className="youtube-section" hidden={activeSection !== 'youtube'}>
+            <Suspense fallback={<div className="collection-empty" role="status">Cargando YouTube Music…</div>}>
+              <YoutubeView active={activeSection === 'youtube'} />
+            </Suspense>
+          </div>
+        )}
     </div>
 
       {spotlightArtist && (
@@ -897,7 +916,11 @@ function DiscoveryView({
           onClose={() => selectSong(null)}
           onNext={() => selectRelativeSong(1)}
           onOpenMiniPlayer={() => openMiniPlayerWindow().catch(() => {})}
-          onPlaybackChange={setSelectedSongPlaying}
+          onPlaybackChange={(playing) => {
+            setSelectedSongPlaying(playing)
+            // Si empieza a sonar Mysic, se pausa YouTube Music
+            if (playing) window.dispatchEvent(new CustomEvent('yotubei:pause'))
+          }}
           onPlaybackStateChange={publishMiniPlayerSnapshot}
           onPrevious={() => selectRelativeSong(-1)}
           onQueueSelect={(songId) => selectSong(songId, {

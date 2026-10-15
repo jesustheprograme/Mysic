@@ -7,6 +7,7 @@ export const sectionHashes = {
   artists: '#/artistas',
   playlists: '#/playlists',
   downloads: '#/descargas',
+  youtube: '#/youtube',
   import: '#/importar',
 }
 

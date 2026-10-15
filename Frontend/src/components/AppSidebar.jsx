@@ -8,6 +8,7 @@ import {
   House,
   Import,
   ListMusic,
+  MonitorPlay,
   MoreVertical,
   Pencil,
   Pin,
@@ -34,6 +35,7 @@ const libraryNavigationItems = [
   { id: 'artists', label: 'Artistas', icon: UsersRound },
   { id: 'playlists', label: 'Playlists', icon: ListMusic },
   { id: 'downloads', label: 'Descargas', icon: Download },
+  { id: 'youtube', label: 'YouTube Music', icon: MonitorPlay },
 ]
 
 function AppSidebar({

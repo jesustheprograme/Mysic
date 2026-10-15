@@ -6,7 +6,7 @@ const desktopApiUrl = import.meta.env.VITE_DESKTOP_API_URL?.trim()
 const defaultApiUrl = isTauriRuntime
   ? desktopApiUrl
   : import.meta.env.DEV ? `http://${window.location.hostname}:4000/api` : '/api'
-const API_URL = (import.meta.env.VITE_API_URL || defaultApiUrl).replace(/\/$/, '')
+export const API_URL = (import.meta.env.VITE_API_URL || defaultApiUrl).replace(/\/$/, '')
 
 export class ApiError extends Error {
   constructor(message, status) {
