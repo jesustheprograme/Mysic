@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useLayoutEffect
 import AppHeader from '../../components/AppHeader.jsx'
 import AppSidebar from '../../components/AppSidebar.jsx'
 import PlayerDock from '../../components/PlayerDock.jsx'
+import { PlayerPanelContent, VolumeControl } from '../../components/reproductor/ControlesReproductor.jsx'
 import AlbumView from '../collections/AlbumView.jsx'
 import ArtistView from '../collections/ArtistView.jsx'
 import PlaylistEditorModal from '../playlists/PlaylistEditorModal.jsx'
@@ -876,7 +877,11 @@ function DiscoveryView({
         {youtubeVisited && (
           <div className="youtube-section" hidden={activeSection !== 'youtube'}>
             <Suspense fallback={<div className="collection-empty" role="status">Cargando YouTube Music…</div>}>
-              <YoutubeView active={activeSection === 'youtube'} />
+              <YoutubeView
+                active={activeSection === 'youtube'}
+                PlayerPanelComponent={PlayerPanelContent}
+                VolumeControlComponent={VolumeControl}
+              />
             </Suspense>
           </div>
         )}

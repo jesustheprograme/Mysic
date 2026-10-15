@@ -146,6 +146,26 @@ function parseCatalogPagination(query) {
   }
 }
 
+function streamLocalFile(req, res, filePath, range) {
+  const stream = fs.createReadStream(filePath, range || undefined)
+  const stopStream = () => stream.destroy()
+  const detach = () => {
+    req.off('aborted', stopStream)
+    res.off('close', stopStream)
+  }
+
+  req.once('aborted', stopStream)
+  res.once('close', stopStream)
+  stream.once('close', detach)
+  stream.once('error', (error) => {
+    detach()
+    if (!res.headersSent) res.status(500).json({ message: 'No se pudo leer el archivo de audio.' })
+    else res.destroy(error)
+  })
+  stream.pipe(res)
+  return res
+}
+
 function createCatalogRouter(config) {
   const router = express.Router()
 
@@ -397,13 +417,13 @@ function createCatalogRouter(config) {
     }
     if (!range) {
       res.setHeader('Content-Length', stats.size)
-      return fs.createReadStream(filePath).pipe(res)
+      return streamLocalFile(req, res, filePath)
     }
 
     res.status(206)
     res.setHeader('Content-Length', range.end - range.start + 1)
     res.setHeader('Content-Range', `bytes ${range.start}-${range.end}/${stats.size}`)
-    return fs.createReadStream(filePath, range).pipe(res)
+    return streamLocalFile(req, res, filePath, range)
   }))
 
   return router

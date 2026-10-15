@@ -1,10 +1,6 @@
 import {
   ListMusic,
   MoreVertical,
-  Pause,
-  Play,
-  SkipBack,
-  SkipForward,
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
@@ -16,6 +12,7 @@ import HeartToggle from './HeartToggle.jsx'
 import {
   CompactNowPlaying,
   PlayerDiscoveryLoader,
+  PlayerPanelContent,
   PlayerPanelToggleIcon,
   VolumeControl,
 } from './reproductor/ControlesReproductor.jsx'
@@ -41,7 +38,7 @@ function PlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoad
   const pauseFadeRef = useRef({ frameId: null, resolve: null, promise: null, waveSurfer: null })
   const onPlaybackStateChangeRef = useRef(onPlaybackStateChange)
   const onNextRef = useRef(onNext)
-  const nextTrackPreloadRef = useRef(null)
+  const lastProgressUpdateRef = useRef(0)
   const playbackStateRef = useRef({
     currentTime: 0,
     duration: track.durationSeconds ?? 0,
@@ -56,7 +53,7 @@ function PlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoad
   const [trackChangeAnimationEnabled, setTrackChangeAnimationEnabled] = useState(false)
   const [analyser, setAnalyser] = useState(null)
   const hasAudio = Boolean(track.audioUrl)
-  const nextTrackAudioUrl = queue[0]?.audioUrl ?? null
+  const hasNextTrack = Boolean(queue[0]?.audioUrl)
   const notifyAnalyserChange = useEffectEvent((nextAnalyser) => onAnalyserChange?.(nextAnalyser))
 
   const notifyPlaybackState = useCallback((patch) => {
@@ -81,27 +78,7 @@ function PlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoad
 
   useEffect(() => {
     onNextRef.current = onNext
-  }, [onNext, nextTrackAudioUrl])
-
-  useEffect(() => {
-    const connection = navigator.connection
-    if (!nextTrackAudioUrl || connection?.saveData || /(^|-)2g$/.test(connection?.effectiveType || '')) {
-      nextTrackPreloadRef.current = null
-      return undefined
-    }
-
-    const audio = new Audio()
-    audio.crossOrigin = 'anonymous'
-    audio.preload = 'none'
-    audio.src = nextTrackAudioUrl
-    nextTrackPreloadRef.current = { audio, started: false }
-
-    return () => {
-      audio.removeAttribute('src')
-      audio.load()
-      if (nextTrackPreloadRef.current?.audio === audio) nextTrackPreloadRef.current = null
-    }
-  }, [nextTrackAudioUrl])
+  }, [onNext])
 
   const setOutputVolume = useCallback((nextVolume) => {
     const normalizedVolume = Math.min(Math.max(nextVolume / 100, 0), 1)
@@ -224,7 +201,7 @@ function PlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoad
     const media = takePrimedAudio(track.audioUrl) ?? new Audio()
     media.crossOrigin = 'anonymous'
     if (media.getAttribute('src') !== track.audioUrl) media.src = track.audioUrl
-    media.preload = 'auto'
+    media.preload = 'metadata'
     media.hidden = true
     media.muted = false
     media.setAttribute('aria-hidden', 'true')
@@ -260,7 +237,6 @@ function PlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoad
       progressColor: '#e7e9e5',
       duration: mediaDuration,
       waveColor: '#414846',
-      url: track.audioUrl,
     })
 
     waveSurferRef.current = waveSurfer
@@ -302,22 +278,18 @@ function PlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoad
       waveSurfer.on('pause', () => updatePlaybackState(false)),
       waveSurfer.on('timeupdate', (time) => {
         if (pauseFadeRef.current.promise) return
+        const now = performance.now()
+        if (now - lastProgressUpdateRef.current < 200) return
+        lastProgressUpdateRef.current = now
         setCurrentTime(time)
         notifyPlaybackState({ currentTime: time })
-        const next = nextTrackPreloadRef.current
-        const remaining = waveSurfer.getDuration() - time
-        if (next && !next.started && remaining > 0 && remaining <= 15) {
-          next.started = true
-          next.audio.preload = 'auto'
-          next.audio.load()
-        }
       }),
       waveSurfer.on('finish', () => {
         const finishedAt = waveSurfer.getDuration()
         setCurrentTime(finishedAt)
         notifyPlaybackState({ currentTime: finishedAt })
         updatePlaybackState(false)
-        if (nextTrackAudioUrl) onNextRef.current?.()
+        if (hasNextTrack) onNextRef.current?.()
       }),
       waveSurfer.on('error', () => updatePlaybackState(false)),
     ]
@@ -339,7 +311,7 @@ function PlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoad
       media.remove()
       if (waveSurferRef.current === waveSurfer) waveSurferRef.current = null
     }
-  }, [fadeInNonce, hasAudio, isLoading, nextTrackAudioUrl, notifyPlaybackState, setOutputVolume, startFadeIn, stopPauseFade, track.audioUrl, track.durationSeconds, track.id, updatePlaybackState])
+  }, [fadeInNonce, hasAudio, hasNextTrack, isLoading, notifyPlaybackState, setOutputVolume, startFadeIn, stopPauseFade, track.audioUrl, track.durationSeconds, track.id, updatePlaybackState])
 
   useEffect(() => {
     const previousTrack = previousTrackRef.current
@@ -578,62 +550,17 @@ function PlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoad
         <PlayerDiscoveryLoader />
       ) : (
         <>
-          <div className="player-dock__track">
-            <div className="player-dock__artwork">
-              <span
-                className="player-dock__artwork-backdrop"
-                style={{ backgroundImage: `url(${track.artwork})` }}
-                aria-hidden="true"
-              />
-              <img src={track.artwork} alt="" />
-            </div>
-            <div className="player-dock__details">
-              <strong>{track.title}</strong>
-              <span>{track.artist}</span>
-            </div>
-            <div
-              className="player-dock__favorite-wrap"
-              aria-label="Añadir a favoritos"
-              title="Añadir a favoritos"
-            >
-              <HeartToggle
-                key={track.id}
-                className="heart-container--player"
-                portalCelebration
-                label={`Me gusta ${track.title}`}
-                liked={liked}
-                onToggle={onToggleFavorite}
-                removeLabel={`Quitar ${track.title} de favoritas`}
-              />
-            </div>
-          </div>
-
-          <div className="player-dock__center">
-            <div className="player-dock__transport">
-              <button type="button" aria-label="Anterior" title="Anterior" onClick={onPrevious}>
-                <SkipBack size={19} fill="currentColor" aria-hidden="true" />
-              </button>
-              <button
-                className="player-dock__play"
-                type="button"
-                aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
-                title={hasAudio ? (isPlaying ? 'Pausar' : 'Reproducir') : 'Audio no disponible'}
-                disabled={!hasAudio}
-                onClick={togglePlayback}
-              >
-                {isPlaying ? (
-                  <Pause size={19} fill="currentColor" aria-hidden="true" />
-                ) : (
-                  <Play size={19} fill="currentColor" aria-hidden="true" />
-                )}
-              </button>
-              <button type="button" aria-label="Siguiente" title="Siguiente" onClick={onNext}>
-                <SkipForward size={19} fill="currentColor" aria-hidden="true" />
-              </button>
-            </div>
-
-            <div className="waveform-timeline">
-              <span>{formatTime(currentTime)}</span>
+          <PlayerPanelContent
+            artwork={track.artwork}
+            artist={track.artist}
+            currentTime={currentTime}
+            duration={duration}
+            hasAudio={hasAudio}
+            isPlaying={isPlaying}
+            onNext={onNext}
+            onPrevious={onPrevious}
+            onTogglePlayback={togglePlayback}
+            progress={(
               <div
                 className={`waveform-timeline__wave${hasAudio ? '' : ' waveform-timeline__wave--empty'}`}
                 ref={waveformRef}
@@ -646,9 +573,26 @@ function PlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoad
                 aria-valuetext={`${formatTime(currentTime)} de ${formatTime(duration)}`}
                 onKeyDown={handleWaveformKeyDown}
               />
-              <span>{formatTime(duration)}</span>
-            </div>
-          </div>
+            )}
+            title={track.title}
+            trackAction={(
+              <div
+                className="player-dock__favorite-wrap"
+                aria-label="Añadir a favoritos"
+                title="Añadir a favoritos"
+              >
+                <HeartToggle
+                  key={track.id}
+                  className="heart-container--player"
+                  portalCelebration
+                  label={`Me gusta ${track.title}`}
+                  liked={liked}
+                  onToggle={onToggleFavorite}
+                  removeLabel={`Quitar ${track.title} de favoritas`}
+                />
+              </div>
+            )}
+          />
 
           <div className="player-dock__actions">
             <button

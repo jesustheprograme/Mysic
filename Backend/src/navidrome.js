@@ -48,7 +48,21 @@ async function proxyNavidromeAudio(config, songId, req, res) {
     if (value) res.setHeader(header, value)
   }
   res.setHeader('Cache-Control', 'private, max-age=3600')
-  Readable.fromWeb(response.body).pipe(res)
+  const stream = Readable.fromWeb(response.body)
+  const stopStream = () => stream.destroy()
+  const detach = () => {
+    req.off('aborted', stopStream)
+    res.off('close', stopStream)
+  }
+  req.once('aborted', stopStream)
+  res.once('close', stopStream)
+  stream.once('close', detach)
+  stream.once('error', (error) => {
+    detach()
+    res.destroy(error)
+  })
+  stream.pipe(res)
+  return res
 }
 
 module.exports = { navidromeRequest, proxyNavidromeAudio }

@@ -27,7 +27,7 @@ import { SearchResults } from './views/SearchResults.jsx';
  *   active = false cuando la vista está montada pero oculta (p. ej. otra sección
  *   de Mysic): la música sigue sonando pero los atajos de teclado no actúan.
  */
-function YoutubeView({ active = true }) {
+function YoutubeView({ active = true, PlayerPanelComponent, VolumeControlComponent }) {
   const browse = useBrowse();
   const dl = useDownloads();
   const player = usePlayer({ isDownloaded: dl.isDownloaded, enabled: active });
@@ -140,7 +140,12 @@ function YoutubeView({ active = true }) {
         {view.kind === 'downloads' && <DownloadsView downloads={dl.downloads} songListProps={songListProps} />}
       </main>
 
-      <Player player={player} onOpenArtist={browse.openArtist} />
+      <Player
+        player={player}
+        onOpenArtist={browse.openArtist}
+        PlayerPanelComponent={PlayerPanelComponent}
+        VolumeControlComponent={VolumeControlComponent}
+      />
     </div>
     </div>
   );

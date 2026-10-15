@@ -1,7 +1,63 @@
-import { Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
+import { LoaderCircle, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import VerticalSpectrum from '../VerticalSpectrum.jsx'
 import { formatTime } from './utilidadesReproductor.js'
+
+export function PlayerPanelContent({ artwork, artist, currentTime, duration, error, hasAudio, isBuffering = false, isPlaying, onNext, onPrevious, onTogglePlayback, progress, title, trackAction = null }) {
+  return (
+    <>
+      <div className={`player-dock__track${trackAction ? '' : ' player-dock__track--without-action'}`}>
+        <div className="player-dock__artwork">
+          <span
+            className="player-dock__artwork-backdrop"
+            style={{ backgroundImage: artwork ? `url(${artwork})` : undefined }}
+            aria-hidden="true"
+          />
+          {artwork && <img src={artwork} alt="" />}
+        </div>
+        <div className="player-dock__details">
+          <strong>{title}</strong>
+          <span>{artist}</span>
+        </div>
+        {trackAction}
+      </div>
+
+      <div className="player-dock__center">
+        <div className="player-dock__transport">
+          <button type="button" aria-label="Anterior" title="Anterior" onClick={onPrevious}>
+            <SkipBack size={19} fill="currentColor" aria-hidden="true" />
+          </button>
+          <button
+            className="player-dock__play"
+            type="button"
+            aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
+            title={hasAudio ? (isPlaying ? 'Pausar' : 'Reproducir') : 'Audio no disponible'}
+            disabled={!hasAudio}
+            onClick={onTogglePlayback}
+          >
+            {isBuffering ? (
+              <LoaderCircle className="player-dock__buffering" size={19} aria-hidden="true" />
+            ) : isPlaying ? (
+              <Pause size={19} fill="currentColor" aria-hidden="true" />
+            ) : (
+              <Play size={19} fill="currentColor" aria-hidden="true" />
+            )}
+          </button>
+          <button type="button" aria-label="Siguiente" title="Siguiente" onClick={onNext}>
+            <SkipForward size={19} fill="currentColor" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="waveform-timeline">
+          <span>{formatTime(currentTime)}</span>
+          {progress}
+          <span>{formatTime(duration)}</span>
+        </div>
+        {error && <p className="player-dock__error" role="status">{error}</p>}
+      </div>
+    </>
+  )
+}
 
 export function PlayerPanelToggleIcon({ collapsed }) {
   return (

@@ -564,6 +564,10 @@
   overflow: visible;
 }
 
+.player-dock__track--without-action {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .player-dock__artwork {
   position: relative;
   grid-column: 1 / -1;
@@ -649,6 +653,21 @@
   width: 44px;
   height: 44px;
   margin: 0 5px;
+}
+
+.player-dock__buffering {
+  animation: player-buffering-spin 800ms linear infinite;
+}
+
+.player-dock__error {
+  margin: 0;
+  color: #f15e6c;
+  font-size: 11px;
+  text-align: center;
+}
+
+@keyframes player-buffering-spin {
+  to { transform: rotate(360deg); }
 }
 
 .waveform-timeline {
