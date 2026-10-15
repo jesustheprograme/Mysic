@@ -635,7 +635,7 @@ function DiscoveryView({
     return true
   }
 
-  const playerVisible = Boolean(selectedSong && !spotlightArtist)
+  const playerVisible = Boolean(selectedSong && !spotlightArtist && activeSection !== 'youtube')
 
   return (
     <div className={`music-app${sidebarCollapsed ? ' music-app--sidebar-collapsed' : ''}${playerVisible ? ' music-app--player-open' : ''}${playerVisible && playerCollapsed ? ' music-app--player-collapsed' : ''}`} id="music-home">
@@ -940,7 +940,7 @@ function DiscoveryView({
           onToggleCollapsed={() => setPlayerCollapsed((collapsed) => !collapsed)}
           playbackToggleNonce={playbackToggleNonce}
           queue={nextSongs}
-          suppressed={Boolean(spotlightArtist)}
+          suppressed={Boolean(spotlightArtist) || activeSection === 'youtube'}
           track={selectedSong}
         />
       )}
