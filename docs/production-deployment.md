@@ -65,6 +65,8 @@ JWT_SECRET=...
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_IDS=...
 MUSIC_IMPORT_ADMIN_EMAIL=jesusobregon2010@gmail.com
+# Caché y descargas del módulo YouTube Music. No requiere Prisma.
+YOUTUBE_DATA_DIR=/srv/mysic/data/youtube
 ```
 
 Genera `JWT_SECRET` con un generador criptográfico; debe tener al menos 32 caracteres y no debe guardarse en Git. Después aplica las migraciones:
@@ -121,15 +123,24 @@ sudo cp -R dist/. /srv/mysic/frontend/
 Usa `deploy/systemd/mysic-api.service.template` como base:
 
 1. Reemplaza `__SERVICE_USER__` y `__PROJECT_ROOT__`.
-2. Guárdalo como `/etc/systemd/system/mysic-api.service`.
-3. Ejecuta:
+2. Crea el directorio persistente que usa la API de YouTube Music. Debe pertenecer al mismo usuario del servicio:
+
+```bash
+sudo install -d -m 0750 -o USUARIO_SERVICIO -g USUARIO_SERVICIO /srv/mysic/data/youtube
+```
+
+3. Guárdalo como `/etc/systemd/system/mysic-api.service`.
+4. Ejecuta:
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now mysic-api
 sudo systemctl status mysic-api
 curl http://127.0.0.1:4000/api/health/ready
+curl http://127.0.0.1:4000/api/youtube/health
 ```
+
+El módulo YouTube Music usa únicamente su API HTTP y archivos bajo `YOUTUBE_DATA_DIR`. No crea tablas ni necesita una migración de Prisma. El comando `prisma migrate deploy` de esta guía se conserva porque el catálogo principal de Mysic sí usa PostgreSQL mediante Prisma.
 
 ## 8. Nginx y HTTPS
 
@@ -155,6 +166,7 @@ Mantén el puerto 4000 cerrado en el firewall. Solo Nginx debe poder alcanzarlo 
 4. No uses el modo Flexible.
 5. Configura una comprobación de disponibilidad contra `/api/health/ready`.
 6. Si Cloudflare y Nginx quedan ambos delante de Express, verifica la IP observada por la API y usa el número exacto de saltos confiables en `TRUST_PROXY` —normalmente `2`. Restringe el acceso directo al origen para evitar cabeceras reenviadas falsificadas.
+7. Excluye `/api/youtube/stream/*` y `/api/youtube/downloads/*` de cualquier regla de caché de Cloudflare. Esas rutas entregan audio dinámico y respetan la cabecera `Range` del reproductor.
 
 ## 10. Verificación final
 
@@ -164,10 +176,13 @@ Comprueba:
 curl -I https://music.example.com/
 curl https://music.example.com/api/health
 curl https://music.example.com/api/health/ready
+curl https://music.example.com/api/youtube/health
+curl 'https://music.example.com/api/youtube/search?q=Ado&type=all'
 curl -I -H 'Range: bytes=0-1023' https://music.example.com/api/catalog/media/ASSET_ID/stream
+curl -sS -D - -o /dev/null -H 'Range: bytes=0-1023' https://music.example.com/api/youtube/stream/VIDEO_ID
 ```
 
-La última petición debe responder `206`, `Accept-Ranges: bytes` y un `Content-Range` válido. Prueba además registro, Google OAuth, favoritos, playlists, búsqueda, cambio automático de canción y reproducción desde una conexión móvil.
+Las dos peticiones de audio deben responder `206`, `Accept-Ranges: bytes` y un `Content-Range` válido. El endpoint `/api/youtube/health` debe indicar `ok: true`, `ready: true` y `online: true`. Prueba además registro, Google OAuth, favoritos, playlists, búsqueda, cambio automático de canción y reproducción desde una conexión móvil.
 
 ## 11. Secuencia para actualizaciones posteriores
 
@@ -184,6 +199,7 @@ npx prisma migrate deploy
 npm run check
 sudo systemctl restart mysic-api
 curl http://127.0.0.1:4000/api/health/ready
+curl http://127.0.0.1:4000/api/youtube/health
 
 cd ../Frontend
 npm ci

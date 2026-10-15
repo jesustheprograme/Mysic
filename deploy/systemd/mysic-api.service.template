@@ -9,6 +9,7 @@ User=__SERVICE_USER__
 WorkingDirectory=__PROJECT_ROOT__/Backend
 Environment=NODE_ENV=production
 Environment=MYSIC_RUNTIME_ENV=__PROJECT_ROOT__/Backend/.env.production
+Environment=YOUTUBE_DATA_DIR=/srv/mysic/data/youtube
 EnvironmentFile=__PROJECT_ROOT__/Backend/.env
 ExecStart=/usr/bin/node server.js
 Restart=on-failure
