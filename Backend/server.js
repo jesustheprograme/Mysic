@@ -79,7 +79,14 @@ async function start() {
 
   if (config.trustProxy !== false) app.set('trust proxy', config.trustProxy)
   app.disable('x-powered-by')
-  app.use(helmet())
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        scriptSrc: ["'self'", 'https://www.youtube.com'],
+        frameSrc: ["'self'", 'https://www.youtube.com', 'https://www.youtube-nocookie.com'],
+      },
+    },
+  }))
   app.use(cors({
     credentials: true,
     origin(origin, callback) {

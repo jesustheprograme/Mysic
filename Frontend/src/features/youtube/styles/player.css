@@ -26,6 +26,27 @@
   min-width: 0;
 }
 
+.yt-app .player-youtube {
+  display: none;
+  width: 100%;
+  min-height: 200px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #000;
+}
+
+.yt-app .player-youtube--active {
+  display: block;
+}
+
+.yt-app .player-youtube iframe {
+  display: block;
+  width: 100%;
+  min-width: 200px;
+  height: 200px;
+  border: 0;
+}
+
 .yt-app .player-cover {
   width: 72px;
   height: 72px;
@@ -224,6 +245,14 @@
   .yt-app .player-track {
     grid-column: 1;
     grid-row: 1;
+  }
+
+  .yt-app .player-youtube {
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    right: 12px;
+    bottom: calc(100% + 8px);
   }
 
   .yt-app .player-volume {
