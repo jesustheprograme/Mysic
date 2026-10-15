@@ -32,6 +32,8 @@ export function usePlayer({ isDownloaded, enabled = true }) {
   const audioRef = useRef(null);
   const iframeHostRef = useRef(null);
   const youtubeRef = useRef(null);
+  const youtubeReadyRef = useRef(false);
+  const pendingVideoIdRef = useRef(null);
   const nextRef = useRef(() => {});
   const [queue, setQueue] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(-1);
@@ -107,7 +109,8 @@ export function usePlayer({ isDownloaded, enabled = true }) {
     setIsBuffering(true);
     loadIframeApi().then((YT) => {
       if (cancelled || !iframeHostRef.current) return;
-      if (!youtubeRef.current) {
+      if (!youtubeRef.current?.loadVideoById) {
+        pendingVideoIdRef.current = videoId;
         youtubeRef.current = new YT.Player(iframeHostRef.current, {
           width: 320,
           height: 200,
@@ -116,8 +119,12 @@ export function usePlayer({ isDownloaded, enabled = true }) {
           playerVars: { autoplay: 1, controls: 0, playsinline: 1, rel: 0 },
           events: {
             onReady: (event) => {
+              youtubeReadyRef.current = true;
               event.target.setVolume(Math.round(volumeRef.current * 100));
-              event.target.playVideo();
+              const requestedVideoId = pendingVideoIdRef.current;
+              pendingVideoIdRef.current = null;
+              if (requestedVideoId && requestedVideoId !== videoId) event.target.loadVideoById(requestedVideoId);
+              else event.target.playVideo();
             },
             onStateChange: (event) => {
               if (event.data === YT.PlayerState.PLAYING) {
@@ -138,13 +145,20 @@ export function usePlayer({ isDownloaded, enabled = true }) {
             },
           },
         });
-      } else youtubeRef.current.loadVideoById(videoId);
+      } else if (youtubeReadyRef.current) youtubeRef.current.loadVideoById(videoId);
+      else pendingVideoIdRef.current = videoId;
     }).catch((error) => {
       setIsBuffering(false);
       setPlayerError(error.message);
     });
     return () => { cancelled = true; };
   }, [videoId, isLocal]);
+
+  useEffect(() => () => {
+    youtubeRef.current?.destroy?.();
+    youtubeRef.current = null;
+    youtubeReadyRef.current = false;
+  }, []);
 
   useEffect(() => {
     const audio = audioRef.current;
