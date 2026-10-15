@@ -126,6 +126,10 @@ async function start() {
   app.use('/api/favorites', createFavoritesRouter(config))
   app.use('/api/playlists', createPlaylistsRouter(config))
 
+  // YouTube Music (Yotubei). Rutas públicas, sin sesión. Código en src/youtube (ESM, generado).
+  const { createApiRouter: createYoutubeRouter } = await import('./src/youtube/routes/index.mjs')
+  app.use('/api/youtube', createYoutubeRouter())
+
   app.post('/api/auth/register', authLimiter, auth.register)
   app.post('/api/auth/login', authLimiter, auth.login)
   app.post('/api/auth/google', authLimiter, auth.google)
@@ -147,6 +151,9 @@ async function start() {
 
   server = app.listen(config.port, config.bindHost, () => {
     console.log(`Mysic API running on http://${config.bindHost}:${config.port}`)
+    // Yotubei: hilos de comparación de imágenes y conexión con YouTube (reintenta sola si no hay internet)
+    import('./src/youtube/services/similarityPool.mjs').then(({ warmSimilarityPool }) => warmSimilarityPool())
+    import('./src/youtube/youtube/client.mjs').then(({ initYoutube }) => initYoutube(30_000))
   })
 }
 
