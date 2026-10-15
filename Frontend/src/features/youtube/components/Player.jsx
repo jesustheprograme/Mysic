@@ -35,9 +35,7 @@ export function Player({ player, onOpenArtist }) {
       <footer className={`player${currentSong ? ' player--active' : ''}`}>
         <div className={`player-youtube${currentSong && !isLocal ? ' player-youtube--active' : ''}`}>
           {currentSong && <Cover className="player-artwork" src={currentSong.thumbnail} />}
-          <div className="player-youtube-engine" aria-hidden="true">
-            <div ref={iframeHostRef} />
-          </div>
+          <div ref={iframeHostRef} className="player-youtube-engine" aria-hidden="true" />
         </div>
         <div className="player-track">
           {currentSong ? (

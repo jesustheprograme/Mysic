@@ -120,12 +120,20 @@ export function usePlayer({ isDownloaded, enabled = true }) {
         youtubeRef.current.loadVideoById(videoId);
       } else if (!youtubeCreatingRef.current) {
         youtubeCreatingRef.current = true;
-        youtubeCreatedRef.current = new YT.Player(iframeHostRef.current, {
+        const iframeMount = document.createElement('div');
+        iframeHostRef.current.replaceChildren(iframeMount);
+        youtubeCreatedRef.current = new YT.Player(iframeMount, {
           width: 320,
           height: 200,
           videoId,
           host: 'https://www.youtube-nocookie.com',
-          playerVars: { autoplay: 1, controls: 0, playsinline: 1, rel: 0 },
+          playerVars: {
+            autoplay: 1,
+            controls: 0,
+            playsinline: 1,
+            rel: 0,
+            origin: window.location.origin,
+          },
           events: {
             onReady: (event) => {
               youtubeRef.current = event.target;
@@ -167,6 +175,7 @@ export function usePlayer({ isDownloaded, enabled = true }) {
 
   useEffect(() => () => {
     youtubeCreatedRef.current?.destroy?.();
+    iframeHostRef.current?.replaceChildren();
     youtubeCreatedRef.current = null;
     youtubeRef.current = null;
     youtubeReadyRef.current = false;
