@@ -41,6 +41,14 @@ La preparación para publicar la versión web está detallada en [docs/productio
 
 La pantalla **Importar música** permite preparar MP3 desde uno o varios enlaces autorizados mediante n8n, yt-dlp y FFmpeg. El permiso se calcula en el backend a partir de `MUSIC_IMPORT_ADMIN_EMAIL` y una cuenta Google verificada; la opción no aparece para los demás usuarios y la ruta directa vuelve a Inicio. La adquisición se ejecuta localmente, una URL a la vez, y siempre deja los archivos pendientes de análisis y aprobación humana antes de cualquier subida. Consulta [n8n/README.md](n8n/README.md) para instalar dependencias, crear las dos credenciales Header Auth, importar el workflow y usar el iniciador único de Windows.
 
+## YouTube Music
+
+La opción **YouTube Music** del sidebar abre una sección autónoma con búsqueda, sugerencias, páginas de artista y álbum, reproductor y descargas. Consume únicamente la API pública montada en `/api/youtube`; no usa Prisma, PostgreSQL, favoritos, playlists ni el catálogo de Mysic.
+
+El código de `Backend/src/youtube/` y `Frontend/src/features/youtube/` se genera desde el repositorio `youtubei_Mysic` mediante `tools/migrar-a-mysic.mjs` y no se edita manualmente. Sus descargas y cachés se guardan en `Backend/data/youtube/`, ignorada por Git. Puedes cambiar esa ubicación con `YOUTUBE_DATA_DIR`.
+
+El servidor necesita salida a Internet hacia YouTube, Discogs, MusicBrainz y Deezer. La API abre aunque YouTube no esté disponible y reintenta la conexión en segundo plano; las canciones descargadas siguen funcionando sin conexión.
+
 ## Configuración resumida
 
 1. Copia `Backend/.env.example` como `Backend/.env`. El ejemplo apunta deliberadamente a `mysic_bd_local` y `Mysic_local`.
