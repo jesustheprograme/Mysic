@@ -71,6 +71,7 @@ function DiscoveryView({
   })
   // YouTube Music se monta la primera vez que se visita y ya no se desmonta (la música sigue al cambiar de sección)
   const [youtubeVisited, setYoutubeVisited] = useState(false)
+  const [youtubePlayerVisible, setYoutubePlayerVisible] = useState(false)
   if (activeSection === 'youtube' && !youtubeVisited) setYoutubeVisited(true)
   const [activeAlbumId, setActiveAlbumId] = useState(getAlbumIdFromHash)
   const [activeArtistId, setActiveArtistId] = useState(getArtistIdFromHash)
@@ -647,7 +648,10 @@ function DiscoveryView({
     return true
   }
 
-  const playerVisible = Boolean(selectedSong && !spotlightArtist && activeSection !== 'youtube')
+  const playerVisible = Boolean(
+    (selectedSong && !spotlightArtist && activeSection !== 'youtube')
+    || (activeSection === 'youtube' && youtubePlayerVisible),
+  )
 
   return (
     <div className={`music-app${sidebarCollapsed ? ' music-app--sidebar-collapsed' : ''}${playerVisible ? ' music-app--player-open' : ''}${playerVisible && playerCollapsed ? ' music-app--player-collapsed' : ''}`} id="music-home">
@@ -895,6 +899,7 @@ function DiscoveryView({
               <YoutubeView
                 active={activeSection === 'youtube'}
                 onAddToPlaylist={setPlaylistPickerSong}
+                onPlayerVisibilityChange={setYoutubePlayerVisible}
               />
             </Suspense>
           </div>

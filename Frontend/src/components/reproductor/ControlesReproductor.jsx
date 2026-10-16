@@ -1,4 +1,4 @@
-import { LoaderCircle, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
+import { LoaderCircle, MoreVertical, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import VerticalSpectrum from '../VerticalSpectrum.jsx'
 import { formatTime } from './utilidadesReproductor.js'
@@ -56,6 +56,50 @@ export function PlayerPanelContent({ artwork, artist, currentTime, duration, err
         {error && <p className="player-dock__error" role="status">{error}</p>}
       </div>
     </>
+  )
+}
+
+export function PlayerQueue({ activeIndex = null, activeTrackId = null, onQueueSelect, queue }) {
+  return (
+    <section className="player-dock__queue" aria-labelledby="player-queue-title">
+      <div className="player-dock__tabs" role="tablist" aria-label="Contenido del reproductor">
+        <button className="player-dock__tab player-dock__tab--active" type="button" role="tab" aria-selected="true">
+          Cola
+        </button>
+        <button className="player-dock__tab" type="button" role="tab" aria-selected="false">
+          Artistas
+        </button>
+        <button className="player-dock__tab" type="button" role="tab" aria-selected="false">
+          Favoritos
+        </button>
+      </div>
+      <h2 id="player-queue-title" className="sr-only">Cola de reproducción</h2>
+      <div className="player-dock__queue-list">
+        {queue.map((item, index) => {
+          const isActive = activeIndex === index || (activeIndex === null && item.id === activeTrackId)
+
+          return (
+            <button
+              className={`player-dock__queue-item${isActive ? ' player-dock__queue-item--active' : ''}`}
+              type="button"
+              key={item.id}
+              onClick={() => onQueueSelect(item, index)}
+            >
+              <img src={item.artwork} alt="" />
+              <span>
+                <strong>{item.title}</strong>
+                <small>{item.artist}</small>
+              </span>
+              <time>{formatTime(item.durationSeconds)}</time>
+              <MoreVertical size={16} aria-hidden="true" />
+            </button>
+          )
+        })}
+      </div>
+      <button className="player-dock__clear" type="button">
+        Limpiar cola
+      </button>
+    </section>
   )
 }
 

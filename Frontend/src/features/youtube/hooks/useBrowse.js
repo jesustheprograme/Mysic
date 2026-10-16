@@ -6,6 +6,25 @@ import { api } from '../lib/api.js';
 import { scrollAppToTop } from '../lib/scroll.js';
 import { useSearchHistory } from './useSearchHistory.js';
 
+async function loadArtist(id) {
+  const artist = await api.artist(id);
+  const topSongs = await Promise.all(
+    artist.topSongs.map(async (song) => {
+      if (song.durationSeconds > 0) return song;
+
+      try {
+        const result = await api.search(song.title, 'song');
+        const completeSong = result.items?.find((candidate) => candidate.id === song.id);
+        return completeSong ? { ...song, ...completeSong } : song;
+      } catch {
+        return song;
+      }
+    })
+  );
+
+  return { ...artist, topSongs };
+}
+
 export const SEARCH_TABS = [
   { type: 'all', label: 'Todo' },
   { type: 'song', label: 'Canciones' },
@@ -72,7 +91,7 @@ export function useBrowse() {
     }
   }, []);
 
-  const openArtist = useCallback((id) => id && openDetail('artist', () => api.artist(id)), [openDetail]);
+  const openArtist = useCallback((id) => id && openDetail('artist', () => loadArtist(id)), [openDetail]);
   const openAlbum = useCallback((id) => id && openDetail('album', () => api.album(id)), [openDetail]);
 
   const showDownloads = () => {

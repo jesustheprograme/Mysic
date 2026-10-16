@@ -1,180 +1,351 @@
-// Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera.
-// frontend/src/App.jsx
-// Composición de la aplicación: buscador, pestañas, vista activa y reproductor.
-// La lógica vive en los hooks (hooks/), la interfaz en components/ y views/.
-import './styles/base.css'
-import './styles/layout.css'
-import './styles/search.css'
-import './styles/results.css'
-import './styles/songs.css'
-import './styles/detail.css'
-import './styles/artist.css'
-import './styles/downloads.css'
-import './styles/player.css'
-import { SearchBox } from './components/SearchBox.jsx';
-import { useEffect, useEffectEvent } from 'react';
-import { Player } from './components/Player.jsx';
-import { DownloadIcon, OfflineIcon, Spinner } from './components/icons.jsx';
-import { useBrowse, SEARCH_TABS } from './hooks/useBrowse.js';
-import { useDownloads } from './hooks/useDownloads.js';
-import { usePlayer } from './hooks/usePlayer.js';
-import { AlbumView } from './views/AlbumView.jsx';
-import { ArtistView } from './views/ArtistView.jsx';
-import { DownloadsView } from './views/DownloadsView.jsx';
-import { SearchResults } from './views/SearchResults.jsx';
+import { Download, LoaderCircle, Search, Trash2, WifiOff } from 'lucide-react'
+import { useEffect, useEffectEvent, useState } from 'react'
+import { createPortal } from 'react-dom'
+import PlayerDock from '../../components/PlayerDock.jsx'
+import ArtistView from '../collections/ArtistView.jsx'
+import CollectionDetailView from '../collections/CollectionDetailView.jsx'
+import HomeRail from '../discovery/HomeRail.jsx'
+import SongList from '../discovery/SongList.jsx'
+import { SEARCH_TABS, useBrowse } from './hooks/useBrowse.js'
+import { useDownloads } from './hooks/useDownloads.js'
+import { usePlayer } from './hooks/usePlayer.js'
+import { readStorage, writeStorage } from './lib/storage.js'
 
-/**
- * @param {{ active?: boolean }} props
- *   active = false cuando la vista está montada pero oculta (p. ej. otra sección
- *   de Mysic): la música sigue sonando pero los atajos de teclado no actúan.
- */
-function YoutubeView({ active = true, onAddToPlaylist }) {
-  const browse = useBrowse();
-  const dl = useDownloads();
-  const player = usePlayer({ isDownloaded: dl.isDownloaded, enabled: active });
+const ignorePreview = () => {}
 
-  const { view, loading, error } = browse;
+function useFavoriteIds(storageKey) {
+  const [ids, setIds] = useState(() => new Set(readStorage(storageKey, [])))
 
-  const playExternalSong = useEffectEvent((event) => {
-    if (event.detail?.id) player.playFrom([event.detail], 0);
-  });
+  function toggle(id, liked) {
+    setIds((current) => {
+      const next = new Set(current)
+      if (liked) next.add(id)
+      else next.delete(id)
+      writeStorage(storageKey, [...next])
+      return next
+    })
+  }
 
-  useEffect(() => {
-    const listener = (event) => playExternalSong(event);
-    window.addEventListener('mysic:play-youtube-song', listener);
-    return () => window.removeEventListener('mysic:play-youtube-song', listener);
-  }, []);
-
-  // Props comunes para cualquier lista de canciones
-  const songListProps = {
-    currentId: player.currentSong?.id,
-    isPlaying: player.isPlaying,
-    onPlay: player.playFrom,
-    onPlayShuffled: player.playShuffled,
-    onTogglePlay: player.togglePlay,
-    onOpenArtist: browse.openArtist,
-    onOpenAlbum: browse.openAlbum,
-    downloadedIds: dl.downloadedIds,
-    jobs: dl.downloads.jobs,
-    onDownload: dl.downloadSong,
-    onDownloadMany: dl.downloadMany,
-    onDeleteDownload: dl.deleteDownload,
-    online: dl.online,
-    onAddToPlaylist,
-  };
-
-  // Qué hacer al elegir una entidad del desplegable de sugerencias
-  const handlePickEntity = (entity) => {
-    if (entity.kind === 'artist') browse.openArtist(entity.id);
-    else if (entity.kind === 'album') browse.openAlbum(entity.id);
-    else if (entity.kind === 'song' && entity.song) player.playFrom([entity.song], 0);
-  };
-
-  // .yt-app aísla los estilos: dentro de otra app todas las reglas van prefijadas con él
-  return (
-    <div className="yt-app">
-    <div className={`app${player.currentSong ? ' app--player-open' : ''}`}>
-      <main className={`content${view.kind === 'artist' ? ' content--wide' : ''}`}>
-        {view.kind === 'search' && (
-          <header className="browse-intro">
-            <div>
-              <p className="browse-intro__eyebrow">Catálogo en línea</p>
-              <h1 className="browse-intro__title">YouTube Music</h1>
-              <p className="browse-intro__copy">Encuentra música y reprodúcela sin salir de Mysic.</p>
-            </div>
-            <span className="browse-intro__status">
-              <span aria-hidden="true" /> Disponible
-            </span>
-          </header>
-        )}
-
-        {view.kind === 'search' && (
-          <div className="search-stage">
-            <SearchBox
-              value={browse.query}
-              onChange={browse.setQuery}
-              onSubmit={(text) => browse.runSearch(text, browse.searchType)}
-              onPickEntity={handlePickEntity}
-              history={browse.history}
-              onRemoveHistory={browse.removeFromHistory}
-              loading={loading}
-            />
-          </div>
-        )}
-
-        {(view.kind === 'search' || view.kind === 'downloads') && (
-        <div className="tabs" role="tablist" aria-label="Tipo de contenido">
-          {SEARCH_TABS.map((tab) => {
-            const isActive = view.kind !== 'downloads' && browse.searchType === tab.type;
-            return (
-              <button
-                key={tab.type}
-                role="tab"
-                aria-selected={isActive}
-                className={`tab${isActive ? ' tab--active' : ''}`}
-                onClick={() => browse.changeTab(tab.type)}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-          <button
-            role="tab"
-            aria-selected={view.kind === 'downloads'}
-            className={`tab tab--downloads${view.kind === 'downloads' ? ' tab--active' : ''}`}
-            onClick={browse.showDownloads}
-          >
-            <DownloadIcon /> Descargas
-            {dl.downloads.items.length > 0 && <span className="tab-count">{dl.downloads.items.length}</span>}
-            {dl.activeJobs > 0 && <Spinner small />}
-          </button>
-        </div>
-        )}
-
-        {!dl.online && (
-          <p className="offline-banner">
-            <OfflineIcon /> Sin conexión a internet. Solo puedes escuchar las canciones descargadas.
-          </p>
-        )}
-
-        {error && <p className="message error">{error}</p>}
-        {loading && view.kind !== 'search' && <p className="message message--surface">Cargando contenido…</p>}
-
-        {view.kind === 'search' && (
-          <SearchResults
-            results={browse.results}
-            loading={loading}
-            error={error}
-            songListProps={songListProps}
-            onOpenArtist={browse.openArtist}
-            onOpenAlbum={browse.openAlbum}
-            onShowAll={browse.changeTab}
-          />
-        )}
-        {view.kind === 'artist' && (
-          <ArtistView
-            artist={view.data}
-            songListProps={songListProps}
-            onOpenAlbum={browse.openAlbum}
-            onBack={browse.goBack}
-          />
-        )}
-        {view.kind === 'album' && (
-          <AlbumView
-            album={view.data}
-            onAddToPlaylist={onAddToPlaylist}
-            onBack={browse.goBack}
-            onOpenArtist={browse.openArtist}
-            songListProps={songListProps}
-          />
-        )}
-        {view.kind === 'downloads' && <DownloadsView downloads={dl.downloads} songListProps={songListProps} />}
-      </main>
-
-      <Player player={player} />
-    </div>
-    </div>
-  );
+  return [ids, toggle]
 }
 
-export default YoutubeView;
+function adaptSong(song, index = 0) {
+  return {
+    ...song,
+    albumTitle: song.album,
+    artwork: song.thumbnail ?? song.artwork,
+    source: 'youtube',
+    trackNo: song.index ?? index + 1,
+  }
+}
+
+function adaptArtist(artist) {
+  return {
+    artwork: artist.thumbnail,
+    id: artist.id,
+    meta: artist.subtitle,
+    title: artist.name,
+  }
+}
+
+function adaptAlbum(album) {
+  return {
+    artwork: album.thumbnail,
+    artist: album.kind !== 'Álbum' ? album.kind : album.artist,
+    detail: album.year,
+    id: album.id,
+    title: album.title,
+  }
+}
+
+function getReleaseType(title, kind) {
+  if (/ep/i.test(kind) || /ep/i.test(title)) return 'ep'
+  if (/single/i.test(title)) return 'single'
+  return 'album'
+}
+
+function adaptReleases(shelves) {
+  return shelves.flatMap((shelf) => shelf.items.map((release) => ({
+    artwork: release.thumbnail,
+    id: release.id,
+    releaseDate: release.year ? `${release.year}-01-01` : null,
+    releaseType: getReleaseType(shelf.title, release.kind),
+    songCount: null,
+    songs: [],
+    subtitle: release.kind !== 'Álbum' ? release.kind : release.artist,
+    title: release.title,
+  })))
+}
+
+function YoutubeView({ active = true, onAddToPlaylist, onPlayerVisibilityChange }) {
+  const browse = useBrowse()
+  const downloads = useDownloads()
+  const [likedSongIds, toggleSongFavorite] = useFavoriteIds('mysic:youtube:favorite-songs')
+  const [likedArtistIds, toggleArtistFavorite] = useFavoriteIds('mysic:youtube:favorite-artists')
+  const [likedAlbumIds, toggleAlbumFavorite] = useFavoriteIds('mysic:youtube:favorite-albums')
+  const player = usePlayer({
+    enabled: active,
+    isDownloaded: downloads.isDownloaded,
+    onPlayerVisibilityChange,
+  })
+  const { error, loading, results, searchType, view } = browse
+
+  const playExternalSong = useEffectEvent((event) => {
+    if (event.detail?.id) player.playFrom([event.detail], 0)
+  })
+
+  useEffect(() => {
+    const listener = (event) => playExternalSong(event)
+    window.addEventListener('mysic:play-youtube-song', listener)
+    return () => window.removeEventListener('mysic:play-youtube-song', listener)
+  }, [])
+
+  function playSongs(sourceSongs, songId) {
+    const index = sourceSongs.findIndex((song) => song.id === songId)
+    if (index >= 0) player.playFrom(sourceSongs, index)
+  }
+
+  function toggleDownload(song) {
+    if (downloads.downloadedIds.has(song.id)) {
+      downloads.deleteDownload(song.id)
+      return
+    }
+    downloads.downloadSong(song)
+  }
+
+  function renderDownloadAction(song) {
+    const job = downloads.downloads.jobs[song.id]
+    const downloaded = downloads.downloadedIds.has(song.id)
+    const busy = job?.status === 'downloading'
+    const Icon = busy ? LoaderCircle : downloaded ? Trash2 : Download
+    const label = downloaded ? `Eliminar descarga de ${song.title}` : `Descargar ${song.title}`
+
+    return (
+      <button
+        className="song-row__action collection-detail__track-action"
+        type="button"
+        aria-label={label}
+        title={label}
+        disabled={busy || (!downloads.online && !downloaded)}
+        onClick={() => toggleDownload(song)}
+      >
+        <Icon size={16} strokeWidth={1.8} aria-hidden="true" />
+      </button>
+    )
+  }
+
+  function renderSongResults(sourceSongs, title = 'Canciones') {
+    const songs = sourceSongs.map(adaptSong)
+    return (
+      <SongList
+        emptyMessage="No se encontraron canciones."
+        likedSongIds={likedSongIds}
+        onAddToPlaylist={onAddToPlaylist}
+        onAlbumSelect={browse.openAlbum}
+        onArtistSelect={browse.openArtist}
+        onPlaybackToggle={player.togglePlay}
+        onPreviewStart={ignorePreview}
+        onPreviewStop={ignorePreview}
+        onSongSelect={(songId) => playSongs(sourceSongs, songId)}
+        onToggleFavorite={toggleSongFavorite}
+        preview={null}
+        renderSongActions={renderDownloadAction}
+        selectedSongId={player.currentSong?.id}
+        selectedSongPlaying={player.isPlaying}
+        songs={songs}
+        title={title}
+      />
+    )
+  }
+
+  function renderSearchResults() {
+    if (!results) return <div className="collection-empty">Busca canciones, artistas o álbumes para comenzar.</div>
+
+    const songs = results.type === 'all' ? results.songs : results.type === 'song' ? results.items : []
+    const artists = results.type === 'all' ? results.artists : results.type === 'artist' ? results.items : []
+    const albums = results.type === 'all' ? results.albums : results.type === 'album' ? results.items : []
+
+    return (
+      <>
+        {songs.length > 0 && renderSongResults(songs)}
+        {artists.length > 0 && (
+          <HomeRail items={artists.map(adaptArtist)} onSelect={browse.openArtist} title="Artistas" variant="artist" />
+        )}
+        {albums.length > 0 && (
+          <HomeRail items={albums.map(adaptAlbum)} onSelect={browse.openAlbum} title="Álbumes" />
+        )}
+      </>
+    )
+  }
+
+  function renderSearchView() {
+    return (
+      <div className="home-page">
+        <div className="collection-heading">
+          <div>
+            <span>CATÁLOGO EN LÍNEA</span>
+            <h1>YouTube Music</h1>
+          </div>
+        </div>
+
+        <form
+          className="collection-heading"
+          onSubmit={(event) => {
+            event.preventDefault()
+            browse.runSearch(browse.query, searchType)
+          }}
+        >
+          <label className="music-search" style={{ width: 'min(100%, 620px)' }}>
+            <span className="sr-only">Buscar canciones, artistas o álbumes</span>
+            <Search className="music-search__icon" size={16} strokeWidth={1.8} aria-hidden="true" />
+            <input
+              className="music-search__input"
+              value={browse.query}
+              onChange={(event) => browse.setQuery(event.target.value)}
+              placeholder="Buscar canciones, artistas o álbumes"
+              type="search"
+              autoComplete="off"
+            />
+            <span className="music-search__border" aria-hidden="true" />
+          </label>
+          <button className="song-pagination__step" type="submit" disabled={loading || !browse.query.trim()}>
+            {loading ? 'Buscando…' : 'Buscar'}
+          </button>
+        </form>
+
+        <nav className="song-pagination" aria-label="Tipo de contenido">
+          {SEARCH_TABS.map((tab) => (
+            <button
+              className={tab.type === searchType ? 'song-pagination__page song-pagination__page--active' : 'song-pagination__page'}
+              type="button"
+              aria-current={tab.type === searchType ? 'page' : undefined}
+              key={tab.type}
+              onClick={() => browse.changeTab(tab.type)}
+            >
+              {tab.label}
+            </button>
+          ))}
+          <button className="song-pagination__step" type="button" onClick={browse.showDownloads}>
+            Descargas{downloads.downloads.items.length ? ` (${downloads.downloads.items.length})` : ''}
+          </button>
+        </nav>
+
+        {!downloads.online && (
+          <div className="collection-empty" role="status">
+            <WifiOff aria-hidden="true" /> Sin conexión. Solo están disponibles las descargas.
+          </div>
+        )}
+        {error && <div className="collection-empty" role="alert">{error}</div>}
+        {loading ? <div className="collection-empty" role="status">Cargando contenido…</div> : renderSearchResults()}
+      </div>
+    )
+  }
+
+  function renderArtistView() {
+    const sourceSongs = view.data.topSongs
+    const songs = sourceSongs.map(adaptSong)
+    return (
+      <ArtistView
+        artist={{
+          artistId: view.data.id,
+          artwork: view.data.thumbnail,
+          images: view.data.images?.map((image) => image.url ?? image).filter(Boolean),
+          title: view.data.name,
+        }}
+        likedArtistIds={likedArtistIds}
+        likedSongIds={likedSongIds}
+        onAddToPlaylist={onAddToPlaylist}
+        onAlbumSelect={browse.openAlbum}
+        onBack={browse.goBack}
+        onPlaybackToggle={player.togglePlay}
+        onReleasePlay={(release) => browse.openAlbum(release.id)}
+        onSongSelect={(songId) => playSongs(sourceSongs, songId)}
+        onToggleArtistFavorite={toggleArtistFavorite}
+        onToggleFavorite={toggleSongFavorite}
+        releases={adaptReleases(view.data.shelves)}
+        renderSongActions={renderDownloadAction}
+        selectedSongId={player.currentSong?.id}
+        selectedSongPlaying={player.isPlaying}
+        songs={songs}
+      />
+    )
+  }
+
+  function renderAlbumView() {
+    const sourceSongs = view.data.tracks
+    const songs = sourceSongs.map(adaptSong)
+    return (
+      <CollectionDetailView
+        collection={{
+          albumId: view.data.id,
+          artist: view.data.artist,
+          artistArtwork: view.data.thumbnail,
+          artistId: view.data.artistId,
+          artwork: view.data.thumbnail,
+          kind: 'Álbum',
+          title: view.data.title,
+          year: view.data.year,
+        }}
+        collectionFavorite={likedAlbumIds.has(view.data.id)}
+        likedSongIds={likedSongIds}
+        onAddToPlaylist={onAddToPlaylist}
+        onArtistSelect={browse.openArtist}
+        onBack={browse.goBack}
+        onDownloadCollection={() => downloads.downloadMany(sourceSongs)}
+        onPlaybackToggle={player.togglePlay}
+        onSongSelect={(songId) => playSongs(sourceSongs, songId)}
+        onToggleCollectionFavorite={(liked) => toggleAlbumFavorite(view.data.id, liked)}
+        onToggleFavorite={toggleSongFavorite}
+        renderTrackActions={renderDownloadAction}
+        selectedSongId={player.currentSong?.id}
+        selectedSongPlaying={player.isPlaying}
+        songs={songs}
+      />
+    )
+  }
+
+  const root = document.getElementById('music-home')
+  const currentTrack = player.currentSong ? adaptSong(player.currentSong) : null
+
+  return (
+    <div className="youtube-catalog">
+      <main className="music-app__main">
+        <div className="music-workspace">
+          {view.kind === 'search' && renderSearchView()}
+          {view.kind === 'artist' && renderArtistView()}
+          {view.kind === 'album' && renderAlbumView()}
+          {view.kind === 'downloads' && renderSongResults(downloads.downloads.items, 'Descargas')}
+        </div>
+      </main>
+
+      <audio {...player.audioProps} />
+      <div ref={player.iframeHostRef} className="youtube-player-engine" aria-hidden="true" />
+      {active && currentTrack && root && createPortal(
+        <PlayerDock
+          externalPlayback={{
+            commitSeek: player.commitSeek,
+            currentIndex: player.currentIndex,
+            currentTime: player.currentTime,
+            duration: player.progressMax,
+            error: player.playerError,
+            handleSeek: player.handleSeek,
+            isBuffering: player.isBuffering,
+            isPlaying: player.isPlaying,
+            setVolume: player.setVolume,
+            togglePlayback: player.togglePlay,
+            volume: player.volume,
+          }}
+          onClose={player.closePlayer}
+          onNext={player.playNext}
+          onPrevious={player.playPrev}
+          onQueueSelect={(index) => player.playFrom(player.queue, index)}
+          queue={player.queue.map(adaptSong)}
+          track={currentTrack}
+        />,
+        root,
+      )}
+    </div>
+  )
+}
+
+export default YoutubeView

@@ -27,6 +27,7 @@ function SongList({
   onSongSelect,
   onToggleFavorite,
   preview,
+  renderSongActions,
   selectedSongId,
   selectedSongPlaying,
   showNumbers = false,
@@ -187,6 +188,7 @@ function SongList({
                         >
                           <ListPlus size={16} strokeWidth={1.8} aria-hidden="true" />
                         </button>
+                        {renderSongActions?.(song)}
                       </span>
                       <span className="song-row__duration">{formatDuration(song.durationSeconds)}</span>
                     </span>

@@ -28,7 +28,7 @@ function loadIframeApi() {
   return iframeApiPromise;
 }
 
-export function usePlayer({ isDownloaded, enabled = true }) {
+export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChange }) {
   const audioRef = useRef(null);
   const iframeHostRef = useRef(null);
   const youtubeRef = useRef(null);
@@ -59,7 +59,8 @@ export function usePlayer({ isDownloaded, enabled = true }) {
     setCurrentTime(0);
     setDuration(list[index].durationSeconds || 0);
     setIsBuffering(true);
-  }, []);
+    onPlayerVisibilityChange?.(true);
+  }, [onPlayerVisibilityChange]);
 
   const playShuffled = useCallback((list) => {
     if (!list?.length) return;
@@ -107,6 +108,20 @@ export function usePlayer({ isDownloaded, enabled = true }) {
     }
     if (currentIndex > 0) playFrom(queue, currentIndex - 1);
   }, [currentIndex, queue, playFrom, isLocal]);
+
+  const closePlayer = useCallback(() => {
+    audioRef.current?.pause();
+    youtubeRef.current?.pauseVideo?.();
+    pendingVideoIdRef.current = null;
+    setQueue([]);
+    setCurrentIndex(-1);
+    setCurrentTime(0);
+    setDuration(0);
+    setIsPlaying(false);
+    setIsBuffering(false);
+    setPlayerError('');
+    onPlayerVisibilityChange?.(false);
+  }, [onPlayerVisibilityChange]);
 
   useEffect(() => {
     if (!videoId || isLocal) return undefined;
@@ -268,11 +283,11 @@ export function usePlayer({ isDownloaded, enabled = true }) {
   };
   const progressMax = duration || currentSong?.durationSeconds || 0;
   return {
-    audioProps, iframeHostRef, isLocal, currentSong,
+    audioProps, iframeHostRef, isLocal, currentSong, currentIndex, queue,
     hasNext: currentIndex < queue.length - 1,
     isPlaying, isBuffering, playerError, currentTime, progressMax,
     progressPct: progressMax ? (currentTime / progressMax) * 100 : 0,
-    volume, setVolume, playFrom, playShuffled, togglePlay, playNext, playPrev,
+    volume, setVolume, playFrom, playShuffled, togglePlay, playNext, playPrev, closePlayer,
     handleSeek, commitSeek,
   };
 }

@@ -1,6 +1,5 @@
 import {
   ListMusic,
-  MoreVertical,
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
@@ -14,6 +13,7 @@ import {
   PlayerDiscoveryLoader,
   PlayerPanelContent,
   PlayerPanelToggleIcon,
+  PlayerQueue,
   VolumeControl,
 } from './reproductor/ControlesReproductor.jsx'
 import {
@@ -23,7 +23,90 @@ import {
   setMediaSessionAction,
 } from './reproductor/utilidadesReproductor.js'
 
-function PlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoading = false, liked = false, onAnalyserChange, onClose, onNext, onOpenMiniPlayer, onPlaybackChange, onPlaybackStateChange, onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, playbackToggleNonce, queue, suppressed = false, track }) {
+function ControlledPlayerDock({ externalPlayback, onClose, onNext, onPrevious, onQueueSelect, queue, track }) {
+  const [volumeExpanded, setVolumeExpanded] = useState(false)
+  const {
+    commitSeek,
+    currentIndex,
+    currentTime,
+    duration,
+    error,
+    handleSeek,
+    isBuffering,
+    isPlaying,
+    setVolume,
+    togglePlayback,
+    volume,
+  } = externalPlayback
+  const progress = duration > 0 ? Math.min((currentTime / duration) * 100, 100) : 0
+
+  return (
+    <aside className="player-dock player-dock--animated" aria-label={`Reproductor de ${track.title}`}>
+      <div className="player-dock__scroller">
+        <div className="player-dock__header">
+          <strong>Reproduciendo ahora</strong>
+          <div className="player-dock__header-actions">
+            <button className="player-dock__close" type="button" aria-label="Cerrar reproductor" title="Cerrar reproductor" onClick={onClose}>
+              <X size={18} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+
+        <PlayerPanelContent
+          artwork={track.artwork}
+          artist={track.artist}
+          currentTime={currentTime}
+          duration={duration}
+          error={error}
+          hasAudio
+          isBuffering={isBuffering}
+          isPlaying={isPlaying}
+          onNext={onNext}
+          onPrevious={onPrevious}
+          onTogglePlayback={togglePlayback}
+          progress={(
+            <input
+              className="player-dock__timeline-range"
+              type="range"
+              min="0"
+              max={duration || 0}
+              step="0.1"
+              value={Math.min(currentTime, duration || 0)}
+              disabled={!duration}
+              aria-label="Progreso de reproducción"
+              onChange={handleSeek}
+              onMouseUp={commitSeek}
+              onTouchEnd={commitSeek}
+              onKeyUp={commitSeek}
+              style={{ '--player-progress': `${progress}%` }}
+            />
+          )}
+          title={track.title}
+        />
+
+        <div className="player-dock__actions">
+          <span />
+          <div className="player-dock__volume">
+            <VolumeControl
+              expanded={volumeExpanded}
+              onExpandedChange={setVolumeExpanded}
+              onVolumeChange={(nextVolume) => setVolume(nextVolume / 100)}
+              volume={Math.round(volume * 100)}
+            />
+          </div>
+        </div>
+
+        <PlayerQueue
+          activeIndex={currentIndex}
+          onQueueSelect={(_item, index) => onQueueSelect(index)}
+          queue={queue}
+        />
+      </div>
+    </aside>
+  )
+}
+
+function AudioPlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoading = false, liked = false, onAnalyserChange, onClose, onNext, onOpenMiniPlayer, onPlaybackChange, onPlaybackStateChange, onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, playbackToggleNonce, queue, suppressed = false, track }) {
   const PAUSE_FADE_DURATION_MS = 400
   const START_FADE_DURATION_MS = 1200
   const waveformRef = useRef(null)
@@ -623,46 +706,21 @@ function PlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoad
             </div>
           </div>
 
-          <section className="player-dock__queue" aria-labelledby="player-queue-title">
-            <div className="player-dock__tabs" role="tablist" aria-label="Contenido del reproductor">
-              <button className="player-dock__tab player-dock__tab--active" type="button" role="tab" aria-selected="true">
-                Cola
-              </button>
-              <button className="player-dock__tab" type="button" role="tab" aria-selected="false">
-                Artistas
-              </button>
-              <button className="player-dock__tab" type="button" role="tab" aria-selected="false">
-                Favoritos
-              </button>
-            </div>
-            <h2 id="player-queue-title" className="sr-only">Cola de reproduccion</h2>
-            <div className="player-dock__queue-list">
-              {queue.map((item) => (
-                <button
-                  className={`player-dock__queue-item${item.id === track.id ? ' player-dock__queue-item--active' : ''}`}
-                  type="button"
-                  key={item.id}
-                  onClick={() => onQueueSelect(item.id)}
-                >
-                  <img src={item.artwork} alt="" />
-                  <span>
-                    <strong>{item.title}</strong>
-                    <small>{item.artist}</small>
-                  </span>
-                  <time>{formatTime(item.durationSeconds)}</time>
-                  <MoreVertical size={16} aria-hidden="true" />
-                </button>
-              ))}
-            </div>
-            <button className="player-dock__clear" type="button">
-              Limpiar cola
-            </button>
-          </section>
+          <PlayerQueue
+            activeTrackId={track.id}
+            onQueueSelect={(item) => onQueueSelect(item.id)}
+            queue={queue}
+          />
         </>
       )}
       </div>
     </aside>
   )
+}
+
+function PlayerDock(props) {
+  if (props.externalPlayback) return <ControlledPlayerDock {...props} />
+  return <AudioPlayerDock {...props} />
 }
 
 export default PlayerDock
