@@ -58,6 +58,7 @@ function CollectionDetailView({
   onArtistSelect,
   onBack,
   onDelete,
+  onDownloadCollection,
   onEdit,
   onMoveSong,
   onPlaybackToggle,
@@ -65,6 +66,7 @@ function CollectionDetailView({
   onToggleFavorite,
   onToggleCollectionFavorite,
   onTogglePinned,
+  renderTrackActions,
   selectedSongId,
   selectedSongAlbumId,
   selectedSongPlaying,
@@ -264,6 +266,7 @@ function CollectionDetailView({
         onToggleFavorite={onToggleFavorite}
         nodeRef={isSelected ? activeTrackRef : null}
         reorderable={Boolean(onMoveSong)}
+        renderTrackActions={renderTrackActions}
         song={song}
         status={{
           isLiked: likedSongIds?.has(song.id),
@@ -318,7 +321,7 @@ function CollectionDetailView({
           )}
         </div>
         <div className="collection-detail__controls">
-          <button className="collection-detail__control" type="button" disabled={!songs.some((song) => song.audioUrl)} aria-label={`Descargar ${collection.title}`} title="Descargar" onClick={downloadCollection}>
+          <button className="collection-detail__control" type="button" disabled={!onDownloadCollection && !songs.some((song) => song.audioUrl)} aria-label={`Descargar ${collection.title}`} title="Descargar" onClick={onDownloadCollection ?? downloadCollection}>
             <Download size={22} strokeWidth={1.8} aria-hidden="true" />
           </button>
           {onTogglePinned ? (
@@ -330,7 +333,7 @@ function CollectionDetailView({
               removeLabel={`Quitar ${collection.title} de tu biblioteca`}
               size={20}
             />
-          ) : (
+          ) : onToggleCollectionFavorite ? (
             <HeartToggle
               className={`collection-detail__control${collectionIsSaved ? ' collection-detail__control--active' : ''}`}
               label={`Añadir ${collection.title} a álbumes favoritos`}
@@ -339,7 +342,7 @@ function CollectionDetailView({
               removeLabel={`Quitar ${collection.title} de álbumes favoritos`}
               size={20}
             />
-          )}
+          ) : null}
           <button className="collection-detail__play" type="button" disabled={!songs.length} aria-label={collectionIsPlaying ? `Pausar ${collection.title}` : `Reproducir ${collection.title}`} title={collectionIsPlaying ? 'Pausar' : 'Reproducir'} onClick={toggleCollectionPlayback}>
             {collectionIsPlaying ? <Pause size={31} fill="currentColor" strokeWidth={1.8} aria-hidden="true" /> : <Play size={31} fill="currentColor" strokeWidth={1.8} aria-hidden="true" />}
           </button>

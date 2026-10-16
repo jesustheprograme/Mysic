@@ -1,51 +1,57 @@
-// Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera.
-// frontend/src/views/AlbumView.jsx
-// Página de álbum: carátula, datos, "Reproducir", "Descargar todo" y pistas numeradas.
-import { Cover } from '../components/Cover.jsx';
-import { DownloadAllButton } from '../components/DownloadButton.jsx';
-import { PlayIcon } from '../components/icons.jsx';
-import { SongList } from '../components/SongList.jsx';
+// Adapta el álbum de YouTube al mismo detalle visual usado por Mysic.
+import CollectionDetailView from '../../collections/CollectionDetailView.jsx';
+import { DownloadButton } from '../components/DownloadButton.jsx';
 
-export function AlbumView({ album, songListProps, onOpenArtist }) {
+function adaptSong(song, index) {
+  return {
+    ...song,
+    albumTitle: song.album,
+    artwork: song.thumbnail,
+    source: 'youtube',
+    trackNo: song.index ?? index + 1,
+  };
+}
+
+export function AlbumView({ album, songListProps, onAddToPlaylist, onBack, onOpenArtist }) {
+  const songs = album.tracks.map(adaptSong);
+
+  function selectSong(songId) {
+    const songIndex = album.tracks.findIndex((song) => song.id === songId);
+    if (songIndex >= 0) songListProps.onPlay(album.tracks, songIndex);
+  }
+
   return (
-    <section className="detail-page" style={{ '--detail-artwork': `url("${album.thumbnail || ''}")` }}>
-      <div className="detail-ambient" aria-hidden="true" />
-      <header className="detail">
-        <Cover className="detail-cover" src={album.thumbnail} />
-        <div className="detail-meta">
-          <p className="detail-kind">Álbum</p>
-          <h2 className="detail-title">{album.title}</h2>
-          <p className="detail-sub">
-            {album.artistId ? (
-              <button className="link" onClick={() => onOpenArtist(album.artistId)}>
-                {album.artist}
-              </button>
-            ) : (
-              album.artist
-            )}
-            {album.year && ` • ${album.year}`}
-            {album.info && ` • ${album.info}`}
-          </p>
-          {album.tracks.length > 0 && (
-            <div className="detail-actions">
-              <button className="play-all" onClick={() => songListProps.onPlay(album.tracks, 0)}>
-                <PlayIcon /> Reproducir
-              </button>
-              <DownloadAllButton songs={album.tracks} {...songListProps} />
-            </div>
-          )}
-        </div>
-      </header>
-      <div className="detail-tracklist">
-        <div className="section-heading section-heading--compact">
-          <div>
-            <p className="section-eyebrow">Lista de reproducción</p>
-            <h3 className="section-title">Canciones</h3>
-          </div>
-          <span className="section-count">{album.tracks.length}</span>
-        </div>
-        <SongList songs={album.tracks} {...songListProps} hideAlbum showIndex />
-      </div>
-    </section>
+    <CollectionDetailView
+      collection={{
+        albumId: album.id,
+        artist: album.artist,
+        artistArtwork: album.thumbnail,
+        artistId: album.artistId,
+        artwork: album.thumbnail,
+        description: album.info,
+        kind: 'Álbum',
+        title: album.title,
+        year: album.year,
+      }}
+      onAddToPlaylist={onAddToPlaylist}
+      onArtistSelect={onOpenArtist}
+      onBack={onBack}
+      onDownloadCollection={() => songListProps.onDownloadMany(album.tracks)}
+      onPlaybackToggle={songListProps.onTogglePlay}
+      onSongSelect={selectSong}
+      renderTrackActions={(song) => (
+        <DownloadButton
+          downloadedIds={songListProps.downloadedIds}
+          jobs={songListProps.jobs}
+          onDeleteDownload={songListProps.onDeleteDownload}
+          onDownload={songListProps.onDownload}
+          online={songListProps.online}
+          song={song}
+        />
+      )}
+      selectedSongId={songListProps.currentId}
+      selectedSongPlaying={songListProps.isPlaying}
+      songs={songs}
+    />
   );
 }

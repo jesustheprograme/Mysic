@@ -1,5 +1,16 @@
 /* Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera. */
 /* Cabeceras de álbum y descargas (views/AlbumView.jsx, DownloadsView.jsx) */
+.yt-app .content:has(.collection-detail) {
+  max-width: none;
+  height: calc(100dvh - 64px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.yt-app .content:has(.collection-detail) .collection-detail {
+  height: 100%;
+}
+
 .yt-app .detail-page {
   position: relative;
   isolation: isolate;

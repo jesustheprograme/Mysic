@@ -5,6 +5,7 @@ import useCatalogo from './estado/catalogo/useCatalogo.js'
 import AuthView from './features/auth/AuthView.jsx'
 import useAuth from './features/auth/useAuth.js'
 import DiscoveryView from './features/discovery/DiscoveryView.jsx'
+import { normalizeYoutubePlaylistSong } from './features/youtube/lib/playlistSong.js'
 import './styles/app.css'
 import './styles/home.css'
 
@@ -135,6 +136,7 @@ function MainApp() {
         artworkPublicId: details.artworkPublicId ?? null,
         pinned: Boolean(details.pinned),
         songIds: [],
+        externalSongs: [],
       })
       setPlaylists((currentPlaylists) => [playlist, ...currentPlaylists])
       setPlaylistsError('')
@@ -178,6 +180,17 @@ function MainApp() {
       ? [...playlist.songIds, songId]
       : playlist.songIds.filter((currentSongId) => currentSongId !== songId)
     return updatePlaylist(playlistId, { songIds })
+  }
+
+  async function setExternalSongInPlaylist(playlistId, song, included) {
+    const playlist = playlists.find((item) => item.id === playlistId)
+    const externalSongs = playlist?.externalSongs ?? []
+    const alreadyIncluded = externalSongs.some((item) => item.id === song.id)
+    if (included === alreadyIncluded) return true
+    const nextExternalSongs = included
+      ? [...externalSongs, normalizeYoutubePlaylistSong(song)]
+      : externalSongs.filter((item) => item.id !== song.id)
+    return updatePlaylist(playlistId, { externalSongs: nextExternalSongs })
   }
 
   function addSongToPlaylist(playlistId, songId) {
@@ -296,6 +309,7 @@ function MainApp() {
         onReorderPlaylist={reorderPlaylist}
         onSearchChange={setSearchQuery}
         onSetSongInPlaylist={setSongInPlaylist}
+        onSetExternalSongInPlaylist={setExternalSongInPlaylist}
         onSongSelect={setSelectedSongId}
         onToggleAlbumFavorite={(albumId, liked) => setFavorite('album', albumId, liked)}
         onToggleArtistFavorite={(artistId, liked) => setFavorite('artist', artistId, liked)}

@@ -12,6 +12,19 @@ const PLAYLIST_ARTWORK_FOLDER = 'Mysic_playlist_usuarios/Playlist_imagenes'
 const acceptedArtworkTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const acceptedArtworkExtensions = new Set(['jpg', 'jpeg', 'png', 'webp'])
 
+const externalSongSchema = z.object({
+  id: z.string().trim().min(1).max(128),
+  title: z.string().trim().min(1).max(500),
+  artist: z.string().trim().max(500).default('Artista desconocido'),
+  artistId: z.string().trim().max(128).nullable().default(null),
+  album: z.string().trim().max(500).default('Sencillo'),
+  albumId: z.string().trim().max(128).nullable().default(null),
+  duration: z.string().trim().max(32).default('--:--'),
+  durationSeconds: z.number().nonnegative().default(0),
+  thumbnail: z.string().max(4096).default(''),
+  source: z.literal('youtube'),
+}).strict()
+
 function isAcceptedArtworkFile(file) {
   const extension = file.originalname.split('.').pop()?.toLocaleLowerCase()
   return acceptedArtworkTypes.has(file.mimetype.toLocaleLowerCase())
@@ -37,6 +50,7 @@ const playlistFields = {
   artworkPublicId: z.string().max(512).nullable().default(null),
   pinned: z.boolean().default(false),
   songIds: z.array(z.string().trim().min(1).max(128)).max(5000).default([]),
+  externalSongs: z.array(externalSongSchema).max(5000).default([]),
 }
 
 const createPlaylistSchema = z.object(playlistFields).strict()
@@ -48,6 +62,7 @@ const updatePlaylistSchema = z.object({
   artworkPublicId: z.string().max(512).nullable().optional(),
   pinned: z.boolean().optional(),
   songIds: z.array(z.string().trim().min(1).max(128)).max(5000).optional(),
+  externalSongs: z.array(externalSongSchema).max(5000).optional(),
 }).strict().refine((changes) => Object.keys(changes).length > 0)
 
 function publicPlaylist(playlist, songIds = playlist.songIds || []) {
@@ -59,6 +74,7 @@ function publicPlaylist(playlist, songIds = playlist.songIds || []) {
     artworkPublicId: playlist.artworkPublicId || null,
     pinned: Boolean(playlist.pinned),
     songIds,
+    externalSongs: playlist.externalSongs || [],
   }
 }
 

@@ -1,5 +1,16 @@
 /* Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera. */
 /* Página de artista a dos columnas (views/ArtistView.jsx, components/ArtistHero.jsx) */
+.yt-app .content:has(.artist-profile) {
+  max-width: none;
+  height: calc(100dvh - 64px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.yt-app .content:has(.artist-profile) .artist-profile {
+  height: 100%;
+}
+
 .yt-app .artist-page {
   display: grid;
   grid-template-columns: minmax(300px, 44%) minmax(0, 1fr);

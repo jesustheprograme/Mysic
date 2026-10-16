@@ -3,6 +3,10 @@
 .yt-app .app {
   min-height: 100vh;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.yt-app .app--player-open {
   grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
 }
 

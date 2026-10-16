@@ -25,6 +25,7 @@ export default function FilaCancionOrdenable({
   onToggleFavorite,
   nodeRef,
   reorderable,
+  renderTrackActions,
   song,
   status,
   variant,
@@ -141,17 +142,22 @@ export default function FilaCancionOrdenable({
         </small>}
       </div>
       <span className="collection-detail__track-actions">
-        <HeartToggle
-          className="heart-container--song-row"
-          label={`Me gusta ${song.title}`}
-          liked={isLiked}
-          onToggle={(liked) => onToggleFavorite?.(song.id, liked)}
-          removeLabel={`Quitar ${song.title} de favoritas`}
-          size={17}
-        />
-        <button className="collection-detail__track-action" type="button" aria-label={`Añadir ${song.title} a una playlist`} title="Añadir a playlist" onClick={() => onAddToPlaylist?.(song)}>
-          <ListPlus size={17} strokeWidth={1.8} aria-hidden="true" />
-        </button>
+        {onToggleFavorite && (
+          <HeartToggle
+            className="heart-container--song-row"
+            label={`Me gusta ${song.title}`}
+            liked={isLiked}
+            onToggle={(liked) => onToggleFavorite(song.id, liked)}
+            removeLabel={`Quitar ${song.title} de favoritas`}
+            size={17}
+          />
+        )}
+        {onAddToPlaylist && (
+          <button className="collection-detail__track-action" type="button" aria-label={`Añadir ${song.title} a una playlist`} title="Añadir a playlist" onClick={() => onAddToPlaylist(song)}>
+            <ListPlus size={17} strokeWidth={1.8} aria-hidden="true" />
+          </button>
+        )}
+        {renderTrackActions?.(song)}
       </span>
       <time>{formatDuration(song.durationSeconds)}</time>
     </li>

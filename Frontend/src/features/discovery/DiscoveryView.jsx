@@ -2,7 +2,6 @@ import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useLayoutEffect
 import AppHeader from '../../components/AppHeader.jsx'
 import AppSidebar from '../../components/AppSidebar.jsx'
 import PlayerDock from '../../components/PlayerDock.jsx'
-import { PlayerPanelContent, VolumeControl } from '../../components/reproductor/ControlesReproductor.jsx'
 import AlbumView from '../collections/AlbumView.jsx'
 import ArtistView from '../collections/ArtistView.jsx'
 import PlaylistEditorModal from '../playlists/PlaylistEditorModal.jsx'
@@ -51,6 +50,7 @@ function DiscoveryView({
   onDeletePlaylist,
   onReorderPlaylist,
   onSearchChange,
+  onSetExternalSongInPlaylist,
   onSetSongInPlaylist,
   onSongSelect,
   onToggleAlbumFavorite,
@@ -163,18 +163,19 @@ function DiscoveryView({
   const availableSongIds = new Set(songs.map((song) => song.id))
   const resolvedPlaylists = playlists.map((playlist) => ({
     ...playlist,
+    externalSongs: playlist.externalSongs ?? [],
     songIds: playlist.songIds.filter((songId) => availableSongIds.has(songId)),
   }))
   const playlistsWithArtwork = resolvedPlaylists.map((playlist) => {
     if (playlist.artwork) return playlist
     const firstSong = playlist.songIds
       .map((songId) => songs.find((song) => song.id === songId))
-      .find(Boolean)
+      .find(Boolean) ?? playlist.externalSongs[0]
     return firstSong?.artwork ? { ...playlist, artwork: firstSong.artwork } : playlist
   })
   const orderedPlaylists = playlistsWithArtwork
     .toSorted((first, second) => Number(second.pinned) - Number(first.pinned))
-    .map((playlist) => ({ ...playlist, meta: `${playlist.songIds.length} canciones` }))
+    .map((playlist) => ({ ...playlist, meta: `${playlist.songIds.length + playlist.externalSongs.length} canciones` }))
   const activePlaylist = playlistsWithArtwork.find((playlist) => playlist.id === activePlaylistId) ?? null
   const activeAlbum = allAlbumItems.find((album) => album.id === activeAlbumId) ?? null
   const allArtistItems = createArtistItems(songs)
@@ -595,14 +596,14 @@ function DiscoveryView({
     navigateTo(fallbackSection)
   }
 
-  function openCreatePlaylist(pendingSongId = null) {
+  function openCreatePlaylist(pendingSong = null) {
     setPlaylistPickerSong(null)
-    setPlaylistEditor({ mode: 'create', initialPlaylist: null, pendingSongId })
+    setPlaylistEditor({ mode: 'create', initialPlaylist: null, pendingSong })
   }
 
   function openEditPlaylist(playlist) {
     const playlistToEdit = playlist?.id ? playlist : activePlaylist
-    if (playlistToEdit) setPlaylistEditor({ mode: 'edit', initialPlaylist: playlistToEdit, pendingSongId: null })
+    if (playlistToEdit) setPlaylistEditor({ mode: 'edit', initialPlaylist: playlistToEdit, pendingSong: null })
   }
 
   async function savePlaylist(details) {
@@ -611,7 +612,11 @@ function DiscoveryView({
     if (playlistEditor.mode === 'create') {
       const playlistId = await createPlaylist(details)
       if (!playlistId) return
-      if (playlistEditor.pendingSongId) await addSongToPlaylist(playlistId, playlistEditor.pendingSongId)
+      if (playlistEditor.pendingSong?.source === 'youtube') {
+        await onSetExternalSongInPlaylist(playlistId, playlistEditor.pendingSong, true)
+      } else if (playlistEditor.pendingSong?.id) {
+        await addSongToPlaylist(playlistId, playlistEditor.pendingSong.id)
+      }
       setPlaylistEditor(null)
       navigateToPlaylist(playlistId)
       return
@@ -625,6 +630,13 @@ function DiscoveryView({
   function togglePlaylistPinned(playlist) {
     const playlistToUpdate = playlist?.id ? playlist : activePlaylist
     if (playlistToUpdate) onUpdatePlaylist(playlistToUpdate.id, { pinned: !playlistToUpdate.pinned })
+  }
+
+  function playExternalSong(song) {
+    navigateTo('youtube')
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new CustomEvent('mysic:play-youtube-song', { detail: song }))
+    })
   }
 
   async function deletePlaylist(playlist) {
@@ -839,6 +851,7 @@ function DiscoveryView({
                 onBack={() => navigateBack('playlists')}
                 onDelete={deletePlaylist}
                 onEdit={openEditPlaylist}
+                onExternalSongSelect={playExternalSong}
                 onPlaybackToggle={() => setPlaybackToggleNonce((nonce) => nonce + 1)}
                 onReorderPlaylist={onReorderPlaylist}
                 onSongSelect={selectSong}
@@ -881,8 +894,7 @@ function DiscoveryView({
             <Suspense fallback={<div className="collection-empty" role="status">Cargando YouTube Music…</div>}>
               <YoutubeView
                 active={activeSection === 'youtube'}
-                PlayerPanelComponent={PlayerPanelContent}
-                VolumeControlComponent={VolumeControl}
+                onAddToPlaylist={setPlaylistPickerSong}
               />
             </Suspense>
           </div>
@@ -962,12 +974,14 @@ function DiscoveryView({
           onAdd={async (selectedPlaylistIds) => {
             const selectedIds = new Set(selectedPlaylistIds)
             const results = await Promise.all(playlists.map((playlist) => (
-              onSetSongInPlaylist(playlist.id, playlistPickerSong.id, selectedIds.has(playlist.id))
+              playlistPickerSong.source === 'youtube'
+                ? onSetExternalSongInPlaylist(playlist.id, playlistPickerSong, selectedIds.has(playlist.id))
+                : onSetSongInPlaylist(playlist.id, playlistPickerSong.id, selectedIds.has(playlist.id))
             )))
             if (results.every(Boolean)) setPlaylistPickerSong(null)
           }}
           onClose={() => setPlaylistPickerSong(null)}
-          onCreate={() => openCreatePlaylist(playlistPickerSong.id)}
+          onCreate={() => openCreatePlaylist(playlistPickerSong)}
           playing={selectedSongPlaying && selectedSongId === playlistPickerSong.id}
           playlists={resolvedPlaylists}
           song={playlistPickerSong}

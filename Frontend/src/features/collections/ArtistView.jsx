@@ -45,6 +45,9 @@ function collectAlbums(songs) {
 
 function ReleaseCard({ onAlbumSelect, onPlay, playing, release }) {
   const year = release.releaseDate ? new Date(release.releaseDate).getUTCFullYear() : null
+  const releaseMeta = release.songCount == null
+    ? [release.subtitle, year].filter(Boolean).join(' · ')
+    : `${year ? `${year} · ` : ''}${release.songCount} ${release.songCount === 1 ? 'canción' : 'canciones'}`
 
   return (
     <article className={`home-shelf-card artist-profile__album${playing ? ' home-shelf-card--playing' : ''}`}>
@@ -79,7 +82,7 @@ function ReleaseCard({ onAlbumSelect, onPlay, playing, release }) {
       >
         <span className="home-shelf-card__meta">
           <strong>{release.title}</strong>
-          <span>{year ? `${year} · ` : ''}{release.songCount} {release.songCount === 1 ? 'canción' : 'canciones'}</span>
+          {releaseMeta && <span>{releaseMeta}</span>}
         </span>
       </button>
     </article>
@@ -94,18 +97,21 @@ function ArtistView({
   onAlbumSelect,
   onBack,
   onPlaybackToggle,
+  onReleasePlay,
   onSongSelect,
   onToggleFavorite,
   onToggleArtistFavorite,
+  renderSongActions,
   selectedSongId,
   selectedSongPlaying,
   songs,
+  releases,
 }) {
   const artistSongs = useMemo(() => songs.filter((song) => (
     song.artistId === artist.artistId
     || song.artists?.some((songArtist) => songArtist.id === artist.artistId)
   )), [artist.artistId, songs])
-  const albums = useMemo(() => collectAlbums(artistSongs), [artistSongs])
+  const albums = useMemo(() => releases ?? collectAlbums(artistSongs), [artistSongs, releases])
   const albumReleases = albums.filter((release) => (
     release.releaseType === 'album' || (!release.releaseType && release.songCount !== 1)
   ))
@@ -146,6 +152,11 @@ function ArtistView({
   }
 
   function playAlbum(album) {
+    if (onReleasePlay) {
+      onReleasePlay(album)
+      return
+    }
+
     const selectedSongBelongsToAlbum = album.songs.some((song) => song.id === selectedSongId)
     if (selectedSongBelongsToAlbum) {
       onPlaybackToggle?.()
@@ -201,14 +212,16 @@ function ArtistView({
               <Shuffle aria-hidden="true" />
               <span>Aleatorio</span>
             </button>
-            <HeartToggle
-              className="heart-container--artist"
-              label={`Añadir ${artist.title} a artistas favoritos`}
-              liked={likedArtistIds?.has(artist.artistId)}
-              onToggle={(liked) => onToggleArtistFavorite?.(artist.artistId, liked)}
-              removeLabel={`Quitar ${artist.title} de artistas favoritos`}
-              size={20}
-            />
+            {onToggleArtistFavorite && (
+              <HeartToggle
+                className="heart-container--artist"
+                label={`Añadir ${artist.title} a artistas favoritos`}
+                liked={likedArtistIds?.has(artist.artistId)}
+                onToggle={(liked) => onToggleArtistFavorite(artist.artistId, liked)}
+                removeLabel={`Quitar ${artist.title} de artistas favoritos`}
+                size={20}
+              />
+            )}
           </div>
         </div>
         {portraits.length > 1 && (
@@ -269,23 +282,28 @@ function ArtistView({
                   </div>
                   <span className="song-row__meta">
                     <span className="song-row__actions">
-                      <HeartToggle
-                        className="heart-container--song-row"
-                        label={`Me gusta ${song.title}`}
-                        liked={likedSongIds?.has(song.id)}
-                        onToggle={(liked) => onToggleFavorite?.(song.id, liked)}
-                        removeLabel={`Quitar ${song.title} de favoritas`}
-                        size={16}
-                      />
-                      <button
-                        className="song-row__action"
-                        type="button"
-                        aria-label={`Añadir ${song.title} a una playlist`}
-                        title="Añadir a playlist"
-                        onClick={() => onAddToPlaylist?.(song)}
-                      >
-                        <ListPlus size={16} strokeWidth={1.8} aria-hidden="true" />
-                      </button>
+                      {onToggleFavorite && (
+                        <HeartToggle
+                          className="heart-container--song-row"
+                          label={`Me gusta ${song.title}`}
+                          liked={likedSongIds?.has(song.id)}
+                          onToggle={(liked) => onToggleFavorite(song.id, liked)}
+                          removeLabel={`Quitar ${song.title} de favoritas`}
+                          size={16}
+                        />
+                      )}
+                      {onAddToPlaylist && (
+                        <button
+                          className="song-row__action"
+                          type="button"
+                          aria-label={`Añadir ${song.title} a una playlist`}
+                          title="Añadir a playlist"
+                          onClick={() => onAddToPlaylist(song)}
+                        >
+                          <ListPlus size={16} strokeWidth={1.8} aria-hidden="true" />
+                        </button>
+                      )}
+                      {renderSongActions?.(song)}
                     </span>
                     <span className="song-row__duration">{formatDuration(song.durationSeconds)}</span>
                   </span>

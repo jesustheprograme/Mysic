@@ -12,8 +12,9 @@ import './styles/artist.css'
 import './styles/downloads.css'
 import './styles/player.css'
 import { SearchBox } from './components/SearchBox.jsx';
+import { useEffect, useEffectEvent } from 'react';
 import { Player } from './components/Player.jsx';
-import { BackIcon, DownloadIcon, OfflineIcon, Spinner } from './components/icons.jsx';
+import { DownloadIcon, OfflineIcon, Spinner } from './components/icons.jsx';
 import { useBrowse, SEARCH_TABS } from './hooks/useBrowse.js';
 import { useDownloads } from './hooks/useDownloads.js';
 import { usePlayer } from './hooks/usePlayer.js';
@@ -27,12 +28,22 @@ import { SearchResults } from './views/SearchResults.jsx';
  *   active = false cuando la vista está montada pero oculta (p. ej. otra sección
  *   de Mysic): la música sigue sonando pero los atajos de teclado no actúan.
  */
-function YoutubeView({ active = true, PlayerPanelComponent, VolumeControlComponent }) {
+function YoutubeView({ active = true, onAddToPlaylist }) {
   const browse = useBrowse();
   const dl = useDownloads();
   const player = usePlayer({ isDownloaded: dl.isDownloaded, enabled: active });
 
   const { view, loading, error } = browse;
+
+  const playExternalSong = useEffectEvent((event) => {
+    if (event.detail?.id) player.playFrom([event.detail], 0);
+  });
+
+  useEffect(() => {
+    const listener = (event) => playExternalSong(event);
+    window.addEventListener('mysic:play-youtube-song', listener);
+    return () => window.removeEventListener('mysic:play-youtube-song', listener);
+  }, []);
 
   // Props comunes para cualquier lista de canciones
   const songListProps = {
@@ -49,6 +60,7 @@ function YoutubeView({ active = true, PlayerPanelComponent, VolumeControlCompone
     onDownloadMany: dl.downloadMany,
     onDeleteDownload: dl.deleteDownload,
     online: dl.online,
+    onAddToPlaylist,
   };
 
   // Qué hacer al elegir una entidad del desplegable de sugerencias
@@ -61,7 +73,7 @@ function YoutubeView({ active = true, PlayerPanelComponent, VolumeControlCompone
   // .yt-app aísla los estilos: dentro de otra app todas las reglas van prefijadas con él
   return (
     <div className="yt-app">
-    <div className="app">
+    <div className={`app${player.currentSong ? ' app--player-open' : ''}`}>
       <main className={`content${view.kind === 'artist' ? ' content--wide' : ''}`}>
         {view.kind === 'search' && (
           <header className="browse-intro">
@@ -125,12 +137,6 @@ function YoutubeView({ active = true, PlayerPanelComponent, VolumeControlCompone
           </p>
         )}
 
-        {view.kind === 'album' && (
-          <button className="back" onClick={browse.goBack}>
-            <BackIcon /> Volver a resultados
-          </button>
-        )}
-
         {error && <p className="message error">{error}</p>}
         {loading && view.kind !== 'search' && <p className="message message--surface">Cargando contenido…</p>}
 
@@ -154,17 +160,18 @@ function YoutubeView({ active = true, PlayerPanelComponent, VolumeControlCompone
           />
         )}
         {view.kind === 'album' && (
-          <AlbumView album={view.data} songListProps={songListProps} onOpenArtist={browse.openArtist} />
+          <AlbumView
+            album={view.data}
+            onAddToPlaylist={onAddToPlaylist}
+            onBack={browse.goBack}
+            onOpenArtist={browse.openArtist}
+            songListProps={songListProps}
+          />
         )}
         {view.kind === 'downloads' && <DownloadsView downloads={dl.downloads} songListProps={songListProps} />}
       </main>
 
-      <Player
-        player={player}
-        onOpenArtist={browse.openArtist}
-        PlayerPanelComponent={PlayerPanelComponent}
-        VolumeControlComponent={VolumeControlComponent}
-      />
+      <Player player={player} />
     </div>
     </div>
   );

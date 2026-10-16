@@ -10,6 +10,7 @@ function PlaylistView({
   onBack,
   onDelete,
   onEdit,
+  onExternalSongSelect,
   onPlaybackToggle,
   onReorderPlaylist,
   onSongSelect,
@@ -25,7 +26,10 @@ function PlaylistView({
   const playlistSongs = playlist.songIds.flatMap((songId) => {
     const song = songs.find((item) => item.id === songId)
     return song ? [song] : []
-  })
+  }).concat((playlist.externalSongs ?? []).map((song) => ({
+    ...song,
+    artwork: song.thumbnail,
+  })))
   const playlistArtists = new Map()
   playlistSongs.forEach((song) => {
     const artist = song.artists?.[0]
@@ -77,9 +81,13 @@ function PlaylistView({
         onBack={onBack}
         onDelete={() => setDeleteModalOpen(true)}
         onEdit={() => onEdit?.(playlist)}
-        onMoveSong={moveSong}
+        onMoveSong={playlist.externalSongs?.length ? undefined : moveSong}
         onPlaybackToggle={onPlaybackToggle}
-        onSongSelect={onSongSelect}
+        onSongSelect={(songId, options) => {
+          const song = playlistSongs.find((item) => item.id === songId)
+          if (song?.source === 'youtube') onExternalSongSelect?.(song)
+          else onSongSelect(songId, options)
+        }}
         onToggleFavorite={onToggleFavorite}
         onTogglePinned={() => onTogglePinned?.(playlist)}
         selectedSongId={selectedSongId}

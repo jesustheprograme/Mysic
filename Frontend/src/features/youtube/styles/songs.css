@@ -13,7 +13,7 @@
   position: relative;
   min-height: 68px;
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) 48px 38px;
+  grid-template-columns: 52px minmax(0, 1fr) 48px 34px 38px;
   align-items: center;
   gap: 13px;
   padding: 7px 10px 7px 7px;
@@ -25,7 +25,7 @@
 }
 
 .yt-app .song:has(.song-index) {
-  grid-template-columns: 28px 48px minmax(0, 1fr) 48px 38px;
+  grid-template-columns: 28px 48px minmax(0, 1fr) 48px 34px 38px;
 }
 
 .yt-app .song:hover,
@@ -112,10 +112,34 @@
   text-align: right;
 }
 
+.yt-app .song-add-to-playlist {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  opacity: 0;
+  transition: color 150ms ease, background-color 150ms ease, opacity 150ms ease;
+}
+
+.yt-app .song:hover .song-add-to-playlist,
+.yt-app .song:focus-within .song-add-to-playlist {
+  opacity: 1;
+}
+
+.yt-app .song-add-to-playlist:hover,
+.yt-app .song-add-to-playlist:focus-visible {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.1);
+}
+
 @media (max-width: 560px) {
   .yt-app .song,
 .yt-app .song:has(.song-index) {
-    grid-template-columns: 46px minmax(0, 1fr) 34px;
+    grid-template-columns: 46px minmax(0, 1fr) 34px 34px;
     gap: 10px;
     min-height: 62px;
     padding: 7px;
@@ -123,6 +147,7 @@
 
   .yt-app .song-index,
 .yt-app .song-duration { display: none; }
+  .yt-app .song-add-to-playlist { opacity: 1; }
   .yt-app .song-cover { width: 46px; height: 46px; }
   .yt-app .song-album { display: none; }
 }

@@ -5,6 +5,15 @@
 import { Cover } from './Cover.jsx';
 import { DownloadButton } from './DownloadButton.jsx';
 import { Equalizer, PauseIcon, PlayIcon } from './icons.jsx';
+import { ListPlus } from 'lucide-react';
+
+function asPlaylistSong(song) {
+  return {
+    ...song,
+    artwork: song.thumbnail,
+    source: 'youtube',
+  };
+}
 
 export function SongList({
   songs,
@@ -22,6 +31,7 @@ export function SongList({
   onDownload,
   onDeleteDownload,
   online,
+  onAddToPlaylist,
 }) {
   if (!songs || songs.length === 0) return null;
   const visible = limit ? songs.slice(0, limit) : songs;
@@ -79,6 +89,17 @@ export function SongList({
               </p>
             </div>
             <div className="song-duration">{isCurrent && isPlaying ? <Equalizer /> : song.duration}</div>
+            {onAddToPlaylist && (
+              <button
+                className="song-add-to-playlist"
+                type="button"
+                aria-label={`Añadir ${song.title} a una playlist`}
+                title="Añadir a playlist"
+                onClick={() => onAddToPlaylist(asPlaylistSong(song))}
+              >
+                <ListPlus size={17} strokeWidth={1.8} aria-hidden="true" />
+              </button>
+            )}
             <DownloadButton song={song} {...downloadProps} />
           </li>
         );
