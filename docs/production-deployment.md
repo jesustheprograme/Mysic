@@ -76,6 +76,7 @@ cd Backend
 npm ci
 npx prisma migrate deploy
 npm run check
+npm prune --omit=dev
 ```
 
 La migración de rendimiento crea la extensión `pg_trgm`. Si el proveedor no permite `CREATE EXTENSION`, actívala desde su panel o solicita que la habiliten antes de ejecutar `prisma migrate deploy`.
@@ -197,6 +198,7 @@ cd Backend
 npm ci
 npx prisma migrate deploy
 npm run check
+npm prune --omit=dev
 sudo systemctl restart mysic-api
 curl http://127.0.0.1:4000/api/health/ready
 curl http://127.0.0.1:4000/api/youtube/health
