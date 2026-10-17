@@ -35,7 +35,7 @@ const libraryNavigationItems = [
   { id: 'artists', label: 'Artistas', icon: UsersRound },
   { id: 'playlists', label: 'Playlists', icon: ListMusic },
   { id: 'downloads', label: 'Descargas', icon: Download },
-  { id: 'youtube', label: 'YouTube Music', icon: MonitorPlay },
+  { id: 'youtube', label: 'Mysic global', icon: MonitorPlay },
 ]
 
 function AppSidebar({

@@ -895,7 +895,7 @@ function DiscoveryView({
       )}
         {youtubeVisited && (
           <div className="youtube-section" hidden={activeSection !== 'youtube'}>
-            <Suspense fallback={<div className="collection-empty" role="status">Cargando YouTube Music…</div>}>
+            <Suspense fallback={<div className="collection-empty" role="status">Cargando Mysic global…</div>}>
               <YoutubeView
                 active={activeSection === 'youtube'}
                 onAddToPlaylist={setPlaylistPickerSong}

@@ -1,9 +1,10 @@
-import { Download, LoaderCircle, Search, Trash2, WifiOff } from 'lucide-react'
+import { Download, LoaderCircle, Trash2, WifiOff } from 'lucide-react'
 import { useEffect, useEffectEvent, useState } from 'react'
 import { createPortal } from 'react-dom'
 import PlayerDock from '../../components/PlayerDock.jsx'
 import ArtistView from '../collections/ArtistView.jsx'
 import CollectionDetailView from '../collections/CollectionDetailView.jsx'
+import FavoriteSearch from '../discovery/FavoriteSearch.jsx'
 import HomeRail from '../discovery/HomeRail.jsx'
 import SongList from '../discovery/SongList.jsx'
 import { SEARCH_TABS, useBrowse } from './hooks/useBrowse.js'
@@ -183,52 +184,47 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerVisibilityChange 
       <div className="home-page">
         <div className="collection-heading">
           <div>
-            <span>CATÁLOGO EN LÍNEA</span>
-            <h1>YouTube Music</h1>
+            <span>CATÁLOGO GLOBAL</span>
+            <h1>Mysic global</h1>
           </div>
         </div>
 
-        <form
-          className="collection-heading"
-          onSubmit={(event) => {
-            event.preventDefault()
-            browse.runSearch(browse.query, searchType)
-          }}
-        >
-          <label className="music-search" style={{ width: 'min(100%, 620px)' }}>
-            <span className="sr-only">Buscar canciones, artistas o álbumes</span>
-            <Search className="music-search__icon" size={16} strokeWidth={1.8} aria-hidden="true" />
-            <input
-              className="music-search__input"
-              value={browse.query}
-              onChange={(event) => browse.setQuery(event.target.value)}
-              placeholder="Buscar canciones, artistas o álbumes"
-              type="search"
-              autoComplete="off"
-            />
-            <span className="music-search__border" aria-hidden="true" />
-          </label>
-          <button className="song-pagination__step" type="submit" disabled={loading || !browse.query.trim()}>
-            {loading ? 'Buscando…' : 'Buscar'}
-          </button>
-        </form>
+        <section className="catalog-search" aria-labelledby="catalog-search-title">
+          <div className="collection-heading catalog-search__heading">
+            <h2 id="catalog-search-title">Buscar</h2>
+          </div>
 
-        <nav className="song-pagination" aria-label="Tipo de contenido">
-          {SEARCH_TABS.map((tab) => (
-            <button
-              className={tab.type === searchType ? 'song-pagination__page song-pagination__page--active' : 'song-pagination__page'}
-              type="button"
-              aria-current={tab.type === searchType ? 'page' : undefined}
-              key={tab.type}
-              onClick={() => browse.changeTab(tab.type)}
-            >
-              {tab.label}
+          <nav className="catalog-search__filters" aria-label="Tipo de contenido">
+            {SEARCH_TABS.map((tab) => (
+              <button
+                className={tab.type === searchType ? 'catalog-search__filter catalog-search__filter--active' : 'catalog-search__filter'}
+                type="button"
+                aria-pressed={tab.type === searchType}
+                key={tab.type}
+                onClick={() => browse.changeTab(tab.type)}
+              >
+                {tab.label}
+              </button>
+            ))}
+            <button className="catalog-search__filter" type="button" onClick={browse.showDownloads}>
+              Descargas{downloads.downloads.items.length ? ` (${downloads.downloads.items.length})` : ''}
             </button>
-          ))}
-          <button className="song-pagination__step" type="button" onClick={browse.showDownloads}>
-            Descargas{downloads.downloads.items.length ? ` (${downloads.downloads.items.length})` : ''}
-          </button>
-        </nav>
+          </nav>
+
+          <form
+            className="catalog-search__form"
+            onSubmit={(event) => {
+              event.preventDefault()
+              browse.runSearch(browse.query, searchType)
+            }}
+          >
+            <FavoriteSearch
+              label="Buscar canciones, artistas o álbumes"
+              value={browse.query}
+              onChange={browse.setQuery}
+            />
+          </form>
+        </section>
 
         {!downloads.online && (
           <div className="collection-empty" role="status">
