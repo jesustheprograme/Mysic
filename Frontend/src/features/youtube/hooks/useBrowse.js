@@ -24,22 +24,7 @@ function scheduleWhenIdle(callback) {
 }
 
 async function loadArtist(id) {
-  const artist = await api.artist(id);
-  const topSongs = await Promise.all(
-    artist.topSongs.map(async (song) => {
-      if (song.durationSeconds > 0) return song;
-
-      try {
-        const result = await api.search(song.title, 'song');
-        const completeSong = result.items?.find((candidate) => candidate.id === song.id);
-        return completeSong ? { ...song, ...completeSong } : song;
-      } catch {
-        return song;
-      }
-    })
-  );
-
-  return { ...artist, topSongs };
+  return api.artist(id);
 }
 
 export const SEARCH_TABS = [

@@ -6,11 +6,6 @@ import express from 'express';
 import { asyncRoute, BROWSE_ID_RE, requireYoutube, validateParam } from '../utils/http.mjs';
 import { getArtistPage } from '../youtube/artist.mjs';
 
-// La página del artista responde enseguida. Solo espera al conjunto completo de
-// fotos este tiempo (suficiente si ya está en caché o a punto de terminar); si
-// no, responde con la cabecera y el frontend recibe el resto en segundo plano.
-const IMAGES_WAIT_MS = 300;
-
 export function createArtistRouter({ getArtistImages }) {
   const router = express.Router();
   const validId = validateParam('id', BROWSE_ID_RE, 'ID de artista inválido');
@@ -33,17 +28,18 @@ export function createArtistRouter({ getArtistImages }) {
     asyncRoute(async (req, res) => {
       const { page, media } = await getArtistPage(req.params.id);
 
-      // Lanza el agregador ya (reutilizando los datos de YouTube) y espera un poco
+      // La cabecera de YouTube basta para pintar el perfil. El conjunto ampliado
+      // de fotos solo bloquea la respuesta cuando ya estaba preparado en caché.
+      const imagesReady = await getArtistImages.isReady(req.params.id);
       const aggregated = getArtistImages(req.params.id, { prefetched: { name: page.name, media } });
       aggregated.catch((error) => console.warn(`[artist] fotos de ${req.params.id}: ${error.message}`));
-      const timeout = new Promise((resolve) => setTimeout(() => resolve(null), IMAGES_WAIT_MS).unref());
-      const full = await Promise.race([aggregated.catch(() => null), timeout]);
+      const full = imagesReady ? await aggregated.catch(() => null) : null;
 
-      const responsePage = full?.images?.length
-        ? { ...page, images: full.images, imagesComplete: true }
-        : page;
-      res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=900');
-      res.json(responsePage);
+      if (full?.images?.length) {
+        page.images = full.images;
+        page.imagesComplete = true;
+      }
+      res.json(page);
     }, 'No se pudo cargar el artista')
   );
 

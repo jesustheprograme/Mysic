@@ -5,6 +5,7 @@ import PreviewIndicator from '../../components/PreviewIndicator.jsx'
 
 const portraitDirections = ['left', 'down', 'right', 'up']
 const PORTRAIT_DURATION = 5600
+const RELEASE_PREVIEW_LIMIT = 6
 
 function getArtistTitleScale(title) {
   const length = Array.from(title.trim()).length
@@ -89,6 +90,51 @@ function ReleaseCard({ onAlbumSelect, onPlay, playing, release }) {
   )
 }
 
+function ReleaseGroup({
+  expanded,
+  headingId,
+  onAlbumSelect,
+  onPlay,
+  onToggleExpanded,
+  releases,
+  selectedSongId,
+  selectedSongPlaying,
+  title,
+}) {
+  const visibleReleases = expanded ? releases : releases.slice(0, RELEASE_PREVIEW_LIMIT)
+  const hasMore = releases.length > RELEASE_PREVIEW_LIMIT
+
+  return (
+    <section className="artist-profile__release-group" aria-labelledby={headingId}>
+      <div className="artist-profile__release-heading">
+        <h3 id={headingId}>{title}</h3>
+        {hasMore && (
+          <button
+            className="artist-profile__release-toggle"
+            type="button"
+            aria-expanded={expanded}
+            aria-controls={`${headingId}-grid`}
+            onClick={onToggleExpanded}
+          >
+            {expanded ? 'Ver menos' : 'Ver todo'}
+          </button>
+        )}
+      </div>
+      <div className="artist-profile__albums" id={`${headingId}-grid`}>
+        {visibleReleases.map((release) => (
+          <ReleaseCard
+            key={release.id}
+            onAlbumSelect={onAlbumSelect}
+            onPlay={() => onPlay(release)}
+            playing={selectedSongPlaying && release.songs?.some((song) => song.id === selectedSongId)}
+            release={release}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
 function ArtistView({
   artist,
   likedArtistIds,
@@ -122,6 +168,10 @@ function ArtistView({
   const featuredSongs = artistSongs.slice(0, 8)
   const portraits = artist.images?.length ? artist.images : [artist.artwork].filter(Boolean)
   const [portraitIndex, setPortraitIndex] = useState(0)
+  const [releaseExpansion, setReleaseExpansion] = useState({ artistId: artist.artistId, groups: {} })
+  const expandedReleaseGroups = releaseExpansion.artistId === artist.artistId
+    ? releaseExpansion.groups
+    : {}
   const activePortraitIndex = portraits.length ? portraitIndex % portraits.length : 0
   const selectedSongBelongsToArtist = artistSongs.some((song) => song.id === selectedSongId)
   const artistIsPlaying = selectedSongBelongsToArtist && selectedSongPlaying
@@ -135,6 +185,16 @@ function ArtistView({
 
     return () => window.clearTimeout(timer)
   }, [portraitIndex, portraits.length])
+
+  function toggleReleaseGroup(group) {
+    setReleaseExpansion((current) => {
+      const groups = current.artistId === artist.artistId ? current.groups : {}
+      return {
+        artistId: artist.artistId,
+        groups: { ...groups, [group]: !groups[group] },
+      }
+    })
+  }
 
   function playArtist() {
     if (!artistSongs.length) return
@@ -323,60 +383,45 @@ function ArtistView({
           </div>
           <div className="artist-profile__release-groups">
             {albumReleases.length > 0 && (
-              <section className="artist-profile__release-group" aria-labelledby="artist-album-releases-title">
-                <div className="artist-profile__release-heading">
-                  <h3 id="artist-album-releases-title">Álbumes</h3>
-                </div>
-                <div className="artist-profile__albums">
-                  {albumReleases.map((release) => (
-                    <ReleaseCard
-                      key={release.id}
-                      onAlbumSelect={onAlbumSelect}
-                      onPlay={() => playAlbum(release)}
-                      playing={selectedSongPlaying && release.songs.some((song) => song.id === selectedSongId)}
-                      release={release}
-                    />
-                  ))}
-                </div>
-              </section>
+              <ReleaseGroup
+                expanded={Boolean(expandedReleaseGroups.albums)}
+                headingId="artist-album-releases-title"
+                onAlbumSelect={onAlbumSelect}
+                onPlay={playAlbum}
+                onToggleExpanded={() => toggleReleaseGroup('albums')}
+                releases={albumReleases}
+                selectedSongId={selectedSongId}
+                selectedSongPlaying={selectedSongPlaying}
+                title="Álbumes"
+              />
             )}
 
             {epReleases.length > 0 && (
-              <section className="artist-profile__release-group" aria-labelledby="artist-ep-releases-title">
-                <div className="artist-profile__release-heading">
-                  <h3 id="artist-ep-releases-title">EPs</h3>
-                </div>
-                <div className="artist-profile__albums">
-                  {epReleases.map((release) => (
-                    <ReleaseCard
-                      key={release.id}
-                      onAlbumSelect={onAlbumSelect}
-                      onPlay={() => playAlbum(release)}
-                      playing={selectedSongPlaying && release.songs.some((song) => song.id === selectedSongId)}
-                      release={release}
-                    />
-                  ))}
-                </div>
-              </section>
+              <ReleaseGroup
+                expanded={Boolean(expandedReleaseGroups.eps)}
+                headingId="artist-ep-releases-title"
+                onAlbumSelect={onAlbumSelect}
+                onPlay={playAlbum}
+                onToggleExpanded={() => toggleReleaseGroup('eps')}
+                releases={epReleases}
+                selectedSongId={selectedSongId}
+                selectedSongPlaying={selectedSongPlaying}
+                title="EPs"
+              />
             )}
 
             {singleReleases.length > 0 && (
-              <section className="artist-profile__release-group" aria-labelledby="artist-single-releases-title">
-                <div className="artist-profile__release-heading">
-                  <h3 id="artist-single-releases-title">Singles</h3>
-                </div>
-                <div className="artist-profile__albums">
-                  {singleReleases.map((release) => (
-                    <ReleaseCard
-                      key={release.id}
-                      onAlbumSelect={onAlbumSelect}
-                      onPlay={() => playAlbum(release)}
-                      playing={selectedSongPlaying && release.songs.some((song) => song.id === selectedSongId)}
-                      release={release}
-                    />
-                  ))}
-                </div>
-              </section>
+              <ReleaseGroup
+                expanded={Boolean(expandedReleaseGroups.singles)}
+                headingId="artist-single-releases-title"
+                onAlbumSelect={onAlbumSelect}
+                onPlay={playAlbum}
+                onToggleExpanded={() => toggleReleaseGroup('singles')}
+                releases={singleReleases}
+                selectedSongId={selectedSongId}
+                selectedSongPlaying={selectedSongPlaying}
+                title="Singles"
+              />
             )}
           </div>
         </section>

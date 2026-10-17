@@ -2009,10 +2009,21 @@
   font-weight: 620;
 }
 
-.artist-profile__release-heading span {
+.artist-profile__release-heading span,
+.artist-profile__release-toggle {
   color: #6f7975;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+}
+
+.artist-profile__release-toggle {
+  padding: 4px 0;
+  transition: color 160ms ease;
+}
+
+.artist-profile__release-toggle:hover,
+.artist-profile__release-toggle:focus-visible {
+  color: #f3f6f3;
 }
 
 .artist-profile__album {
