@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { readIndexedSearch, writeIndexedSearch } from '../lib/searchIndex.js';
+import { rankSearchResult } from '../lib/searchRanking.js';
 import { scrollAppToTop } from '../lib/scroll.js';
 import { useSearchHistory } from './useSearchHistory.js';
 
@@ -83,6 +84,17 @@ export function useBrowse() {
     enrichmentCancelRef.current?.();
   }, []);
 
+  const showCatalog = useCallback(() => {
+    cancelSearch();
+    setError('');
+    setView({ kind: 'search' });
+  }, [cancelSearch]);
+
+  useEffect(() => {
+    globalThis.addEventListener?.('mysic:global-home', showCatalog);
+    return () => globalThis.removeEventListener?.('mysic:global-home', showCatalog);
+  }, [showCatalog]);
+
   const runSearch = useCallback(async (text, type) => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -105,7 +117,7 @@ export function useBrowse() {
 
     try {
       const networkRequest = api.search(trimmed, type, controller.signal);
-      const indexed = await readIndexedSearch(trimmed, type);
+      const indexed = rankSearchResult(await readIndexedSearch(trimmed, type), trimmed);
 
       if (sequence !== searchSequenceRef.current) return;
       if (hasResults(indexed)) {
@@ -115,7 +127,7 @@ export function useBrowse() {
         setEnriching(true);
       }
 
-      const primary = await networkRequest;
+      const primary = rankSearchResult(await networkRequest, trimmed);
       if (sequence !== searchSequenceRef.current) return;
       void writeIndexedSearch(trimmed, type, primary);
 
@@ -138,7 +150,10 @@ export function useBrowse() {
       enrichmentCancelRef.current = scheduleWhenIdle(async () => {
         try {
           const settled = await Promise.allSettled(missingSections.map(async ([sectionType, key]) => {
-            const section = await api.search(trimmed, sectionType, controller.signal);
+            const section = rankSearchResult(
+              await api.search(trimmed, sectionType, controller.signal),
+              trimmed,
+            );
             return { sectionType, key, data: section };
           }));
           if (sequence !== searchSequenceRef.current) return;
@@ -149,6 +164,7 @@ export function useBrowse() {
             complete = { ...complete, [result.value.key]: result.value.data.items };
             void writeIndexedSearch(trimmed, result.value.sectionType, result.value.data);
           });
+          complete = rankSearchResult(complete, trimmed);
           setResults({ ...complete, query: trimmed });
           void writeIndexedSearch(trimmed, 'all', complete);
           if (!hasResults(complete)) setError('No se encontraron resultados.');
@@ -209,11 +225,7 @@ export function useBrowse() {
     setView({ kind: 'downloads' });
   };
 
-  const goBack = () => {
-    cancelSearch();
-    setError('');
-    setView({ kind: 'search' });
-  };
+  const goBack = showCatalog;
 
   return {
     query,

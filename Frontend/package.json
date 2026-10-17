@@ -8,7 +8,7 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint src",
-    "test": "node --test src/lib/tracks.test.js src/features/discovery/paginatedArtwork.test.js src/features/music-import/musicImportErrors.test.js src/features/music-import/musicImportAccess.test.js src/features/youtube/lib/playlistSong.test.js",
+    "test": "node --test src/lib/tracks.test.js src/features/discovery/paginatedArtwork.test.js src/features/music-import/musicImportErrors.test.js src/features/music-import/musicImportAccess.test.js src/features/youtube/lib/playlistSong.test.js src/features/youtube/lib/searchIndex.test.js src/features/youtube/lib/searchRanking.test.js",
     "check": "npm run test && npm run lint && npm run typecheck && npm run build",
     "preview": "vite preview",
     "tauri": "node scripts/run-tauri.mjs",

@@ -1,7 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import AppHeader from '../../components/AppHeader.jsx'
 import AppSidebar from '../../components/AppSidebar.jsx'
-import PlayerDock from '../../components/PlayerDock.jsx'
 import AlbumView from '../collections/AlbumView.jsx'
 import ArtistView from '../collections/ArtistView.jsx'
 import PlaylistEditorModal from '../playlists/PlaylistEditorModal.jsx'
@@ -22,6 +21,7 @@ import { canImportMusic } from '../music-import/musicImportAccess.js'
 
 const MusicImportView = lazy(() => import('../music-import/MusicImportView.jsx'))
 const NewArtistSpotlight = lazy(() => import('./NewArtistSpotlight.jsx'))
+const PlayerDock = lazy(() => import('../../components/PlayerDock.jsx'))
 const YoutubeView = lazy(() => import('../youtube/YoutubeView.jsx'))
 import {
   createAlbumItems,
@@ -528,6 +528,9 @@ function DiscoveryView({
     const nextHash = sectionHashes[section]
     if (!nextHash) return
     autoSpotlightBlockedRef.current = true
+    if (section === 'youtube' && activeSection === 'youtube') {
+      window.dispatchEvent(new CustomEvent('mysic:global-home'))
+    }
     setActiveSection(section)
     setActiveAlbumId(null)
     setActiveArtistId(null)
@@ -841,6 +844,9 @@ function DiscoveryView({
               <div className="route-page playlist-library-page">
                 <div className="collection-heading">
                   <h1>Playlists</h1>
+                  <button className="song-pagination__step" type="button" onClick={() => openCreatePlaylist()}>
+                    Crear playlist
+                  </button>
                 </div>
                 <HomeRail items={orderedPlaylists} onSelect={navigateToPlaylist} selectedId={activePlaylistId} title="Tus playlists" />
               </div>
@@ -877,7 +883,7 @@ function DiscoveryView({
                 <div className="collection-heading">
                   <h1 id="downloads-title">Descargas</h1>
                 </div>
-                <div className="collection-empty">Aun no tienes musica descargada.</div>
+                <div className="collection-empty">Aún no tienes música descargada.</div>
               </section>
             )}
 
@@ -933,7 +939,8 @@ function DiscoveryView({
       )}
 
       {selectedSong && (
-        <PlayerDock
+        <Suspense fallback={null}>
+          <PlayerDock
           animationNonce={playerAnimationNonce}
           collapsed={playerCollapsed}
           fadeInNonce={playerFadeInNonce}
@@ -961,7 +968,8 @@ function DiscoveryView({
           queue={nextSongs}
           suppressed={Boolean(spotlightArtist) || activeSection === 'youtube'}
           track={selectedSong}
-        />
+          />
+        </Suspense>
       )}
 
       {playlistEditor && (

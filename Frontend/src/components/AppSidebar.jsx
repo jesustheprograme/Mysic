@@ -31,7 +31,7 @@ const primaryNavigationItems = [
 
 const libraryNavigationItems = [
   { id: 'recent', label: 'Historial', icon: Clock3 },
-  { id: 'albums', label: 'Albumes', icon: Album },
+  { id: 'albums', label: 'Álbumes', icon: Album },
   { id: 'artists', label: 'Artistas', icon: UsersRound },
   { id: 'playlists', label: 'Playlists', icon: ListMusic },
   { id: 'downloads', label: 'Descargas', icon: Download },
@@ -86,7 +86,7 @@ function AppSidebar({
         className={`app-sidebar${collapsed ? ' app-sidebar--collapsed' : ''}${mobileOpen ? ' app-sidebar--mobile-open' : ''}`}
         id="mobile-navigation"
       >
-        <nav className="app-sidebar__navigation" aria-label="Navegacion principal">
+        <nav className="app-sidebar__navigation" aria-label="Navegación principal">
           {primaryNavigationItems.map(renderItem)}
           {canImportMusic && (
             <button
@@ -101,7 +101,7 @@ function AppSidebar({
               <span>Importar música</span>
             </button>
           )}
-          {!collapsed && <p className="app-sidebar__label">Tu musica</p>}
+          {!collapsed && <p className="app-sidebar__label">Tu música</p>}
           {libraryNavigationItems.map(renderItem)}
         </nav>
 
