@@ -11,6 +11,10 @@ Las solicitudes por categoría se deduplican dentro de cada búsqueda. Una nueva
 consulta cancela las solicitudes anteriores e impide que sus respuestas cambien
 los resultados actuales. Volver al catálogo reactiva las categorías pendientes.
 IndexedDB dispone de 80 ms para aportar resultados iniciales sin bloquear la red.
+Solo se muestran respuestas guardadas para la misma consulta y filtro mediante
+una lectura directa por clave. Las coincidencias parciales de otras búsquedas
+no se presentan como resultados provisionales. Repetir Enter durante una petición
+de la misma consulta y filtro no inicia otra petición.
 
 Esto es carga por visibilidad, no virtualización completa: las secciones visitadas
 permanecen montadas y la lista de canciones conserva su paginación. Los endpoints

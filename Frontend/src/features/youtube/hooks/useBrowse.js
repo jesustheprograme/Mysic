@@ -78,7 +78,7 @@ export function useBrowse({ progressive = false } = {}) {
       const controller = new AbortController();
       searchControllerRef.current = controller;
       searchContextRef.current = {
-        ...searchContextRef.current, controller, sequence: searchSequenceRef.current,
+        ...searchContextRef.current, controller, sequence: searchSequenceRef.current, pending: false,
       };
       sectionRequestsRef.current.clear();
     }
@@ -94,6 +94,10 @@ export function useBrowse({ progressive = false } = {}) {
   const runSearch = useCallback(async (text, type) => {
     const trimmed = text.trim();
     if (!trimmed) return;
+    const current = searchContextRef.current;
+    if (current?.pending && current.type === type
+      && current.query.toLocaleLowerCase() === trimmed.toLocaleLowerCase()
+      && current.sequence === searchSequenceRef.current && !current.controller.signal.aborted) return;
 
     searchControllerRef.current?.abort();
     enrichmentCancelRef.current?.();
@@ -103,7 +107,7 @@ export function useBrowse({ progressive = false } = {}) {
     searchControllerRef.current = controller;
     setQuery(trimmed);
     sectionRequestsRef.current.clear();
-    searchContextRef.current = { query: trimmed, sequence, controller };
+    searchContextRef.current = { query: trimmed, type, sequence, controller, pending: true };
     setResults(null);
     setLoading(true);
     setEnriching(type === 'all');
@@ -119,7 +123,7 @@ export function useBrowse({ progressive = false } = {}) {
       const networkRequest = api.search(trimmed, progressive && type === 'all' ? 'song' : type, controller.signal)
         .then((data) => ({ data }), (error) => ({ error }));
       const indexed = rankSearchResult(await Promise.race([
-        readIndexedSearch(trimmed, type),
+        readIndexedSearch(trimmed, type, { exactOnly: true }),
         new Promise((resolve) => setTimeout(() => resolve(null), 80)),
       ]), trimmed);
 
@@ -203,6 +207,7 @@ export function useBrowse({ progressive = false } = {}) {
       }
     } finally {
       if (sequence === searchSequenceRef.current) {
+        searchContextRef.current.pending = false;
         setLoading(false);
         if (!deferredEnrichment) {
           if (!progressive) searchControllerRef.current = null;

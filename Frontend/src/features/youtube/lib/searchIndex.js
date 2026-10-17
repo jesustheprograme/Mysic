@@ -146,7 +146,21 @@ export function buildIndexedSearchResult(
   return { type: 'all', top: null, songs, artists, albums };
 }
 
-export async function readIndexedSearch(query, type = 'all') {
+export async function readIndexedSearch(query, type = 'all', { exactOnly = false } = {}) {
+  if (exactOnly) {
+    const key = createRecordKey(query, type);
+    let record = memoryIndex.get(key);
+    if (!record) {
+      const database = await openDatabase();
+      if (database) {
+        try {
+          record = await requestResult(database.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(key));
+          if (record) memoryIndex.set(key, record);
+        } catch { return null; }
+      }
+    }
+    return record && Date.now() - record.updatedAt <= RECORD_TTL_MS ? record.data : null;
+  }
   const records = await readStoredRecords();
   return buildIndexedSearchResult(records, query, type);
 }

@@ -27,6 +27,9 @@ try {
   function Harness() { browse = useBrowse({ progressive: true }); return null }
   const root = createRoot(document.getElementById('root'))
   await React.act(async () => root.render(React.createElement(Harness)))
+  await React.act(async () => Promise.all([browse.runSearch('Ado', 'all'), browse.runSearch('Ado', 'all')]))
+  assert.equal(requests.length, 1, 'repeated Enter shares the in-flight search')
+  requests.length = 0
   await React.act(async () => browse.runSearch('Ado', 'all'))
   assert.equal(requests.length, 1)
   assert.match(requests[0], /type=song/)
