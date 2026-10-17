@@ -1,7 +1,7 @@
 // Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera.
 // frontend/src/hooks/useBrowse.js
 // Búsqueda y navegación entre vistas: resultados, artista, álbum y descargas.
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { scrollAppToTop } from '../lib/scroll.js';
 import { useSearchHistory } from './useSearchHistory.js';
@@ -40,19 +40,44 @@ export function useBrowse() {
   const [error, setError] = useState('');
   // { kind: 'search' } | { kind: 'artist', data } | { kind: 'album', data } | { kind: 'downloads' }
   const [view, setView] = useState({ kind: 'search' });
-  const history = useSearchHistory();
+  const { history, add: addHistory, remove: removeFromHistory } = useSearchHistory();
+  const searchControllerRef = useRef(null);
+  const searchSequenceRef = useRef(0);
+
+  const cancelSearch = useCallback(() => {
+    try {
+      searchSequenceRef.current += 1;
+      searchControllerRef.current?.abort();
+      searchControllerRef.current = null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(
+    () => () => {
+      searchSequenceRef.current += 1;
+      searchControllerRef.current?.abort();
+    },
+    []
+  );
 
   const runSearch = useCallback(
     async (text, type) => {
       const trimmed = text.trim();
       if (!trimmed) return;
+      searchControllerRef.current?.abort();
+      const controller = new AbortController();
+      const sequence = ++searchSequenceRef.current;
+      searchControllerRef.current = controller;
       setQuery(trimmed);
       setLoading(true);
       setError('');
       setView({ kind: 'search' });
-      history.add(trimmed);
+      addHistory(trimmed);
       try {
-        const data = await api.search(trimmed, type);
+        const data = await api.search(trimmed, type, controller.signal);
+        if (sequence !== searchSequenceRef.current) return;
         setResults({ ...data, query: trimmed });
         const empty =
           data.type === 'all'
@@ -60,15 +85,19 @@ export function useBrowse() {
             : data.items.length === 0;
         if (empty) setError('No se encontraron resultados.');
       } catch (err) {
+        if (err.name === 'AbortError' || sequence !== searchSequenceRef.current) return;
         console.error('Error de búsqueda:', err);
         setError(
           err.message.includes('fetch') ? 'No se pudo conectar con el servidor. ¿Está el backend arrancado?' : err.message
         );
       } finally {
-        setLoading(false);
+        if (sequence === searchSequenceRef.current) {
+          searchControllerRef.current = null;
+        }
+        setLoading((current) => (sequence === searchSequenceRef.current ? false : current));
       }
     },
-    [history]
+    [addHistory]
   );
 
   const changeTab = (type) => {
@@ -78,6 +107,7 @@ export function useBrowse() {
   };
 
   const openDetail = useCallback(async (kind, load) => {
+    cancelSearch();
     setLoading(true);
     setError('');
     try {
@@ -89,17 +119,19 @@ export function useBrowse() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [cancelSearch]);
 
   const openArtist = useCallback((id) => id && openDetail('artist', () => loadArtist(id)), [openDetail]);
   const openAlbum = useCallback((id) => id && openDetail('album', () => api.album(id)), [openDetail]);
 
   const showDownloads = () => {
+    cancelSearch();
     setError('');
     setView({ kind: 'downloads' });
   };
 
   const goBack = () => {
+    cancelSearch();
     setError('');
     setView({ kind: 'search' });
   };
@@ -112,8 +144,8 @@ export function useBrowse() {
     loading,
     error,
     view,
-    history: history.history,
-    removeFromHistory: history.remove,
+    history,
+    removeFromHistory,
     runSearch,
     changeTab,
     openArtist,

@@ -6,6 +6,7 @@
 // los clientes. La única combinación que sirve el archivo completo es el
 // cliente YTMUSIC con `po_token` ligado al vídeo y `&pot=` en la URL.
 import { config } from '../config.mjs';
+import { createAsyncTtlCache } from '../utils/asyncCache.mjs';
 import { getYoutube } from './client.mjs';
 import { mintPoToken } from './potoken.mjs';
 
@@ -15,17 +16,19 @@ const STREAM_STRATEGIES = [
   { client: 'IOS', usePoToken: false },
 ];
 
-// Caché de URLs ya descifradas: { url, mimeType, contentLength, client, expiresAt }
-const streamCache = new Map();
+// Caché acotada de URLs descifradas; además comparte una resolución simultánea.
+const streamCache = createAsyncTtlCache({ ttlMs: config.streamCacheTtlMs, maxSize: config.streamCacheMax });
 
 export function invalidateStream(videoId) {
   streamCache.delete(videoId);
 }
 
 export async function resolveAudioStream(videoId) {
+  return streamCache.get(videoId, () => loadAudioStream(videoId));
+}
+
+async function loadAudioStream(videoId) {
   const youtube = getYoutube();
-  const cached = streamCache.get(videoId);
-  if (cached && cached.expiresAt > Date.now()) return cached;
 
   let lastError = null;
   for (const { client, usePoToken } of STREAM_STRATEGIES) {
@@ -47,9 +50,7 @@ export async function resolveAudioStream(videoId) {
         mimeType: format.mime_type || 'audio/mp4',
         contentLength: format.content_length || null,
         client,
-        expiresAt: Date.now() + config.streamCacheTtlMs,
       };
-      streamCache.set(videoId, entry);
       return entry;
     } catch (error) {
       lastError = error;

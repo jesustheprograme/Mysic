@@ -16,6 +16,7 @@ export function createSearchRouter({ warmArtistImages } = {}) {
       const type = SEARCH_TYPES.has(req.query.type) ? req.query.type : 'song';
       if (!text) return res.status(400).json({ error: 'Falta el parámetro de búsqueda "q"' });
       const results = await searchMusic(text, type);
+      res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=240');
       res.json(results);
 
       // Precalienta en segundo plano (baja prioridad) las fotos del artista principal,
@@ -32,6 +33,7 @@ export function createSearchRouter({ warmArtistImages } = {}) {
     asyncRoute(async (req, res) => {
       const q = String(req.query.q || '').trim();
       if (!q) return res.json({ texts: [], entities: [] });
+      res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=240');
       res.json(await getSuggestions(q));
     }, 'No se pudieron obtener sugerencias')
   );

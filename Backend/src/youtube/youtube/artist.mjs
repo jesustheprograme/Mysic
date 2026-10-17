@@ -1,10 +1,13 @@
 // Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera.
 // backend/src/youtube/artist.js
 // Página de artista de YouTube Music y sus imágenes en YouTube.
+import { config } from '../config.mjs';
+import { createAsyncTtlCache } from '../utils/asyncCache.mjs';
 import { getYoutube } from './client.mjs';
 import { mapAlbumItem, mapSong, pickThumbnail } from './mappers.mjs';
 
 const MAX_VIDEO_THUMBNAILS = 8;
+const artistCache = createAsyncTtlCache({ ttlMs: config.browseCacheTtlMs, maxSize: config.requestCacheMax });
 
 /**
  * Imágenes del artista disponibles en la página de YouTube Music (sin llamadas extra):
@@ -75,6 +78,10 @@ export async function getArtistNameAndMedia(id) {
 
 /** Página completa: cabecera, canciones destacadas y estanterías de álbumes/sencillos. */
 export async function getArtistPage(id) {
+  return artistCache.get(id, () => loadArtistPage(id));
+}
+
+async function loadArtistPage(id) {
   const artist = await getYoutube().music.getArtist(id);
   const header = artist.header;
   const name = header?.title?.text || 'Artista';

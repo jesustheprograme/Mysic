@@ -39,11 +39,11 @@ export function createArtistRouter({ getArtistImages }) {
       const timeout = new Promise((resolve) => setTimeout(() => resolve(null), IMAGES_WAIT_MS).unref());
       const full = await Promise.race([aggregated.catch(() => null), timeout]);
 
-      if (full?.images?.length) {
-        page.images = full.images;
-        page.imagesComplete = true;
-      }
-      res.json(page);
+      const responsePage = full?.images?.length
+        ? { ...page, images: full.images, imagesComplete: true }
+        : page;
+      res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=900');
+      res.json(responsePage);
     }, 'No se pudo cargar el artista')
   );
 

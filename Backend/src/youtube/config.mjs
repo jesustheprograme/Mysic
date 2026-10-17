@@ -16,12 +16,17 @@ export const config = {
   downloadsDir: path.join(dataDir, 'downloads'),
   imageCacheDir: path.join(dataDir, 'cache', 'images'),
   artistImagesCacheDir: path.join(dataDir, 'cache', 'artist-images'),
+  youtubeiCacheDir: path.join(dataDir, 'cache', 'youtubei'),
 
   // Reintento de conexión con YouTube cuando no hay internet
   youtubeRetryMs: 30 * 1000,
 
   // Cachés en memoria
   streamCacheTtlMs: 30 * 60 * 1000,
+  streamCacheMax: 500,
+  searchCacheTtlMs: 2 * 60 * 1000,
+  browseCacheTtlMs: 15 * 60 * 1000,
+  requestCacheMax: 300,
   suggestCacheTtlMs: 5 * 60 * 1000,
   suggestCacheMax: 500,
 };

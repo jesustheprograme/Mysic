@@ -2,7 +2,8 @@
 // backend/src/youtube/client.js
 // Instancia única de Innertube (youtubei.js). Se inicializa en segundo plano
 // después de abrir el puerto y se reintenta si no hay internet.
-import { Innertube, Platform } from 'youtubei.js';
+import { Innertube, Platform, UniversalCache } from 'youtubei.js';
+import { config } from '../config.mjs';
 import { warmUpPoToken } from './potoken.mjs';
 
 // youtubei.js necesita un evaluador JS para descifrar las URLs de los clientes web.
@@ -25,7 +26,10 @@ export function isYoutubeReady() {
 export async function initYoutube(retryMs) {
   try {
     console.log('🔄 Inicializando conexión con YouTube...');
-    youtube = await Innertube.create();
+    youtube = await Innertube.create({
+      cache: new UniversalCache(true, config.youtubeiCacheDir),
+      enable_session_cache: true,
+    });
     console.log('✅ Conexión con YouTubei.js completada con éxito.');
   } catch (error) {
     console.error(

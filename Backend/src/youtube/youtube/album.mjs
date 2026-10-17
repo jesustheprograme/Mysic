@@ -1,10 +1,18 @@
 // Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera.
 // backend/src/youtube/album.js
 // Página de álbum de YouTube Music: cabecera y pistas.
+import { config } from '../config.mjs';
+import { createAsyncTtlCache } from '../utils/asyncCache.mjs';
 import { getYoutube } from './client.mjs';
 import { mapSong, pickThumbnail } from './mappers.mjs';
 
+const albumCache = createAsyncTtlCache({ ttlMs: config.browseCacheTtlMs, maxSize: config.requestCacheMax });
+
 export async function getAlbumPage(id) {
+  return albumCache.get(id, () => loadAlbumPage(id));
+}
+
+async function loadAlbumPage(id) {
   const album = await getYoutube().music.getAlbum(id);
   const header = album.header;
   const title = header?.title?.text || 'Álbum';

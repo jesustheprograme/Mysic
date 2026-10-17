@@ -4,6 +4,7 @@
 // GET /api/stream/:id/info  metadatos del stream sin descargarlo
 import express from 'express';
 import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { asyncRoute, requireYoutube, validateParam, VIDEO_ID_RE } from '../utils/http.mjs';
 import { invalidateStream, resolveAudioStream } from '../youtube/stream.mjs';
 
@@ -27,36 +28,33 @@ export function createStreamRouter() {
 
   router.get('/:id', requireYoutube, validId, async (req, res) => {
     const { id } = req.params;
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    req.once('aborted', abort);
+    res.once('close', abort);
 
+    // googlevideo rechaza peticiones sin Range; pedimos siempre un rango.
     let stream;
+    let upstream;
     try {
-      stream = await resolveAudioStream(id);
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        stream = await resolveAudioStream(id);
+        upstream = await fetch(stream.url, {
+          headers: { Range: req.headers.range || 'bytes=0-' },
+          signal: controller.signal,
+        });
+        if (upstream.status !== 403 && upstream.status !== 410) break;
+        await upstream.body?.cancel();
+        invalidateStream(id);
+      }
     } catch (error) {
-      console.error(`[stream] error resolviendo ${id}:`, error.message);
+      if (controller.signal.aborted) return;
+      console.error(`[stream] fallo al preparar ${id}:`, error.message);
       return res.status(502).json({ error: 'No se pudo obtener el audio', details: error.message });
     }
 
-    const controller = new AbortController();
-    req.on('close', () => controller.abort());
-
-    // googlevideo rechaza peticiones sin Range; pedimos siempre un rango.
-    let upstream;
-    try {
-      upstream = await fetch(stream.url, {
-        headers: { Range: req.headers.range || 'bytes=0-' },
-        signal: controller.signal,
-      });
-    } catch (error) {
-      if (controller.signal.aborted) return;
-      console.error(`[stream] fallo al conectar con googlevideo para ${id}:`, error.message);
-      return res.status(502).json({ error: 'Fallo al conectar con el origen del audio' });
-    }
-
     if (upstream.status === 403 || upstream.status === 410) {
-      // La URL caducó o fue rechazada: se regenerará en la siguiente petición
-      invalidateStream(id);
-      await upstream.body?.cancel();
-      return res.status(502).json({ error: 'La URL del audio caducó, vuelve a intentarlo' });
+      return res.status(502).json({ error: 'El origen rechazó la URL regenerada del audio' });
     }
     if (!upstream.ok) {
       await upstream.body?.cancel();
@@ -77,12 +75,17 @@ export function createStreamRouter() {
     if (clientAskedRange && contentRange) res.setHeader('Content-Range', contentRange);
 
     if (!upstream.body) return res.end();
-    const nodeStream = Readable.fromWeb(upstream.body);
-    nodeStream.on('error', (error) => {
-      if (!controller.signal.aborted) console.error(`[stream] error en el flujo de ${id}:`, error.message);
-      res.destroy();
-    });
-    nodeStream.pipe(res);
+    try {
+      await pipeline(Readable.fromWeb(upstream.body), res, { signal: controller.signal });
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        console.error(`[stream] error en el flujo de ${id}:`, error.message);
+        res.destroy(error);
+      }
+    } finally {
+      req.off('aborted', abort);
+      res.off('close', abort);
+    }
   });
 
   return router;

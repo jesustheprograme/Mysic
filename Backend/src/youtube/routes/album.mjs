@@ -13,6 +13,7 @@ export function createAlbumRouter() {
     requireYoutube,
     validateParam('id', BROWSE_ID_RE, 'ID de álbum inválido'),
     asyncRoute(async (req, res) => {
+      res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=900');
       res.json(await getAlbumPage(req.params.id));
     }, 'No se pudo cargar el álbum')
   );
