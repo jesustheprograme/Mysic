@@ -899,7 +899,9 @@ function DiscoveryView({
               <YoutubeView
                 active={activeSection === 'youtube'}
                 onAddToPlaylist={setPlaylistPickerSong}
+                onPlayerCollapseToggle={() => setPlayerCollapsed((collapsed) => !collapsed)}
                 onPlayerVisibilityChange={setYoutubePlayerVisible}
+                playerCollapsed={playerCollapsed}
               />
             </Suspense>
           </div>

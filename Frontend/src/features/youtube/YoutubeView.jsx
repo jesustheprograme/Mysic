@@ -78,7 +78,7 @@ function adaptReleases(shelves) {
   })))
 }
 
-function YoutubeView({ active = true, onAddToPlaylist, onPlayerVisibilityChange }) {
+function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, onPlayerVisibilityChange, playerCollapsed = false }) {
   const browse = useBrowse()
   const downloads = useDownloads()
   const [likedSongIds, toggleSongFavorite] = useFavoriteIds('mysic:youtube:favorite-songs')
@@ -348,6 +348,7 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerVisibilityChange 
       <div ref={player.iframeHostRef} className="youtube-player-engine" aria-hidden="true" />
       {active && currentTrack && root && createPortal(
         <PlayerDock
+          collapsed={playerCollapsed}
           externalPlayback={{
             commitSeek: player.commitSeek,
             currentIndex: player.currentIndex,
@@ -365,6 +366,9 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerVisibilityChange 
           onNext={player.playNext}
           onPrevious={player.playPrev}
           onQueueSelect={(index) => player.playFrom(player.queue, index)}
+          onToggleCollapsed={onPlayerCollapseToggle}
+          liked={likedSongIds.has(player.currentSong.id)}
+          onToggleFavorite={(liked) => toggleSongFavorite(player.currentSong.id, liked)}
           queue={player.queue.map(adaptSong)}
           track={currentTrack}
         />,

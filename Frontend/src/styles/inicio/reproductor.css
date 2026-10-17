@@ -693,6 +693,13 @@
   pointer-events: auto;
 }
 
+.player-dock__controlled-wave > div {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+}
+
 .waveform-timeline__wave--empty {
   background: #252b29;
 }

@@ -2,7 +2,7 @@ import {
   ListMusic,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 import { takePrimedAudio } from '../features/auth/autoplayUnlock.js'
 import { listenToMiniPlayerCommands } from '../features/mini-player/playerBridge.ts'
@@ -23,7 +23,7 @@ import {
   setMediaSessionAction,
 } from './reproductor/utilidadesReproductor.js'
 
-function ControlledPlayerDock({ externalPlayback, onClose, onNext, onPrevious, onQueueSelect, queue, track }) {
+function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = false, onClose, onNext, onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, queue, track }) {
   const [volumeExpanded, setVolumeExpanded] = useState(false)
   const {
     commitSeek,
@@ -39,9 +39,44 @@ function ControlledPlayerDock({ externalPlayback, onClose, onNext, onPrevious, o
     volume,
   } = externalPlayback
   const progress = duration > 0 ? Math.min((currentTime / duration) * 100, 100) : 0
+  const waveformPeaks = useMemo(() => createWaveformPeaks(track.id), [track.id])
+  const playerStyle = {
+    '--mobile-player-progress': `${progress}%`,
+    ...(collapsed && track.artwork ? { '--compact-artwork': `url(${track.artwork})` } : {}),
+  }
 
   return (
-    <aside className="player-dock player-dock--animated" aria-label={`Reproductor de ${track.title}`}>
+    <aside
+      className={`player-dock player-dock--animated${collapsed ? ' player-dock--collapsed' : ''}`}
+      aria-label={`Reproductor de ${track.title}`}
+      style={playerStyle}
+    >
+      <button
+        className="player-dock__collapse"
+        type="button"
+        aria-expanded={!collapsed}
+        aria-label={collapsed ? 'Desplegar reproductor' : 'Contraer reproductor'}
+        title={collapsed ? 'Desplegar reproductor' : 'Contraer reproductor'}
+        onClick={onToggleCollapsed}
+      >
+        <PlayerPanelToggleIcon collapsed={collapsed} />
+      </button>
+      {collapsed && (
+        <div className="player-dock__compact">
+          <CompactNowPlaying
+            analyser={null}
+            currentTime={currentTime}
+            duration={duration}
+            hasAudio
+            isPlaying={isPlaying}
+            onExpand={onToggleCollapsed}
+            onNext={onNext}
+            onPrevious={onPrevious}
+            onTogglePlayback={togglePlayback}
+            track={track}
+          />
+        </div>
+      )}
       <div className="player-dock__scroller">
         <div className="player-dock__header">
           <strong>Reproduciendo ahora</strong>
@@ -65,23 +100,45 @@ function ControlledPlayerDock({ externalPlayback, onClose, onNext, onPrevious, o
           onPrevious={onPrevious}
           onTogglePlayback={togglePlayback}
           progress={(
-            <input
-              className="player-dock__timeline-range"
-              type="range"
-              min="0"
-              max={duration || 0}
-              step="0.1"
-              value={Math.min(currentTime, duration || 0)}
-              disabled={!duration}
-              aria-label="Progreso de reproducción"
-              onChange={handleSeek}
-              onMouseUp={commitSeek}
-              onTouchEnd={commitSeek}
-              onKeyUp={commitSeek}
-              style={{ '--player-progress': `${progress}%` }}
-            />
+            <div className="waveform-timeline__wave player-dock__controlled-wave">
+              <div aria-hidden="true">
+                {waveformPeaks.map((peak, index) => (
+                  <i
+                    className={(index / waveformPeaks.length) * 100 <= progress ? 'is-elapsed' : undefined}
+                    key={index}
+                    style={{ '--wave-height': `${Math.round(peak * 100)}%` }}
+                  />
+                ))}
+              </div>
+              <input
+                type="range"
+                min="0"
+                max={duration || 0}
+                step="0.1"
+                value={Math.min(currentTime, duration || 0)}
+                disabled={!duration}
+                aria-label="Progreso de reproducción"
+                onChange={handleSeek}
+                onMouseUp={commitSeek}
+                onTouchEnd={commitSeek}
+                onKeyUp={commitSeek}
+              />
+            </div>
           )}
           title={track.title}
+          trackAction={(
+            <div className="player-dock__favorite-wrap">
+              <HeartToggle
+                key={track.id}
+                className="heart-container--player"
+                portalCelebration
+                label={`Me gusta ${track.title}`}
+                liked={liked}
+                onToggle={onToggleFavorite}
+                removeLabel={`Quitar ${track.title} de favoritas`}
+              />
+            </div>
+          )}
         />
 
         <div className="player-dock__actions">
