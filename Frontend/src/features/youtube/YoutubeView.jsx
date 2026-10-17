@@ -179,9 +179,11 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerVisibilityChange 
     )
   }
 
-  function renderSearchView() {
+  function renderCatalogNavigation() {
+    const showingDownloads = view.kind === 'downloads'
+
     return (
-      <div className="home-page">
+      <>
         <div className="collection-heading">
           <div>
             <span>CATÁLOGO GLOBAL</span>
@@ -197,16 +199,21 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerVisibilityChange 
           <nav className="catalog-search__filters" aria-label="Tipo de contenido">
             {SEARCH_TABS.map((tab) => (
               <button
-                className={tab.type === searchType ? 'catalog-search__filter catalog-search__filter--active' : 'catalog-search__filter'}
+                className={!showingDownloads && tab.type === searchType ? 'catalog-search__filter catalog-search__filter--active' : 'catalog-search__filter'}
                 type="button"
-                aria-pressed={tab.type === searchType}
+                aria-pressed={!showingDownloads && tab.type === searchType}
                 key={tab.type}
                 onClick={() => browse.changeTab(tab.type)}
               >
                 {tab.label}
               </button>
             ))}
-            <button className="catalog-search__filter" type="button" onClick={browse.showDownloads}>
+            <button
+              className={showingDownloads ? 'catalog-search__filter catalog-search__filter--active' : 'catalog-search__filter'}
+              type="button"
+              aria-pressed={showingDownloads}
+              onClick={browse.showDownloads}
+            >
               Descargas{downloads.downloads.items.length ? ` (${downloads.downloads.items.length})` : ''}
             </button>
           </nav>
@@ -225,6 +232,14 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerVisibilityChange 
             />
           </form>
         </section>
+      </>
+    )
+  }
+
+  function renderSearchView() {
+    return (
+      <div className="home-page">
+        {renderCatalogNavigation()}
 
         {!downloads.online && (
           <div className="collection-empty" role="status">
@@ -233,6 +248,21 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerVisibilityChange 
         )}
         {error && <div className="collection-empty" role="alert">{error}</div>}
         {loading ? <div className="collection-empty" role="status">Cargando contenido…</div> : renderSearchResults()}
+      </div>
+    )
+  }
+
+  function renderDownloadsView() {
+    return (
+      <div className="home-page">
+        {renderCatalogNavigation()}
+        {!downloads.online && (
+          <div className="collection-empty" role="status">
+            <WifiOff aria-hidden="true" /> Sin conexión. Solo están disponibles las descargas.
+          </div>
+        )}
+        {error && <div className="collection-empty" role="alert">{error}</div>}
+        {renderSongResults(downloads.downloads.items, 'Descargas')}
       </div>
     )
   }
@@ -310,7 +340,7 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerVisibilityChange 
           {view.kind === 'search' && renderSearchView()}
           {view.kind === 'artist' && renderArtistView()}
           {view.kind === 'album' && renderAlbumView()}
-          {view.kind === 'downloads' && renderSongResults(downloads.downloads.items, 'Descargas')}
+          {view.kind === 'downloads' && renderDownloadsView()}
         </div>
       </main>
 
