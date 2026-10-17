@@ -1,7 +1,8 @@
 import { Download, LoaderCircle, Trash2, WifiOff } from 'lucide-react'
-import { useEffect, useEffectEvent, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useState } from 'react'
 import { createPortal } from 'react-dom'
 import PlayerDock from '../../components/PlayerDock.jsx'
+import VisibleContent from '../../components/VisibleContent.jsx'
 import ArtistView from '../collections/ArtistView.jsx'
 import CollectionDetailView from '../collections/CollectionDetailView.jsx'
 import FavoriteSearch from '../discovery/FavoriteSearch.jsx'
@@ -79,7 +80,10 @@ function adaptReleases(shelves) {
 }
 
 function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, onPlayerVisibilityChange, playerCollapsed = false }) {
-  const browse = useBrowse()
+  const browse = useBrowse({ progressive: true })
+  const { loadSection } = browse
+  const loadArtists = useCallback(() => loadSection('artist'), [loadSection])
+  const loadAlbums = useCallback(() => loadSection('album'), [loadSection])
   const downloads = useDownloads()
   const [likedSongIds, toggleSongFavorite] = useFavoriteIds('mysic:youtube:favorite-songs')
   const [likedArtistIds, toggleArtistFavorite] = useFavoriteIds('mysic:youtube:favorite-artists')
@@ -169,11 +173,17 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
     return (
       <>
         {songs.length > 0 && renderSongResults(songs)}
-        {artists.length > 0 && (
-          <HomeRail items={artists.map(adaptArtist)} onSelect={browse.openArtist} title="Artistas" variant="artist" />
+        {(results.type === 'all' || artists.length > 0) && (
+          <VisibleContent key={`artists-${results.query}`} title="Artistas" onVisible={results.type === 'all' ? loadArtists : undefined}>
+            <HomeRail deferArtwork items={artists.map(adaptArtist)} onSelect={browse.openArtist} title="Artistas" variant="artist"
+              emptyMessage={results.pending?.includes('artist') ? 'Cargando artistas…' : 'No se encontraron artistas.'} />
+          </VisibleContent>
         )}
-        {albums.length > 0 && (
-          <HomeRail items={albums.map(adaptAlbum)} onSelect={browse.openAlbum} title="Álbumes" />
+        {(results.type === 'all' || albums.length > 0) && (
+          <VisibleContent key={`albums-${results.query}`} title="Álbumes" onVisible={results.type === 'all' ? loadAlbums : undefined}>
+            <HomeRail deferArtwork items={albums.map(adaptAlbum)} onSelect={browse.openAlbum} title="Álbumes"
+              emptyMessage={results.pending?.includes('album') ? 'Cargando álbumes…' : 'No se encontraron álbumes.'} />
+          </VisibleContent>
         )}
       </>
     )
@@ -247,7 +257,7 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
           </div>
         )}
         {error && <div className="collection-empty" role="alert">{error}</div>}
-        {loading ? <div className="collection-empty" role="status">Cargando contenido…</div> : renderSearchResults()}
+        {loading && !results ? <div className="collection-empty" role="status">Cargando canciones…</div> : renderSearchResults()}
       </div>
     )
   }
