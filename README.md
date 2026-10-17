@@ -49,6 +49,8 @@ El código de `Backend/src/youtube/` y `Frontend/src/features/youtube/` se gener
 
 El servidor necesita salida a Internet hacia YouTube, Discogs, MusicBrainz y Deezer. La API abre aunque YouTube no esté disponible y reintenta la conexión en segundo plano; las canciones descargadas siguen funcionando sin conexión.
 
+La búsqueda global prioriza el primer contenido visible y completa las secciones secundarias progresivamente. Las consultas recientes se conservan en `Backend/data/youtube/cache/search/`, por lo que una búsqueda aprendida puede responder inmediatamente incluso después de reiniciar el backend; los datos anteriores se actualizan en segundo plano.
+
 ## Configuración resumida
 
 1. Copia `Backend/.env.example` como `Backend/.env`. El ejemplo apunta deliberadamente a `mysic_bd_local` y `Mysic_local`.

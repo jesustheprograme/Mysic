@@ -4,7 +4,7 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "node --test scripts/import-music.test.js src/auth.test.js src/catalog.test.js src/object-storage.test.js src/playlists.test.js src/music-import-access.test.js src/youtube/utils/asyncCache.test.mjs",
+    "test": "node --test scripts/import-music.test.js src/auth.test.js src/catalog.test.js src/object-storage.test.js src/playlists.test.js src/music-import-access.test.js src/youtube/utils/asyncCache.test.mjs src/youtube/utils/persistentSearchCache.test.mjs",
     "check": "npm test && npx prisma validate",
     "start": "node server.js",
     "dev": "nodemon server.js",

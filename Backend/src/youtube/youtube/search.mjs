@@ -2,7 +2,7 @@
 // backend/src/youtube/search.js
 // Búsqueda en YouTube Music y sugerencias de autocompletado.
 import { config } from '../config.mjs';
-import { createAsyncTtlCache } from '../utils/asyncCache.mjs';
+import { createPersistentSearchCache } from '../utils/persistentSearchCache.mjs';
 import { getYoutube } from './client.mjs';
 import { mapAlbumItem, mapArtistItem, mapSong, mapTopResult, pickThumbnail } from './mappers.mjs';
 
@@ -11,11 +11,16 @@ export const SEARCH_TYPES = new Set(['all', 'song', 'artist', 'album']);
 const mapSongs = (r) => (r.songs?.contents || []).filter((s) => s.id).map((s) => mapSong(s));
 const mapArtists = (r) => (r.artists?.contents || []).filter((a) => a.id).map(mapArtistItem);
 const mapAlbums = (r) => (r.albums?.contents || []).filter((a) => a.id).map(mapAlbumItem);
-const searchCache = createAsyncTtlCache({ ttlMs: config.searchCacheTtlMs, maxSize: config.requestCacheMax });
+const searchCache = createPersistentSearchCache({
+  dir: config.searchCacheDir,
+  freshTtlMs: config.searchCacheTtlMs,
+  staleTtlMs: config.searchCacheStaleMs,
+  maxSize: config.searchCacheMax,
+});
 
 /**
- * `type === 'all'` devuelve { type, top, songs, artists, albums } lanzando las
- * cuatro búsquedas en paralelo; cualquier otro tipo devuelve { type, items }.
+ * `type === 'all'` devuelve cuanto antes las secciones incluidas en la búsqueda
+ * general. El frontend completa cada sección por tipo sin bloquear el primer render.
  */
 export async function searchMusic(text, type) {
   const key = `${type}:${text.trim().toLocaleLowerCase('es')}`;
@@ -26,19 +31,14 @@ async function loadSearchMusic(text, type) {
   const youtube = getYoutube();
 
   if (type === 'all') {
-    const [general, songsRes, artistsRes, albumsRes] = await Promise.all([
-      youtube.music.search(text).catch(() => null),
-      youtube.music.search(text, { type: 'song' }),
-      youtube.music.search(text, { type: 'artist' }),
-      youtube.music.search(text, { type: 'album' }),
-    ]);
+    const general = await youtube.music.search(text);
     const card = general?.contents?.find((c) => c.type === 'MusicCardShelf');
     return {
       type: 'all',
       top: mapTopResult(card),
-      songs: mapSongs(songsRes),
-      artists: mapArtists(artistsRes),
-      albums: mapAlbums(albumsRes),
+      songs: mapSongs(general),
+      artists: mapArtists(general),
+      albums: mapAlbums(general),
     };
   }
 
