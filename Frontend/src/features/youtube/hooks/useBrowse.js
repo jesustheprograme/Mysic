@@ -2,6 +2,7 @@
 // Búsqueda y navegación entre vistas: resultados, artista, álbum y descargas.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
+import { readIndexedSearch, writeIndexedSearch } from '../lib/searchIndex.js';
 import { scrollAppToTop } from '../lib/scroll.js';
 import { useSearchHistory } from './useSearchHistory.js';
 
@@ -10,6 +11,16 @@ const SEARCH_SECTIONS = [
   ['artist', 'artists'],
   ['album', 'albums'],
 ];
+
+function scheduleWhenIdle(callback) {
+  if (typeof globalThis.requestIdleCallback === 'function') {
+    const id = globalThis.requestIdleCallback(callback, { timeout: 1_200 });
+    return () => globalThis.cancelIdleCallback(id);
+  }
+
+  const id = globalThis.setTimeout(callback, 500);
+  return () => globalThis.clearTimeout(id);
+}
 
 async function loadArtist(id) {
   const artist = await api.artist(id);
@@ -38,8 +49,9 @@ export const SEARCH_TABS = [
 ];
 
 function hasResults(results) {
-  if (results.type !== 'all') return results.items.length > 0;
-  return Boolean(results.top || results.songs.length || results.artists.length || results.albums.length);
+  if (!results) return false;
+  if (results.type !== 'all') return Boolean(results.items?.length);
+  return Boolean(results.top || results.songs?.length || results.artists?.length || results.albums?.length);
 }
 
 export function useBrowse() {
@@ -52,12 +64,15 @@ export function useBrowse() {
   const [view, setView] = useState({ kind: 'search' });
   const { history, add: addHistory, remove: removeFromHistory } = useSearchHistory();
   const searchControllerRef = useRef(null);
+  const enrichmentCancelRef = useRef(null);
   const searchSequenceRef = useRef(0);
 
   const cancelSearch = useCallback(() => {
     searchSequenceRef.current += 1;
     searchControllerRef.current?.abort();
     searchControllerRef.current = null;
+    enrichmentCancelRef.current?.();
+    enrichmentCancelRef.current = null;
     setLoading(false);
     setEnriching(false);
   }, []);
@@ -65,6 +80,7 @@ export function useBrowse() {
   useEffect(() => () => {
     searchSequenceRef.current += 1;
     searchControllerRef.current?.abort();
+    enrichmentCancelRef.current?.();
   }, []);
 
   const runSearch = useCallback(async (text, type) => {
@@ -72,6 +88,8 @@ export function useBrowse() {
     if (!trimmed) return;
 
     searchControllerRef.current?.abort();
+    enrichmentCancelRef.current?.();
+    enrichmentCancelRef.current = null;
     const controller = new AbortController();
     const sequence = ++searchSequenceRef.current;
     searchControllerRef.current = controller;
@@ -82,53 +100,81 @@ export function useBrowse() {
     setView({ kind: 'search' });
     addHistory(trimmed);
 
+    let indexedResultsShown = false;
+    let deferredEnrichment = false;
+
     try {
+      const networkRequest = api.search(trimmed, type, controller.signal);
+      const indexed = await readIndexedSearch(trimmed, type);
+
+      if (sequence !== searchSequenceRef.current) return;
+      if (hasResults(indexed)) {
+        indexedResultsShown = true;
+        setResults({ ...indexed, query: trimmed });
+        setLoading(false);
+        setEnriching(true);
+      }
+
+      const primary = await networkRequest;
+      if (sequence !== searchSequenceRef.current) return;
+      void writeIndexedSearch(trimmed, type, primary);
+
       if (type !== 'all') {
-        const data = await api.search(trimmed, type, controller.signal);
-        if (sequence !== searchSequenceRef.current) return;
-        setResults({ ...data, query: trimmed });
-        if (!hasResults(data)) setError('No se encontraron resultados.');
+        setResults({ ...primary, query: trimmed });
+        if (!hasResults(primary)) setError('No se encontraron resultados.');
         return;
       }
 
-      // Las consultas secundarias empiezan ya, pero no bloquean el primer resultado visual.
-      const sectionsPromise = Promise.allSettled(SEARCH_SECTIONS.map(async ([sectionType, key]) => {
-        const section = await api.search(trimmed, sectionType, controller.signal);
-        if (sequence === searchSequenceRef.current) {
-          setResults((current) => current?.query === trimmed
-            ? { ...current, [key]: section.items }
-            : current);
-        }
-        return { key, items: section.items };
-      }));
-      const primary = await api.search(trimmed, 'all', controller.signal);
-      if (sequence !== searchSequenceRef.current) return;
+      setResults({ ...primary, query: trimmed });
+      const missingSections = SEARCH_SECTIONS.filter(([, key]) => !primary[key]?.length);
 
-      let complete = { ...primary, query: trimmed };
-      setResults(complete);
-      setLoading(false);
+      if (!missingSections.length) {
+        if (!hasResults(primary)) setError('No se encontraron resultados.');
+        return;
+      }
 
-      const settled = await sectionsPromise;
-      if (sequence !== searchSequenceRef.current) return;
+      deferredEnrichment = true;
+      setEnriching(true);
+      enrichmentCancelRef.current = scheduleWhenIdle(async () => {
+        try {
+          const settled = await Promise.allSettled(missingSections.map(async ([sectionType, key]) => {
+            const section = await api.search(trimmed, sectionType, controller.signal);
+            return { sectionType, key, data: section };
+          }));
+          if (sequence !== searchSequenceRef.current) return;
 
-      settled.forEach((result) => {
-        if (result.status === 'fulfilled') {
-          complete = { ...complete, [result.value.key]: result.value.items };
+          let complete = { ...primary };
+          settled.forEach((result) => {
+            if (result.status !== 'fulfilled' || !result.value.data?.items?.length) return;
+            complete = { ...complete, [result.value.key]: result.value.data.items };
+            void writeIndexedSearch(trimmed, result.value.sectionType, result.value.data);
+          });
+          setResults({ ...complete, query: trimmed });
+          void writeIndexedSearch(trimmed, 'all', complete);
+          if (!hasResults(complete)) setError('No se encontraron resultados.');
+        } finally {
+          if (sequence === searchSequenceRef.current) {
+            searchControllerRef.current = null;
+            enrichmentCancelRef.current = null;
+            setEnriching(false);
+          }
         }
       });
-      setResults(complete);
-      if (!hasResults(complete)) setError('No se encontraron resultados.');
     } catch (err) {
       if (err.name === 'AbortError' || sequence !== searchSequenceRef.current) return;
       console.error('Error de búsqueda:', err);
-      setError(
-        err.message.includes('fetch') ? 'No se pudo conectar con el servidor. ¿Está el backend arrancado?' : err.message
-      );
+      if (!indexedResultsShown) {
+        setError(
+          err.message.includes('fetch') ? 'No se pudo conectar con el servidor. ¿Está el backend arrancado?' : err.message
+        );
+      }
     } finally {
       if (sequence === searchSequenceRef.current) {
-        searchControllerRef.current = null;
         setLoading(false);
-        setEnriching(false);
+        if (!deferredEnrichment) {
+          searchControllerRef.current = null;
+          setEnriching(false);
+        }
       }
     }
   }, [addHistory]);
