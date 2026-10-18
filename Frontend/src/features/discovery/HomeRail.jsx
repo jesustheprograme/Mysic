@@ -1,29 +1,8 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useRef } from 'react'
 import PreviewIndicator from '../../components/PreviewIndicator.jsx'
 
-function RailArtwork({ src }) {
-  const ref = useRef(null)
-  const [visible, setVisible] = useState(false)
-  useEffect(() => {
-    if (!globalThis.IntersectionObserver) {
-      setVisible(true)
-      return undefined
-    }
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        setVisible(true)
-        observer.disconnect()
-      }
-    }, { rootMargin: '120px' })
-    observer.observe(ref.current)
-    return () => observer.disconnect()
-  }, [])
-  return <img ref={ref} src={visible ? src : undefined} alt="" decoding="async" />
-}
-
 function HomeRail({
-  deferArtwork = false,
   emptyMessage = 'Todavía no hay elementos.',
   headingAction,
   items,
@@ -88,9 +67,7 @@ function HomeRail({
                 onPointerLeave={onPreviewStop}
               >
                 <span className={`home-shelf-card__visual${item.artwork ? '' : ' home-shelf-card__visual--empty'}`}>
-                  {item.artwork && (deferArtwork
-                    ? <RailArtwork src={item.artwork} />
-                    : <img src={item.artwork} alt="" loading={index < 3 ? 'eager' : 'lazy'} />)}
+                  {item.artwork && <img src={item.artwork} alt="" loading={index < 3 ? 'eager' : 'lazy'} decoding="async" />}
                   {item.badge && <span className="home-shelf-card__badge">{item.badge}</span>}
                   {item.artwork && (
                     <span className="home-shelf-card__play" aria-hidden="true">

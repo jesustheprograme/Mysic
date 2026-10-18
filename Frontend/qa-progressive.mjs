@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
+import { readFile } from 'node:fs/promises'
 import { createServer } from 'vite'
 const backendRequire = createRequire(new URL('../Backend/package.json', import.meta.url))
 const { JSDOM } = backendRequire('jsdom')
@@ -71,6 +72,13 @@ try {
   assert.equal(document.querySelectorAll('img').length, 1)
   await React.act(async () => sectionRoot.unmount())
   assert.ok(observers.every(observer => observer.disconnected), 'observers cleaned on unmount')
+  const youtubeViewSource = await readFile(new URL('./src/features/youtube/YoutubeView.jsx', import.meta.url), 'utf8')
+  const homeRailSource = await readFile(new URL('./src/features/discovery/HomeRail.jsx', import.meta.url), 'utf8')
+  assert.doesNotMatch(youtubeViewSource, /VisibleContent|deferArtwork/, 'global results must not wait for viewport observers')
+  assert.match(youtubeViewSource, /void loadSection\('artist'\)/, 'artist enrichment starts after song results')
+  assert.match(youtubeViewSource, /void loadSection\('album'\)/, 'album enrichment starts after song results')
+  assert.doesNotMatch(homeRailSource, /IntersectionObserver/, 'artwork uses native image loading without per-card observers')
   console.log('PASS: songs first, sections on demand, deduplication, stale cancellation, direct filters')
   console.log('PASS: offscreen sections defer requests and artwork; visibility loads once; cleanup')
+  console.log('PASS: Mysic global enriches results without waiting for scroll or per-card observers')
 } finally { await server.close(); dom.window.close() }
