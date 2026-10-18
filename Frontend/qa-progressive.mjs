@@ -64,6 +64,7 @@ try {
   await React.act(async () => sectionRoot.render(React.createElement(VisibleContent,
     { title: 'Álbumes', onVisible: async () => { loads++ } }, React.createElement('img', { src: '/cover.jpg', alt: '' }))))
   assert.equal(loads, 0, 'offscreen section does not request data')
+  assert.equal(document.getElementById('root').firstElementChild.style.minWidth, '0', 'deferred wrapper must not expand the parent grid to carousel width')
   assert.equal(document.querySelectorAll('img').length, 0, 'offscreen section does not mount artwork')
   await React.act(async () => observers[0].callback([{ isIntersecting: true }]))
   assert.equal(loads, 1)

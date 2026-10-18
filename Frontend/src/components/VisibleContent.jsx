@@ -30,7 +30,7 @@ export default function VisibleContent({ children, onVisible, title, minHeight =
   }, [visible, onVisible])
 
   return (
-    <div ref={ref} style={{ minHeight: visible ? undefined : minHeight }}>
+    <div ref={ref} style={{ minWidth: 0, minHeight: visible ? undefined : minHeight }}>
       {visible ? children : <h2>{title}</h2>}
       {error && <button type="button" onClick={() => {
         setError(false)
