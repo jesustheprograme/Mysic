@@ -1,42 +1,14 @@
 // Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { localAudioUrl } from '../lib/api.js';
+import { localAudioUrl, streamUrl } from '../lib/api.js';
 import { readStorage, writeStorage } from '../lib/storage.js';
 
 export const PLAY_EVENT = 'yotubei:play';
 export const PAUSE_EVENT = 'yotubei:pause';
 
-let iframeApiPromise;
-
-function loadIframeApi() {
-  if (window.YT?.Player) return Promise.resolve(window.YT);
-  if (iframeApiPromise) return iframeApiPromise;
-  iframeApiPromise = new Promise((resolve, reject) => {
-    const previous = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      previous?.();
-      resolve(window.YT);
-    };
-    if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
-      const script = document.createElement('script');
-      script.src = 'https://www.youtube.com/iframe_api';
-      script.async = true;
-      script.onerror = () => reject(new Error('No se pudo cargar el reproductor de YouTube.'));
-      document.head.appendChild(script);
-    }
-  });
-  return iframeApiPromise;
-}
-
 export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChange }) {
   const audioRef = useRef(null);
-  const iframeHostRef = useRef(null);
-  const youtubeRef = useRef(null);
-  const youtubeCreatingRef = useRef(false);
-  const youtubeCreatedRef = useRef(null);
-  const youtubeReadyRef = useRef(false);
-  const pendingVideoIdRef = useRef(null);
-  const nextRef = useRef(() => {});
+  const loadTimeoutRef = useRef(null);
   const [queue, setQueue] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -49,7 +21,12 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
   const currentSong = currentIndex >= 0 ? queue[currentIndex] : null;
   const videoId = currentSong?.id;
   const isLocal = Boolean(currentSong && (currentSong.local || isDownloaded(currentSong.id)));
-  const volumeRef = useRef(volume);
+
+  const clearLoadTimeout = useCallback(() => {
+    if (loadTimeoutRef.current === null) return;
+    window.clearTimeout(loadTimeoutRef.current);
+    loadTimeoutRef.current = null;
+  }, []);
 
   const playFrom = useCallback((list, index) => {
     if (!list || index < 0 || index >= list.length) return;
@@ -76,43 +53,29 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
     if (currentIndex < queue.length - 1) playFrom(queue, currentIndex + 1);
     else setIsPlaying(false);
   }, [currentIndex, queue, playFrom]);
-  useEffect(() => {
-    nextRef.current = playNext;
-  }, [playNext]);
 
   const togglePlay = useCallback(() => {
-    if (!currentSong) return;
-    if (isLocal) {
-      const audio = audioRef.current;
-      if (!audio) return;
-      if (audio.paused) audio.play().catch(() => setPlayerError('No se pudo iniciar la reproducción.'));
-      else audio.pause();
-      return;
-    }
-    const player = youtubeRef.current;
-    if (!player?.playVideo || !player?.pauseVideo) {
-      pendingVideoIdRef.current = currentSong.id;
-      setIsBuffering(true);
-      return;
-    }
-    if (player.getPlayerState?.() === window.YT?.PlayerState?.PLAYING) player.pauseVideo();
-    else player.playVideo();
-  }, [currentSong, isLocal]);
+    const audio = audioRef.current;
+    if (!audio || !currentSong) return;
+    if (audio.paused) audio.play().catch(() => setPlayerError('No se pudo iniciar la reproducción.'));
+    else audio.pause();
+  }, [currentSong]);
 
   const playPrev = useCallback(() => {
-    const position = isLocal ? audioRef.current?.currentTime : youtubeRef.current?.getCurrentTime?.();
-    if ((position || 0) > 3) {
-      if (isLocal && audioRef.current) audioRef.current.currentTime = 0;
-      else youtubeRef.current?.seekTo?.(0, true);
+    const audio = audioRef.current;
+    if ((audio?.currentTime || 0) > 3) {
+      audio.currentTime = 0;
       return;
     }
     if (currentIndex > 0) playFrom(queue, currentIndex - 1);
-  }, [currentIndex, queue, playFrom, isLocal]);
+  }, [currentIndex, queue, playFrom]);
 
   const closePlayer = useCallback(() => {
-    audioRef.current?.pause();
-    youtubeRef.current?.pauseVideo?.();
-    pendingVideoIdRef.current = null;
+    clearLoadTimeout();
+    const audio = audioRef.current;
+    audio?.pause();
+    audio?.removeAttribute('src');
+    audio?.load();
     setQueue([]);
     setCurrentIndex(-1);
     setCurrentTime(0);
@@ -121,106 +84,34 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
     setIsBuffering(false);
     setPlayerError('');
     onPlayerVisibilityChange?.(false);
-  }, [onPlayerVisibilityChange]);
-
-  useEffect(() => {
-    if (!videoId || isLocal) return undefined;
-    let cancelled = false;
-    loadIframeApi().then((YT) => {
-      if (cancelled || !iframeHostRef.current) return;
-      pendingVideoIdRef.current = videoId;
-      if (youtubeRef.current?.loadVideoById && youtubeReadyRef.current) {
-        youtubeRef.current.loadVideoById(videoId);
-      } else if (!youtubeCreatingRef.current) {
-        youtubeCreatingRef.current = true;
-        const iframeMount = document.createElement('div');
-        iframeHostRef.current.replaceChildren(iframeMount);
-        youtubeCreatedRef.current = new YT.Player(iframeMount, {
-          width: 320,
-          height: 200,
-          videoId,
-          host: 'https://www.youtube-nocookie.com',
-          playerVars: {
-            autoplay: 1,
-            controls: 0,
-            playsinline: 1,
-            rel: 0,
-            origin: window.location.origin,
-          },
-          events: {
-            onReady: (event) => {
-              youtubeRef.current = event.target;
-              youtubeReadyRef.current = true;
-              youtubeCreatingRef.current = false;
-              event.target.setVolume(Math.round(volumeRef.current * 100));
-              const requestedVideoId = pendingVideoIdRef.current;
-              pendingVideoIdRef.current = null;
-              if (requestedVideoId && requestedVideoId !== videoId) event.target.loadVideoById?.(requestedVideoId);
-              else event.target.playVideo?.();
-            },
-            onStateChange: (event) => {
-              if (event.data === YT.PlayerState.PLAYING) {
-                setIsPlaying(true);
-                setIsBuffering(false);
-                window.dispatchEvent(new CustomEvent(PLAY_EVENT));
-              } else if (event.data === YT.PlayerState.BUFFERING) setIsBuffering(true);
-              else if (event.data === YT.PlayerState.ENDED) nextRef.current();
-              else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.CUED) {
-                setIsPlaying(false);
-                setIsBuffering(false);
-              }
-            },
-            onError: () => {
-              youtubeCreatingRef.current = false;
-              setIsPlaying(false);
-              setIsBuffering(false);
-              setPlayerError('YouTube no permite reproducir esta canción incrustada.');
-            },
-          },
-        });
-      }
-    }).catch((error) => {
-      setIsBuffering(false);
-      setPlayerError(error.message);
-    });
-    return () => { cancelled = true; };
-  }, [videoId, isLocal]);
-
-  useEffect(() => () => {
-    youtubeCreatedRef.current?.destroy?.();
-    iframeHostRef.current?.replaceChildren();
-    youtubeCreatedRef.current = null;
-    youtubeRef.current = null;
-    youtubeReadyRef.current = false;
-    youtubeCreatingRef.current = false;
-  }, []);
+  }, [clearLoadTimeout, onPlayerVisibilityChange]);
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (!videoId || !isLocal || !audio) return;
-    youtubeRef.current?.pauseVideo?.();
-    audio.src = localAudioUrl(videoId);
+    if (!videoId || !audio) return;
+    audio.src = isLocal ? localAudioUrl(videoId) : streamUrl(videoId);
     audio.load();
-    audio.play().catch(() => setPlayerError('No se pudo reproducir el archivo descargado.'));
-  }, [videoId, isLocal]);
+    clearLoadTimeout();
+    loadTimeoutRef.current = window.setTimeout(() => {
+      loadTimeoutRef.current = null;
+      audio.pause();
+      setIsBuffering(false);
+      setIsPlaying(false);
+      setPlayerError('La canción tardó demasiado en cargar. Inténtalo de nuevo.');
+    }, 20000);
+    audio.play().catch((error) => {
+      if (error.name === 'AbortError') return;
+      clearLoadTimeout();
+      setIsBuffering(false);
+      setPlayerError('No se pudo reproducir esta canción.');
+    });
+    return clearLoadTimeout;
+  }, [clearLoadTimeout, videoId, isLocal]);
 
   useEffect(() => {
-    volumeRef.current = volume;
     if (audioRef.current) audioRef.current.volume = volume;
-    youtubeRef.current?.setVolume?.(Math.round(volume * 100));
     writeStorage('volume', volume);
   }, [volume]);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (!youtubeRef.current || isLocal || seeking) return;
-      const nextTime = youtubeRef.current.getCurrentTime?.();
-      const nextDuration = youtubeRef.current.getDuration?.();
-      if (Number.isFinite(nextTime)) setCurrentTime(nextTime);
-      if (Number.isFinite(nextDuration) && nextDuration > 0) setDuration(nextDuration);
-    }, 500);
-    return () => clearInterval(timer);
-  }, [isLocal, seeking]);
 
   useEffect(() => {
     if (!('mediaSession' in navigator) || !currentSong) return;
@@ -230,16 +121,15 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
       album: currentSong.album,
       artwork: currentSong.thumbnail ? [{ src: currentSong.thumbnail }] : [],
     });
-    navigator.mediaSession.setActionHandler('play', () => isLocal ? audioRef.current?.play() : youtubeRef.current?.playVideo?.());
-    navigator.mediaSession.setActionHandler('pause', () => isLocal ? audioRef.current?.pause() : youtubeRef.current?.pauseVideo?.());
+    navigator.mediaSession.setActionHandler('play', () => audioRef.current?.play());
+    navigator.mediaSession.setActionHandler('pause', () => audioRef.current?.pause());
     navigator.mediaSession.setActionHandler('previoustrack', playPrev);
     navigator.mediaSession.setActionHandler('nexttrack', playNext);
-  }, [currentSong, isLocal, playPrev, playNext]);
+  }, [currentSong, playPrev, playNext]);
 
   useEffect(() => {
     const pause = () => {
       audioRef.current?.pause();
-      youtubeRef.current?.pauseVideo?.();
     };
     window.addEventListener(PAUSE_EVENT, pause);
     return () => window.removeEventListener(PAUSE_EVENT, pause);
@@ -254,36 +144,35 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
         togglePlay();
       } else if (event.code === 'ArrowRight' || event.code === 'ArrowLeft') {
         const value = Math.max(0, currentTime + (event.code === 'ArrowRight' ? 5 : -5));
-        if (isLocal && audioRef.current) audioRef.current.currentTime = value;
-        else youtubeRef.current?.seekTo?.(value, true);
+        if (audioRef.current) audioRef.current.currentTime = value;
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [enabled, togglePlay, currentTime, isLocal]);
+  }, [enabled, togglePlay, currentTime]);
 
   const handleSeek = (event) => { setCurrentTime(Number(event.target.value)); setSeeking(true); };
   const commitSeek = (event) => {
     const value = Number(event.target.value);
-    if (isLocal && audioRef.current) audioRef.current.currentTime = value;
-    else youtubeRef.current?.seekTo?.(value, true);
+    if (audioRef.current) audioRef.current.currentTime = value;
     setSeeking(false);
   };
   const audioProps = {
     ref: audioRef,
     preload: 'auto',
-    onPlay: () => { setIsPlaying(true); setIsBuffering(false); window.dispatchEvent(new CustomEvent(PLAY_EVENT)); },
+    onPlay: () => { clearLoadTimeout(); setIsPlaying(true); setIsBuffering(false); window.dispatchEvent(new CustomEvent(PLAY_EVENT)); },
     onPause: () => setIsPlaying(false),
     onWaiting: () => setIsBuffering(true),
-    onPlaying: () => setIsBuffering(false),
+    onPlaying: () => { clearLoadTimeout(); setIsBuffering(false); },
+    onCanPlay: () => { clearLoadTimeout(); setIsBuffering(false); },
     onLoadedMetadata: (event) => setDuration(event.currentTarget.duration),
     onTimeUpdate: (event) => { if (!seeking) setCurrentTime(event.currentTarget.currentTime); },
     onEnded: playNext,
-    onError: () => { setIsBuffering(false); setIsPlaying(false); setPlayerError('Error al cargar el audio descargado.'); },
+    onError: () => { clearLoadTimeout(); setIsBuffering(false); setIsPlaying(false); setPlayerError('Error al cargar el audio. Prueba con otra canción.'); },
   };
   const progressMax = duration || currentSong?.durationSeconds || 0;
   return {
-    audioProps, iframeHostRef, isLocal, currentSong, currentIndex, queue,
+    audioProps, isLocal, currentSong, currentIndex, queue,
     hasNext: currentIndex < queue.length - 1,
     isPlaying, isBuffering, playerError, currentTime, progressMax,
     progressPct: progressMax ? (currentTime / progressMax) * 100 : 0,
