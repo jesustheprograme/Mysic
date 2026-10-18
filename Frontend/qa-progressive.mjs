@@ -80,6 +80,7 @@ try {
   assert.match(youtubeViewSource, /className="music-workspace" key=\{workspaceKey\} ref=\{workspaceRef\}/, 'global views reuse the Mysic workspace entrance')
   assert.match(youtubeViewSource, /scrollPositionsRef = useRef\(new Map\(\)\)/, 'global views keep scroll positions by route')
   assert.match(youtubeViewSource, /workspace\?\.closest\('\.music-app__content'\)/, 'global views restore the shared Mysic scroll container')
+  assert.match(youtubeViewSource, /behavior: 'instant'/, 'global views restore scroll without a visible smooth-scroll transition')
   assert.match(youtubeViewSource, /saveCurrentScrollPosition\(\)[\s\S]*browse\.openArtist/, 'global navigation captures scroll before opening a detail')
   assert.doesNotMatch(homeRailSource, /IntersectionObserver/, 'artwork uses native image loading without per-card observers')
   console.log('PASS: songs first, sections on demand, deduplication, stale cancellation, direct filters')

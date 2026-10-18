@@ -372,7 +372,10 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
     const savedPositions = scrollPositionsRef.current.get(workspaceKey)
 
     scrollTargets.forEach((target, index) => {
-      target.scrollTop = savedPositions?.[index] ?? 0
+      target.scrollTo({
+        top: savedPositions?.[index] ?? 0,
+        behavior: 'instant',
+      })
     })
   }, [active, workspaceKey])
 
