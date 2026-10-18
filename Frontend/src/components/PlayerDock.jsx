@@ -2,10 +2,12 @@ import {
   ListMusic,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
+import ControlledWaveform from './reproductor/ControlledWaveform.jsx'
+import { waveformOptions } from './reproductor/waveformOptions.js'
 import { takePrimedAudio } from '../features/auth/autoplayUnlock.js'
-import { listenToMiniPlayerCommands } from '../features/mini-player/playerBridge.ts'
+import { listenToMiniPlayerCommands, ownsMiniPlayer } from '../features/mini-player/playerBridge.ts'
 import { connectAudioAnalyser, disconnectAudioAnalyser } from '../lib/audioAnalyser.js'
 import HeartToggle from './HeartToggle.jsx'
 import {
@@ -23,7 +25,7 @@ import {
   setMediaSessionAction,
 } from './reproductor/utilidadesReproductor.js'
 
-function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = false, onClose, onNext, onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, queue, track }) {
+function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = false, onClose, onNext, onOpenMiniPlayer, onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, queue, track }) {
   const [volumeExpanded, setVolumeExpanded] = useState(false)
   const {
     commitSeek,
@@ -39,7 +41,6 @@ function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = fal
     volume,
   } = externalPlayback
   const progress = duration > 0 ? Math.min((currentTime / duration) * 100, 100) : 0
-  const waveformPeaks = useMemo(() => createWaveformPeaks(track.id), [track.id])
   const playerStyle = {
     '--mobile-player-progress': `${progress}%`,
     ...(collapsed && track.artwork ? { '--compact-artwork': `url(${track.artwork})` } : {}),
@@ -100,30 +101,12 @@ function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = fal
           onPrevious={onPrevious}
           onTogglePlayback={togglePlayback}
           progress={(
-            <div className="waveform-timeline__wave player-dock__controlled-wave">
-              <div aria-hidden="true">
-                {waveformPeaks.map((peak, index) => (
-                  <i
-                    className={(index / waveformPeaks.length) * 100 <= progress ? 'is-elapsed' : undefined}
-                    key={index}
-                    style={{ '--wave-height': `${Math.round(peak * 100)}%` }}
-                  />
-                ))}
-              </div>
-              <input
-                type="range"
-                min="0"
-                max={duration || 0}
-                step="0.1"
-                value={Math.min(currentTime, duration || 0)}
-                disabled={!duration}
-                aria-label="Progreso de reproducción"
-                onChange={handleSeek}
-                onMouseUp={commitSeek}
-                onTouchEnd={commitSeek}
-                onKeyUp={commitSeek}
-              />
-            </div>
+            <ControlledWaveform trackId={track.id} currentTime={currentTime} duration={duration}
+              onSeek={(time) => {
+                const event = { target: { value: time } }
+                handleSeek(event)
+                commitSeek(event)
+              }} />
           )}
           title={track.title}
           trackAction={(
@@ -142,7 +125,10 @@ function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = fal
         />
 
         <div className="player-dock__actions">
-          <span />
+          <button className="player-dock__action" type="button"
+            aria-label="Abrir mini reproductor" title="Abrir mini reproductor" onClick={onOpenMiniPlayer}>
+            <ListMusic size={17} aria-hidden="true" />
+          </button>
           <div className="player-dock__volume">
             <VolumeControl
               expanded={volumeExpanded}
@@ -372,20 +358,11 @@ function AudioPlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, i
       : 1
 
     const waveSurfer = WaveSurfer.create({
-      barGap: 1,
-      barRadius: 2,
-      barWidth: 2,
+      ...waveformOptions,
       container,
-      cursorColor: 'transparent',
-      cursorWidth: 0,
-      dragToSeek: { debounceTime: 30 },
-      height: 18,
       media,
-      normalize: true,
       peaks: [createWaveformPeaks(track.id)],
-      progressColor: '#e7e9e5',
       duration: mediaDuration,
-      waveColor: '#414846',
     })
 
     waveSurferRef.current = waveSurfer
@@ -617,6 +594,7 @@ function AudioPlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, i
   }
 
   const applyMiniPlayerControl = useEffectEvent((command) => {
+    if (!ownsMiniPlayer('mysic')) return
     if (command.type === 'toggle') togglePlayback()
     if (command.type === 'seek') seekTo(command.time)
     if (command.type === 'volume') changeVolume(command.value)

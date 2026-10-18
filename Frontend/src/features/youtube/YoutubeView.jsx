@@ -8,6 +8,7 @@ import CollectionDetailView from '../collections/CollectionDetailView.jsx'
 import FavoriteSearch from '../discovery/FavoriteSearch.jsx'
 import HomeRail from '../discovery/HomeRail.jsx'
 import SongList from '../discovery/SongList.jsx'
+import useGlobalMiniPlayer from '../mini-player/useGlobalMiniPlayer.js'
 import { SEARCH_TABS, useBrowse } from './hooks/useBrowse.js'
 import { useDownloads } from './hooks/useDownloads.js'
 import { usePlayer } from './hooks/usePlayer.js'
@@ -94,6 +95,7 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
     onPlayerVisibilityChange,
   })
   const { error, loading, results, searchType, view } = browse
+  const openMiniPlayer = useGlobalMiniPlayer(player)
 
   const playExternalSong = useEffectEvent((event) => {
     if (event.detail?.id) player.playFrom([event.detail], 0)
@@ -373,6 +375,7 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
             volume: player.volume,
           }}
           onClose={player.closePlayer}
+          onOpenMiniPlayer={() => openMiniPlayer().catch(() => {})}
           onNext={player.playNext}
           onPrevious={player.playPrev}
           onQueueSelect={(index) => player.playFrom(player.queue, index)}

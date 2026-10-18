@@ -41,6 +41,21 @@ let lastPersistedAt = 0
 let lastCriticalState = ''
 let pendingSnapshot: PlaybackSnapshot | null = null
 let publishTimer: ReturnType<typeof setTimeout> | null = null
+let playbackOwner: 'mysic' | 'global' = 'mysic'
+
+export function claimMiniPlayer(source: 'mysic' | 'global') {
+  if (playbackOwner !== source) {
+    if (publishTimer !== null) clearTimeout(publishTimer)
+    publishTimer = null
+    pendingSnapshot = null
+    lastCriticalState = ''
+  }
+  playbackOwner = source
+}
+
+export function ownsMiniPlayer(source: 'mysic' | 'global') {
+  return playbackOwner === source
+}
 
 function createChannel() {
   return typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel(CHANNEL_NAME)
@@ -78,7 +93,8 @@ async function deliverPlaybackState(snapshot: PlaybackSnapshot) {
   }
 }
 
-export async function publishPlaybackState(snapshot: PlaybackSnapshot) {
+export async function publishPlaybackState(snapshot: PlaybackSnapshot, source: 'mysic' | 'global' = 'mysic') {
+  if (!ownsMiniPlayer(source)) return
   const criticalState = `${snapshot.track?.id ?? ''}:${snapshot.isPlaying}`
   const now = Date.now()
   const shouldPublishNow = criticalState !== lastCriticalState

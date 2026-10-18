@@ -12,6 +12,8 @@ import SectionRoute from './SectionRoute.jsx'
 import SongList from './SongList.jsx'
 import {
   listenToMiniPlayerCommands,
+  claimMiniPlayer,
+  ownsMiniPlayer,
   publishPlaybackState,
 } from '../mini-player/playerBridge.ts'
 import { openMiniPlayerWindow } from '../mini-player/openMiniPlayerWindow.tsx'
@@ -455,6 +457,7 @@ function DiscoveryView({
   }
 
   const handleMiniPlayerCommand = useEffectEvent((command) => {
+    if (!ownsMiniPlayer('mysic')) return
     if (command.type === 'next') {
       selectRelativeSong(1)
       return
@@ -948,11 +951,18 @@ function DiscoveryView({
           onAnalyserChange={setPlayerAnalyser}
           onClose={() => selectSong(null)}
           onNext={() => selectRelativeSong(1)}
-          onOpenMiniPlayer={() => openMiniPlayerWindow().catch(() => {})}
+          onOpenMiniPlayer={() => {
+            claimMiniPlayer('mysic')
+            publishMiniPlayerSnapshot(playbackStateRef.current)
+            openMiniPlayerWindow().catch(() => {})
+          }}
           onPlaybackChange={(playing) => {
             setSelectedSongPlaying(playing)
             // Si empieza a sonar Mysic, se pausa YouTube Music
-            if (playing) window.dispatchEvent(new CustomEvent('yotubei:pause'))
+            if (playing) {
+              claimMiniPlayer('mysic')
+              window.dispatchEvent(new CustomEvent('yotubei:pause'))
+            }
           }}
           onPlaybackStateChange={publishMiniPlayerSnapshot}
           onPrevious={() => selectRelativeSong(-1)}
