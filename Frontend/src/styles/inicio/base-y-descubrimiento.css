@@ -1451,6 +1451,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .music-workspace,
   .music-app .album-card {
     animation: none;
   }

@@ -318,11 +318,12 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
 
   const root = document.getElementById('music-home')
   const currentTrack = player.currentSong ? adaptSong(player.currentSong) : null
+  const workspaceKey = view.data?.id ? `${view.kind}-${view.data.id}` : view.kind
 
   return (
     <div className="youtube-catalog">
       <main className="music-app__main">
-        <div className="music-workspace">
+        <div className="music-workspace" key={workspaceKey}>
           {view.kind === 'search' && renderSearchView()}
           {view.kind === 'artist' && renderArtistView()}
           {view.kind === 'album' && renderAlbumView()}

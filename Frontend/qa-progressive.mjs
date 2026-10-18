@@ -77,6 +77,7 @@ try {
   assert.doesNotMatch(youtubeViewSource, /VisibleContent|deferArtwork/, 'global results must not wait for viewport observers')
   assert.match(youtubeViewSource, /void loadSection\('artist'\)/, 'artist enrichment starts after song results')
   assert.match(youtubeViewSource, /void loadSection\('album'\)/, 'album enrichment starts after song results')
+  assert.match(youtubeViewSource, /className="music-workspace" key=\{workspaceKey\}/, 'global views reuse the Mysic workspace entrance')
   assert.doesNotMatch(homeRailSource, /IntersectionObserver/, 'artwork uses native image loading without per-card observers')
   console.log('PASS: songs first, sections on demand, deduplication, stale cancellation, direct filters')
   console.log('PASS: offscreen sections defer requests and artwork; visibility loads once; cleanup')
