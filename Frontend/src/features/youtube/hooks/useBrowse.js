@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { readIndexedSearch, writeIndexedSearch } from '../lib/searchIndex.js';
 import { rankSearchResult } from '../lib/searchRanking.js';
-import { scrollAppToTop } from '../lib/scroll.js';
 import { useSearchHistory } from './useSearchHistory.js';
 
 const SEARCH_SECTIONS = [
@@ -256,7 +255,6 @@ export function useBrowse({ progressive = false } = {}) {
       const data = await load();
       if (sequence !== searchSequenceRef.current) return;
       setView({ kind, data });
-      scrollAppToTop();
     } catch (err) {
       if (sequence === searchSequenceRef.current) setError(err.message);
     } finally {

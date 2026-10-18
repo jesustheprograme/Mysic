@@ -1,5 +1,5 @@
 import { Download, LoaderCircle, Trash2, WifiOff } from 'lucide-react'
-import { useEffect, useEffectEvent, useState } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import PlayerDock from '../../components/PlayerDock.jsx'
 import ArtistView from '../collections/ArtistView.jsx'
@@ -79,7 +79,20 @@ function adaptReleases(shelves) {
   })))
 }
 
+function getScrollTargets(workspace) {
+  const content = workspace?.closest('.music-app__content')
+  if (!workspace || !content) return []
+
+  return [
+    content,
+    workspace.querySelector('.artist-profile__content'),
+    workspace.querySelector('.collection-detail__tracks'),
+  ].filter(Boolean)
+}
+
 function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, onPlayerVisibilityChange, playerCollapsed = false }) {
+  const scrollPositionsRef = useRef(new Map())
+  const workspaceRef = useRef(null)
   const browse = useBrowse({ progressive: true })
   const { loadSection } = browse
   const downloads = useDownloads()
@@ -151,8 +164,8 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
         emptyMessage="No se encontraron canciones."
         likedSongIds={likedSongIds}
         onAddToPlaylist={onAddToPlaylist}
-        onAlbumSelect={browse.openAlbum}
-        onArtistSelect={browse.openArtist}
+        onAlbumSelect={openAlbum}
+        onArtistSelect={openArtist}
         onPlaybackToggle={player.togglePlay}
         onPreviewStart={ignorePreview}
         onPreviewStop={ignorePreview}
@@ -179,11 +192,11 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
       <>
         {songs.length > 0 && renderSongResults(songs)}
         {(results.type === 'all' || artists.length > 0) && (
-          <HomeRail items={artists.map(adaptArtist)} onSelect={browse.openArtist} title="Artistas" variant="artist"
+          <HomeRail items={artists.map(adaptArtist)} onSelect={openArtist} title="Artistas" variant="artist"
             emptyMessage={results.pending?.includes('artist') ? 'Cargando artistas…' : 'No se encontraron artistas.'} />
         )}
         {(results.type === 'all' || albums.length > 0) && (
-          <HomeRail items={albums.map(adaptAlbum)} onSelect={browse.openAlbum} title="Álbumes"
+          <HomeRail items={albums.map(adaptAlbum)} onSelect={openAlbum} title="Álbumes"
             emptyMessage={results.pending?.includes('album') ? 'Cargando álbumes…' : 'No se encontraron álbumes.'} />
         )}
       </>
@@ -211,10 +224,10 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
             activeType={searchType}
             downloadsActive={showingDownloads}
             downloadsLabel={`Descargas${downloads.downloads.items.length ? ` (${downloads.downloads.items.length})` : ''}`}
-            onDownloadsSelect={browse.showDownloads}
+            onDownloadsSelect={showDownloads}
             onQueryChange={browse.setQuery}
             onSubmit={() => browse.runSearch(browse.query, searchType)}
-            onTypeSelect={browse.changeTab}
+            onTypeSelect={changeTab}
             query={browse.query}
           />
         </section>
@@ -267,10 +280,10 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
         likedArtistIds={likedArtistIds}
         likedSongIds={likedSongIds}
         onAddToPlaylist={onAddToPlaylist}
-        onAlbumSelect={browse.openAlbum}
-        onBack={browse.goBack}
+        onAlbumSelect={openAlbum}
+        onBack={goBack}
         onPlaybackToggle={player.togglePlay}
-        onReleasePlay={(release) => browse.openAlbum(release.id)}
+        onReleasePlay={(release) => openAlbum(release.id)}
         onSongSelect={(songId) => playSongs(sourceSongs, songId)}
         onToggleArtistFavorite={toggleArtistFavorite}
         onToggleFavorite={toggleSongFavorite}
@@ -301,8 +314,8 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
         collectionFavorite={likedAlbumIds.has(view.data.id)}
         likedSongIds={likedSongIds}
         onAddToPlaylist={onAddToPlaylist}
-        onArtistSelect={browse.openArtist}
-        onBack={browse.goBack}
+        onArtistSelect={openArtist}
+        onBack={goBack}
         onDownloadCollection={() => downloads.downloadMany(sourceSongs)}
         onPlaybackToggle={player.togglePlay}
         onSongSelect={(songId) => playSongs(sourceSongs, songId)}
@@ -320,10 +333,53 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
   const currentTrack = player.currentSong ? adaptSong(player.currentSong) : null
   const workspaceKey = view.data?.id ? `${view.kind}-${view.data.id}` : view.kind
 
+  function saveCurrentScrollPosition() {
+    const positions = getScrollTargets(workspaceRef.current).map((target) => target.scrollTop)
+    scrollPositionsRef.current.set(workspaceKey, positions)
+  }
+
+  function openArtist(artistId) {
+    saveCurrentScrollPosition()
+    browse.openArtist(artistId)
+  }
+
+  function openAlbum(albumId) {
+    saveCurrentScrollPosition()
+    browse.openAlbum(albumId)
+  }
+
+  function showDownloads() {
+    saveCurrentScrollPosition()
+    browse.showDownloads()
+  }
+
+  function changeTab(type) {
+    saveCurrentScrollPosition()
+    browse.changeTab(type)
+  }
+
+  function goBack() {
+    saveCurrentScrollPosition()
+    browse.goBack()
+  }
+
+  useLayoutEffect(() => {
+    if (!active) return undefined
+
+    const workspace = workspaceRef.current
+    const scrollTargets = getScrollTargets(workspace)
+    if (!scrollTargets.length) return undefined
+    const savedPositions = scrollPositionsRef.current.get(workspaceKey)
+
+    scrollTargets.forEach((target, index) => {
+      target.scrollTop = savedPositions?.[index] ?? 0
+    })
+  }, [active, workspaceKey])
+
   return (
     <div className="youtube-catalog">
       <main className="music-app__main">
-        <div className="music-workspace" key={workspaceKey}>
+        <div className="music-workspace" key={workspaceKey} ref={workspaceRef}>
           {view.kind === 'search' && renderSearchView()}
           {view.kind === 'artist' && renderArtistView()}
           {view.kind === 'album' && renderAlbumView()}
