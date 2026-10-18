@@ -4,7 +4,7 @@ import { openMiniPlayerWindow } from './openMiniPlayerWindow.tsx'
 
 const adaptTrack = (song) => song ? ({ ...song, artwork: song.thumbnail ?? song.artwork, albumTitle: song.album }) : null
 
-export default function useGlobalMiniPlayer(player) {
+export default function useGlobalMiniPlayer(player, browse) {
   const publish = useCallback(() => {
     publishPlaybackState({
       track: adaptTrack(player.currentSong),
@@ -18,6 +18,17 @@ export default function useGlobalMiniPlayer(player) {
   }, [player.currentSong, player.queue, player.currentTime, player.progressMax, player.isPlaying, player.volume])
   const publishLatest = useEffectEvent(() => publish())
   const applyCommand = useEffectEvent((command) => {
+    if (command.type === 'play-global') {
+      claimMiniPlayer('global')
+      player.playFrom([command.song], 0)
+      return
+    }
+    if (command.type === 'open-global') {
+      window.location.hash = '#/youtube'
+      if (command.kind === 'artist') browse.openArtist(command.id)
+      else browse.openAlbum(command.id)
+      return
+    }
     if (!ownsMiniPlayer('global') || !player.currentSong) return
     if (command.type === 'toggle') player.togglePlay()
     if (command.type === 'next') player.playNext()

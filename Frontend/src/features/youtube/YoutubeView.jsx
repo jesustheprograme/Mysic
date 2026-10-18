@@ -5,11 +5,11 @@ import PlayerDock from '../../components/PlayerDock.jsx'
 import VisibleContent from '../../components/VisibleContent.jsx'
 import ArtistView from '../collections/ArtistView.jsx'
 import CollectionDetailView from '../collections/CollectionDetailView.jsx'
-import FavoriteSearch from '../discovery/FavoriteSearch.jsx'
+import CatalogSearchControls from '../discovery/CatalogSearchControls.jsx'
 import HomeRail from '../discovery/HomeRail.jsx'
 import SongList from '../discovery/SongList.jsx'
 import useGlobalMiniPlayer from '../mini-player/useGlobalMiniPlayer.js'
-import { SEARCH_TABS, useBrowse } from './hooks/useBrowse.js'
+import { useBrowse } from './hooks/useBrowse.js'
 import { useDownloads } from './hooks/useDownloads.js'
 import { usePlayer } from './hooks/usePlayer.js'
 import { readStorage, writeStorage } from './lib/storage.js'
@@ -95,7 +95,7 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
     onPlayerVisibilityChange,
   })
   const { error, loading, results, searchType, view } = browse
-  const openMiniPlayer = useGlobalMiniPlayer(player)
+  const openMiniPlayer = useGlobalMiniPlayer(player, browse)
 
   const playExternalSong = useEffectEvent((event) => {
     if (event.detail?.id) player.playFrom([event.detail], 0)
@@ -208,41 +208,16 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
             <h2 id="catalog-search-title">Buscar</h2>
           </div>
 
-          <nav className="catalog-search__filters" aria-label="Tipo de contenido">
-            {SEARCH_TABS.map((tab) => (
-              <button
-                className={!showingDownloads && tab.type === searchType ? 'catalog-search__filter catalog-search__filter--active' : 'catalog-search__filter'}
-                type="button"
-                aria-pressed={!showingDownloads && tab.type === searchType}
-                key={tab.type}
-                onClick={() => browse.changeTab(tab.type)}
-              >
-                {tab.label}
-              </button>
-            ))}
-            <button
-              className={showingDownloads ? 'catalog-search__filter catalog-search__filter--active' : 'catalog-search__filter'}
-              type="button"
-              aria-pressed={showingDownloads}
-              onClick={browse.showDownloads}
-            >
-              Descargas{downloads.downloads.items.length ? ` (${downloads.downloads.items.length})` : ''}
-            </button>
-          </nav>
-
-          <form
-            className="catalog-search__form"
-            onSubmit={(event) => {
-              event.preventDefault()
-              browse.runSearch(browse.query, searchType)
-            }}
-          >
-            <FavoriteSearch
-              label="Buscar canciones, artistas o álbumes"
-              value={browse.query}
-              onChange={browse.setQuery}
-            />
-          </form>
+          <CatalogSearchControls
+            activeType={searchType}
+            downloadsActive={showingDownloads}
+            downloadsLabel={`Descargas${downloads.downloads.items.length ? ` (${downloads.downloads.items.length})` : ''}`}
+            onDownloadsSelect={browse.showDownloads}
+            onQueryChange={browse.setQuery}
+            onSubmit={() => browse.runSearch(browse.query, searchType)}
+            onTypeSelect={browse.changeTab}
+            query={browse.query}
+          />
         </section>
       </>
     )

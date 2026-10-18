@@ -28,6 +28,8 @@ export type MiniPlayerCommand =
   | { type: 'select'; songId: string }
   | { type: 'toggle' }
   | { type: 'volume'; value: number }
+  | { type: 'play-global'; song: MiniSong & { album?: string; albumId?: string; artistId?: string; thumbnail?: string } }
+  | { type: 'open-global'; kind: 'album' | 'artist'; id: string }
 
 const CHANNEL_NAME = 'mysic-mini-player-v1'
 const SNAPSHOT_KEY = 'mysic-mini-player-snapshot-v1'

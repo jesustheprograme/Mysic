@@ -21,7 +21,8 @@ try {
   const player = { currentSong: { id: 'g1', title: 'Global', thumbnail: '/cover.jpg' }, queue: [{ id: 'g1' }, { id: 'g2' }], currentTime: 12, progressMax: 100, volume: 0.4, isPlaying: true,
     togglePlay: () => calls.push('toggle'), playNext: () => calls.push('next'), playPrev: () => calls.push('previous'),
     setVolume: (value) => calls.push(['volume', value]), handleSeek: () => {}, commitSeek: (e) => calls.push(['seek', e.target.value]), playFrom: (_queue, index) => calls.push(['select', index]) }
-  function Harness() { useGlobalMiniPlayer(player); return null }
+  const browse = { openArtist: (id) => calls.push(['artist', id]), openAlbum: (id) => calls.push(['album', id]) }
+  function Harness() { useGlobalMiniPlayer(player, browse); return null }
   const root = createRoot(document.getElementById('root'))
   await React.act(async () => root.render(React.createElement(Harness)))
   await bridge.sendMiniPlayerCommand({ type: 'toggle' })
@@ -36,7 +37,12 @@ try {
   bridge.claimMiniPlayer('mysic')
   await bridge.sendMiniPlayerCommand({ type: 'next' })
   assert.equal(calls.length, 6, 'global releases controls when library takes over')
+  await bridge.sendMiniPlayerCommand({ type: 'play-global', song: { id: 'result', title: 'Resultado' } })
+  assert.deepEqual(calls.at(-1), ['select', 0], 'catalog result starts global playback')
+  assert.equal(bridge.ownsMiniPlayer('global'), true, 'catalog result returns ownership to global player')
+  await bridge.sendMiniPlayerCommand({ type: 'open-global', kind: 'album', id: 'album-1' })
+  assert.deepEqual(calls.at(-1), ['album', 'album-1'], 'catalog collection opens in global view')
   await React.act(async () => root.unmount())
   assert.equal(listeners.size, 0, 'command channel cleaned up')
-  console.log('PASS: global snapshot, all six commands, ownership isolation, volume scale, cleanup')
+  console.log('PASS: global snapshot, controls, ownership isolation, catalog playback/navigation, volume scale, cleanup')
 } finally { await server.close(); dom.window.close() }

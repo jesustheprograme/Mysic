@@ -18,6 +18,9 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { isTauri } from '@tauri-apps/api/core'
+import CatalogSearchControls from '../discovery/CatalogSearchControls.jsx'
+import { api, imageUrl } from '../youtube/lib/api.js'
+import { rankSearchResult } from '../youtube/lib/searchRanking.js'
 import {
   listenToPlaybackState,
   readPlaybackSnapshot,
@@ -45,6 +48,28 @@ type MiniPlayerProps = {
   hostWindow?: Window
 }
 
+type CatalogItem = {
+  id: string
+  title?: string
+  name?: string
+  artist?: string
+  subtitle?: string
+  album?: string
+  albumId?: string
+  artistId?: string
+  durationSeconds?: number
+  thumbnail?: string
+  artwork?: string
+}
+
+type CatalogResults = {
+  type: 'all' | 'song' | 'artist' | 'album' | 'downloads'
+  query: string
+  songs: CatalogItem[]
+  artists: CatalogItem[]
+  albums: CatalogItem[]
+}
+
 function MiniPlayer({ hostDocument = document, hostWindow = window }: MiniPlayerProps) {
   const [snapshot, setSnapshot] = useState<PlaybackSnapshot | null>(readPlaybackSnapshot)
   const [expanded, setExpanded] = useState(() => readStoredBoolean(MINI_PLAYER_EXPANDED_KEY, false))
@@ -56,6 +81,11 @@ function MiniPlayer({ hostDocument = document, hostWindow = window }: MiniPlayer
   const [surfaceOpen, setSurfaceOpen] = useState(() => expanded && !isTauri())
   const [activeQueueTab, setActiveQueueTab] = useState<'up-next' | 'search' | 'related'>('up-next')
   const [queueSearch, setQueueSearch] = useState('')
+  const [catalogType, setCatalogType] = useState<'all' | 'song' | 'artist' | 'album'>('all')
+  const [catalogDownloads, setCatalogDownloads] = useState(false)
+  const [catalogResults, setCatalogResults] = useState<CatalogResults | null>(null)
+  const [catalogLoading, setCatalogLoading] = useState(false)
+  const [catalogError, setCatalogError] = useState('')
   const [clock, setClock] = useState(Date.now)
   const pendingCommandsRef = useRef<Partial<Record<'seek' | 'volume', MiniPlayerCommand>>>({})
   const commandTimerRef = useRef<number | null>(null)
@@ -67,6 +97,7 @@ function MiniPlayer({ hostDocument = document, hostWindow = window }: MiniPlayer
   const expandedRef = useRef(expanded)
   const seekingRef = useRef(false)
   const changingVolumeRef = useRef(false)
+  const searchControllerRef = useRef<AbortController | null>(null)
   const isPictureInPicture = hostWindow !== window
   const isNativeMiniPlayer = isTauri()
   const reducedMotion = useMemo(() => hostWindow.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false, [hostWindow])
@@ -147,18 +178,71 @@ function MiniPlayer({ hostDocument = document, hostWindow = window }: MiniPlayer
   const queue = useMemo(() => snapshot?.queue.slice(0, 10) ?? [], [snapshot?.queue])
   const relatedQueue = useMemo(() => snapshot?.queue.slice(0, 16) ?? [], [snapshot?.queue])
   const visibleQueue = useMemo(() => {
-    if (activeQueueTab === 'search') {
-      const query = queueSearch.trim().toLocaleLowerCase()
-      if (!query) return queue
-      return queue.filter((song) => `${song.title} ${song.artist}`.toLocaleLowerCase().includes(query))
-    }
+    if (activeQueueTab === 'search') return []
 
     if (activeQueueTab === 'related') {
       return track ? relatedQueue.filter((song) => song.id !== track.id) : relatedQueue
     }
 
     return queue
-  }, [activeQueueTab, queue, queueSearch, relatedQueue, track])
+  }, [activeQueueTab, queue, relatedQueue, track])
+
+  useEffect(() => () => searchControllerRef.current?.abort(), [])
+
+  async function searchCatalog(nextType = catalogType, downloads = catalogDownloads) {
+    const query = queueSearch.trim()
+    if (!query) return
+    searchControllerRef.current?.abort()
+    const controller = new AbortController()
+    searchControllerRef.current = controller
+    setCatalogLoading(true)
+    setCatalogError('')
+    try {
+      if (downloads) {
+        const response = await api.downloads.list()
+        const normalized = query.toLocaleLowerCase()
+        const songs = (response.items ?? []).filter((song: CatalogItem) =>
+          `${song.title ?? ''} ${song.artist ?? ''} ${song.album ?? ''}`.toLocaleLowerCase().includes(normalized))
+        setCatalogResults({ type: 'downloads', query, songs, artists: [], albums: [] })
+        return
+      }
+      const response = rankSearchResult(await api.search(query, nextType, controller.signal), query)
+      setCatalogResults({
+        type: nextType,
+        query,
+        songs: nextType === 'all' ? response.songs ?? [] : nextType === 'song' ? response.items ?? [] : [],
+        artists: nextType === 'all' ? response.artists ?? [] : nextType === 'artist' ? response.items ?? [] : [],
+        albums: nextType === 'all' ? response.albums ?? [] : nextType === 'album' ? response.items ?? [] : [],
+      })
+    } catch (error) {
+      if (!controller.signal.aborted) setCatalogError(error instanceof Error ? error.message : 'No se pudo buscar.')
+    } finally {
+      if (searchControllerRef.current === controller) setCatalogLoading(false)
+    }
+  }
+
+  function changeCatalogType(type: 'all' | 'song' | 'artist' | 'album') {
+    setCatalogType(type)
+    setCatalogDownloads(false)
+    if (queueSearch.trim()) searchCatalog(type, false)
+  }
+
+  function showCatalogDownloads() {
+    setCatalogDownloads(true)
+    if (queueSearch.trim()) searchCatalog(catalogType, true)
+  }
+
+  function playCatalogSong(song: CatalogItem) {
+    const playable = {
+      ...song,
+      title: song.title ?? 'Canción',
+      artist: song.artist ?? song.subtitle ?? 'Artista desconocido',
+      artwork: imageUrl(song.thumbnail ?? song.artwork),
+      durationSeconds: song.durationSeconds ?? 0,
+    }
+    showTrackImmediately(playable)
+    dispatchMiniPlayerCommand({ type: 'play-global', song: playable })
+  }
   const relatedSongColumns = useMemo(() => {
     const columns: MiniSong[][] = []
     for (let index = 0; index < visibleQueue.length; index += 4) {
@@ -308,6 +392,60 @@ function MiniPlayer({ hostDocument = document, hostWindow = window }: MiniPlayer
     container.scrollBy({ left: direction * container.clientWidth, behavior: 'smooth' })
   }
 
+  function renderCatalogResults() {
+    if (catalogLoading) return <p className="mini-player__empty">Buscando en Mysic global…</p>
+    if (catalogError) return <p className="mini-player__empty" role="alert">{catalogError}</p>
+    if (!catalogResults) return <p className="mini-player__empty">Busca canciones, artistas o álbumes.</p>
+    const hasResults = catalogResults.songs.length || catalogResults.artists.length || catalogResults.albums.length
+    if (!hasResults) return <p className="mini-player__empty">No se encontraron resultados.</p>
+
+    return (
+      <div className="mini-player__related mini-player__catalog-results">
+        {catalogResults.songs.length > 0 && (
+          <section className="mini-player__related-section" aria-labelledby="mini-player-search-songs">
+            <div className="mini-player__related-heading"><h3 id="mini-player-search-songs"><ListMusic size={13} aria-hidden="true" />Canciones</h3></div>
+            <div className="mini-player__related-grid mini-player__related-grid--songs">
+              <div className="mini-player__related-song-column">
+                {catalogResults.songs.slice(0, 12).map((song) => (
+                  <button type="button" key={song.id} onClick={() => playCatalogSong(song)}>
+                    <img src={imageUrl(song.thumbnail ?? song.artwork)} alt="" />
+                    <span><strong>{song.title}</strong><small>{song.artist}</small></span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+        {catalogResults.albums.length > 0 && (
+          <section className="mini-player__related-section" aria-labelledby="mini-player-search-albums">
+            <div className="mini-player__related-heading"><h3 id="mini-player-search-albums"><Disc3 size={13} aria-hidden="true" />Álbumes</h3></div>
+            <div className="mini-player__related-grid mini-player__related-grid--albums">
+              {catalogResults.albums.slice(0, 10).map((album) => (
+                <button type="button" key={album.id} onClick={() => dispatchMiniPlayerCommand({ type: 'open-global', kind: 'album', id: album.id })}>
+                  <img src={imageUrl(album.thumbnail)} alt="" />
+                  <span><strong>{album.title}</strong><small>{album.artist ?? album.subtitle}</small></span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+        {catalogResults.artists.length > 0 && (
+          <section className="mini-player__related-section" aria-labelledby="mini-player-search-artists">
+            <div className="mini-player__related-heading"><h3 id="mini-player-search-artists"><UserRound size={13} aria-hidden="true" />Artistas</h3></div>
+            <div className="mini-player__related-grid mini-player__related-grid--artists">
+              {catalogResults.artists.slice(0, 10).map((artist) => (
+                <button type="button" key={artist.id} onClick={() => dispatchMiniPlayerCommand({ type: 'open-global', kind: 'artist', id: artist.id })}>
+                  <img className="mini-player__related-artist" src={imageUrl(artist.thumbnail)} alt="" />
+                  <span><strong>{artist.name ?? artist.title}</strong><small>{artist.subtitle ?? 'Artista'}</small></span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    )
+  }
+
   return (
     <main
       className={`mini-player${renderQueue ? ' mini-player--expanded' : ''}${surfaceOpen ? ' mini-player--surface-open' : ''}${visualAnchor.startsWith('top') ? ' mini-player--anchor-top' : ' mini-player--anchor-bottom'}`}
@@ -454,18 +592,19 @@ function MiniPlayer({ hostDocument = document, hostWindow = window }: MiniPlayer
               aria-labelledby={`mini-player-tab-${activeQueueTab}`}
             >
               {activeQueueTab === 'search' && (
-                <label className="mini-player__queue-search">
-                  <Search size={14} aria-hidden="true" />
-                  <input
-                    type="search"
-                    value={queueSearch}
-                    placeholder="Buscar en la cola"
-                    aria-label="Buscar en la cola"
-                    onChange={(event) => setQueueSearch(event.target.value)}
-                  />
-                </label>
+                <CatalogSearchControls
+                  activeType={catalogType}
+                  className="mini-player__catalog-search"
+                  downloadsActive={catalogDownloads}
+                  label="Buscar en Mysic global"
+                  onDownloadsSelect={showCatalogDownloads}
+                  onQueryChange={setQueueSearch}
+                  onSubmit={() => searchCatalog()}
+                  onTypeSelect={changeCatalogType}
+                  query={queueSearch}
+                />
               )}
-              {activeQueueTab === 'related' ? (
+              {activeQueueTab === 'search' ? renderCatalogResults() : activeQueueTab === 'related' ? (
                 <div className="mini-player__related">
                   <section className="mini-player__related-section" aria-labelledby="mini-player-related-songs">
                     <div className="mini-player__related-heading">
@@ -560,11 +699,7 @@ function MiniPlayer({ hostDocument = document, hostWindow = window }: MiniPlayer
                   ))}
                 </ol>
               ) : (
-                <p className="mini-player__empty">
-                  {activeQueueTab === 'search'
-                      ? 'No se encontraron canciones.'
-                      : 'La cola aparecerá cuando reproduzcas una canción.'}
-                </p>
+                <p className="mini-player__empty">La cola aparecerá cuando reproduzcas una canción.</p>
               )}
             </div>
           </section>
