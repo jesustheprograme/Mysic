@@ -8,6 +8,7 @@ import CatalogSearchControls from '../discovery/CatalogSearchControls.jsx'
 import HomeRail from '../discovery/HomeRail.jsx'
 import SongList from '../discovery/SongList.jsx'
 import useGlobalMiniPlayer from '../mini-player/useGlobalMiniPlayer.js'
+import { connectAudioAnalyser, disconnectAudioAnalyser, resumeAudioContext } from '../../lib/audioAnalyser.js'
 import { useBrowse } from './hooks/useBrowse.js'
 import { useDownloads } from './hooks/useDownloads.js'
 import { usePlayer } from './hooks/usePlayer.js'
@@ -104,8 +105,31 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
     isDownloaded: downloads.isDownloaded,
     onPlayerVisibilityChange,
   })
+  const playerAudioRef = player.audioProps.ref
+  const playerSongId = player.currentSong?.id
+  const playerUsesLocalAudio = player.isLocal
+  const [playerAnalyser, setPlayerAnalyser] = useState(null)
   const { error, loading, results, searchType, view } = browse
   const openMiniPlayer = useGlobalMiniPlayer(player, browse)
+
+  useEffect(() => {
+    const audio = playerAudioRef.current
+    if (!playerUsesLocalAudio || !audio) {
+      setPlayerAnalyser(null)
+      return undefined
+    }
+
+    const analyser = connectAudioAnalyser(audio)
+    const resumeAnalyser = () => resumeAudioContext().catch(() => {})
+    audio.addEventListener('play', resumeAnalyser)
+    setPlayerAnalyser(analyser)
+
+    return () => {
+      audio.removeEventListener('play', resumeAnalyser)
+      disconnectAudioAnalyser(audio)
+      setPlayerAnalyser(null)
+    }
+  }, [playerAudioRef, playerSongId, playerUsesLocalAudio])
 
   useEffect(() => {
     if (results?.type !== 'all') return
@@ -396,6 +420,7 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
         <PlayerDock
           collapsed={playerCollapsed}
           externalPlayback={{
+            analyser: playerAnalyser,
             commitSeek: player.commitSeek,
             currentIndex: player.currentIndex,
             currentTime: player.currentTime,

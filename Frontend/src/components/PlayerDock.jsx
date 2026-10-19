@@ -33,6 +33,7 @@ function playerArtworkUrl(url) {
 function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = false, onClose, onNext, onOpenMiniPlayer, onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, queue, track }) {
   const [volumeExpanded, setVolumeExpanded] = useState(false)
   const {
+    analyser,
     commitSeek,
     currentIndex,
     currentTime,
@@ -72,7 +73,7 @@ function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = fal
       {collapsed && (
         <div className="player-dock__compact">
           <CompactNowPlaying
-            analyser={null}
+            analyser={analyser}
             currentTime={currentTime}
             duration={duration}
             hasAudio
