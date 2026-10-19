@@ -573,8 +573,9 @@
   position: relative;
   grid-column: 1 / -1;
   grid-row: 1;
-  width: 100%;
+  width: min(100%, 220px);
   aspect-ratio: 1;
+  justify-self: center;
   display: block;
   overflow: hidden;
   border-radius: 7px;
