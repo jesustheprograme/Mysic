@@ -263,9 +263,10 @@
 
 .player-dock__compact-spectrum {
   width: 28px;
+  height: clamp(140px, 32vh, 280px);
   min-height: 0;
   display: flex;
-  flex: 1 1 220px;
+  flex: 0 1 clamp(140px, 32vh, 280px);
   align-items: stretch;
   justify-content: center;
   overflow: hidden;

@@ -89,9 +89,9 @@ export default function VerticalSpectrum({ analyser, playing = true, width = 22,
     const fallbackTargets = (now) => {
       const time = now / 1000
       for (let i = 0; i < N; i++) {
-        const pulse = Math.sin(time * 4.6 + i * 0.72) * 0.5 + 0.5
-        const ripple = Math.sin(time * 2.1 - i * 0.31) * 0.5 + 0.5
-        target[i] = (0.16 + pulse * ripple * 0.62) * env[i]
+        const pulse = Math.sin(time * 4.2 + i * 0.68) * 0.5 + 0.5
+        const ripple = Math.sin(time * 1.9 - i * 0.27) * 0.5 + 0.5
+        target[i] = (0.05 + pulse * ripple * 0.28) * env[i]
       }
     }
 
