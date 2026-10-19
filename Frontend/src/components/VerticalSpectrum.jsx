@@ -86,6 +86,15 @@ export default function VerticalSpectrum({ analyser, playing = true, width = 22,
       }
     }
 
+    const fallbackTargets = (now) => {
+      const time = now / 1000
+      for (let i = 0; i < N; i++) {
+        const pulse = Math.sin(time * 4.6 + i * 0.72) * 0.5 + 0.5
+        const ripple = Math.sin(time * 2.1 - i * 0.31) * 0.5 + 0.5
+        target[i] = (0.16 + pulse * ripple * 0.62) * env[i]
+      }
+    }
+
     const pill = (x, y, w, h) => {
       const r = h / 2
       g.beginPath()
@@ -103,6 +112,7 @@ export default function VerticalSpectrum({ analyser, playing = true, width = 22,
       last = now
       const { playing: p, analyser: an } = live.current
       if (p && an && an.context.state === 'running') audioTargets(an)
+      else if (p) fallbackTargets(now)
       else target.fill(0)
 
       // ataque rápido y firme, caída suave (independiente de los fps)

@@ -25,6 +25,11 @@ import {
   setMediaSessionAction,
 } from './reproductor/utilidadesReproductor.js'
 
+function playerArtworkUrl(url) {
+  if (!url?.includes('yt3.googleusercontent.com')) return url
+  return url.replace(/=w\d+-h\d+-/, '=w544-h544-')
+}
+
 function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = false, onClose, onNext, onOpenMiniPlayer, onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, queue, track }) {
   const [volumeExpanded, setVolumeExpanded] = useState(false)
   const {
@@ -41,9 +46,11 @@ function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = fal
     volume,
   } = externalPlayback
   const progress = duration > 0 ? Math.min((currentTime / duration) * 100, 100) : 0
+  const artwork = playerArtworkUrl(track.artwork)
+  const displayedTrack = artwork === track.artwork ? track : { ...track, artwork }
   const playerStyle = {
     '--mobile-player-progress': `${progress}%`,
-    ...(collapsed && track.artwork ? { '--compact-artwork': `url(${track.artwork})` } : {}),
+    ...(collapsed && artwork ? { '--compact-artwork': `url(${artwork})` } : {}),
   }
 
   return (
@@ -74,7 +81,7 @@ function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = fal
             onNext={onNext}
             onPrevious={onPrevious}
             onTogglePlayback={togglePlayback}
-            track={track}
+            track={displayedTrack}
           />
         </div>
       )}
@@ -89,7 +96,7 @@ function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = fal
         </div>
 
         <PlayerPanelContent
-          artwork={track.artwork}
+          artwork={artwork}
           artist={track.artist}
           currentTime={currentTime}
           duration={duration}
