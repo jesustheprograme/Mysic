@@ -53,7 +53,7 @@ function mapShelves(sections) {
 export async function getHome(youtube = getYoutube()) {
   const home = await youtube.music.getHomeFeed();
   return {
-    personalized: youtube.session.logged_in,
+    personalized: Boolean(youtube.session.cookie),
     filters: (home.filters || []).map(plainText).filter(Boolean),
     shelves: mapShelves(home.sections),
   };

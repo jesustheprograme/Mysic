@@ -76,6 +76,7 @@ export const imageUrl = (url) => {
 export const api = {
   account: (signal) => fetchJson('/account', signal),
   startAccountLink: () => send('/link/start', 'POST'),
+  connectMusicSession: (requestText) => send('/link/browser', 'POST', { requestText }),
   accountLinkStatus: (signal) => fetchJson('/link/status', signal),
   unlinkAccount: () => send('/link', 'DELETE'),
   home: (signal) => fetchJson('/home', signal),

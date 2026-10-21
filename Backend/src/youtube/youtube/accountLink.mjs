@@ -10,6 +10,7 @@ const linkFailures = new Map();
 const userClients = new Map();
 const KEY_CONTEXT = Buffer.from('mysic-youtube-oauth-v1');
 const MAX_USER_CLIENTS = 100;
+const MAX_BROWSER_AUTH_LENGTH = 32_768;
 
 function userKey(user) {
   return user._id.toString();
@@ -60,8 +61,18 @@ async function saveCredentials(user, credentials) {
   );
 }
 
+async function saveBrowserAuth(user, browserAuth) {
+  await getUsersCollection().updateOne(
+    { _id: user._id },
+    { $set: { youtubeMusicBrowserAuth: { encrypted: encryptCredentials(browserAuth, undefined, userKey(user)), updatedAt: new Date() } } },
+  );
+}
+
 async function clearCredentials(user) {
-  await getUsersCollection().updateOne({ _id: user._id }, { $unset: { youtubeMusicAuth: '' } });
+  await getUsersCollection().updateOne(
+    { _id: user._id },
+    { $unset: { youtubeMusicAuth: '', youtubeMusicBrowserAuth: '' } },
+  );
 }
 
 async function readCredentials(user) {
@@ -77,6 +88,81 @@ async function readCredentials(user) {
     await clearCredentials(user);
     return null;
   }
+}
+
+async function readBrowserAuth(user) {
+  const stored = await getUsersCollection().findOne(
+    { _id: user._id },
+    { projection: { youtubeMusicBrowserAuth: 1 } },
+  );
+  if (!stored?.youtubeMusicBrowserAuth?.encrypted) return null;
+  try {
+    return decryptCredentials(stored.youtubeMusicBrowserAuth.encrypted, undefined, userKey(user));
+  } catch (error) {
+    console.warn(`Se descartó una sesión de YouTube Music ilegible: ${error.message}`);
+    await getUsersCollection().updateOne(
+      { _id: user._id },
+      { $unset: { youtubeMusicBrowserAuth: '' } },
+    );
+    return null;
+  }
+}
+
+async function clearBrowserAuth(user) {
+  await getUsersCollection().updateOne(
+    { _id: user._id },
+    { $unset: { youtubeMusicBrowserAuth: '' } },
+  );
+  userClients.delete(userKey(user));
+}
+
+function unescapeCopiedValue(value) {
+  return value.trim().replace(/^['"]|['"]$/g, '').replace(/\\(['"])/g, '$1');
+}
+
+function findHeader(text, name) {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const patterns = [
+    new RegExp(`(?:^|\\s)-H\\s+(['"])(?:${escapedName})\\s*:\\s*([\\s\\S]*?)\\1`, 'i'),
+    new RegExp(`['"]${escapedName}['"]\\s*:\\s*(['"])([\\s\\S]*?)\\1`, 'i'),
+    new RegExp(`(?:^|\\r?\\n)\\s*${escapedName}\\s*:\\s*([^\\r\\n]+)`, 'i'),
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) return unescapeCopiedValue(match[2] ?? match[1]);
+  }
+  return '';
+}
+
+export function parseBrowserAuth(requestText) {
+  if (typeof requestText !== 'string' || !requestText.trim()) {
+    throw new Error('Pega la solicitud copiada desde YouTube Music.');
+  }
+  if (Buffer.byteLength(requestText, 'utf8') > MAX_BROWSER_AUTH_LENGTH) {
+    throw new Error('La solicitud copiada es demasiado grande.');
+  }
+  const cookie = findHeader(requestText, 'cookie');
+  if (!/(?:^|;\s*)SAPISID=/i.test(cookie)) {
+    throw new Error('La solicitud no contiene una sesión válida de YouTube Music.');
+  }
+  const rawAccountIndex = findHeader(requestText, 'x-goog-authuser');
+  const accountIndex = /^\d+$/.test(rawAccountIndex) ? Number(rawAccountIndex) : 0;
+  const onBehalfOfUser = findHeader(requestText, 'x-goog-pageid') || undefined;
+  return { cookie, accountIndex, onBehalfOfUser };
+}
+
+async function createBrowserClient(browserAuth) {
+  return Innertube.create({
+    cookie: browserAuth.cookie,
+    account_index: browserAuth.accountIndex,
+    on_behalf_of_user: browserAuth.onBehalfOfUser,
+  });
+}
+
+async function verifyMusicPersonalization(client) {
+  const home = await client.music.getHomeFeed();
+  if (!home?.sections?.length) throw new Error('YouTube Music no devolvió recomendaciones para esta sesión.');
+  return home;
 }
 
 function watchCredentialUpdates(client, user) {
@@ -122,10 +208,43 @@ export async function getAccountStatus(user) {
   }
   if (failure) linkFailures.delete(key);
 
+  const browserAuth = await readBrowserAuth(user);
+  if (browserAuth) {
+    try {
+      const client = await createBrowserClient(browserAuth);
+      await verifyMusicPersonalization(client);
+      cacheUserClient(key, client);
+      return { connected: true, personalized: true, status: 'connected', method: 'browser-session' };
+    } catch {
+      await clearBrowserAuth(user);
+      return {
+        connected: false,
+        personalized: false,
+        youtubeConnected: Boolean(await readCredentials(user)),
+        status: 'error',
+        method: 'anonymous',
+        error: 'La sesión de YouTube Music venció o fue revocada. Conéctala nuevamente.',
+      };
+    }
+  }
   const credentials = await readCredentials(user);
   return credentials
-    ? { connected: true, status: 'connected', method: 'device-oauth' }
-    : { connected: false, status: 'disconnected', method: 'anonymous' };
+    ? { connected: false, personalized: false, youtubeConnected: true, status: 'needs-music-session', method: 'device-oauth' }
+    : { connected: false, personalized: false, youtubeConnected: false, status: 'disconnected', method: 'anonymous' };
+}
+
+export async function connectBrowserSession(user, requestText) {
+  const browserAuth = parseBrowserAuth(requestText);
+  let client;
+  try {
+    client = await createBrowserClient(browserAuth);
+    await verifyMusicPersonalization(client);
+  } catch {
+    throw new Error('YouTube Music rechazó esta sesión. Copia una solicitud reciente de music.youtube.com e inténtalo otra vez.');
+  }
+  await saveBrowserAuth(user, browserAuth);
+  cacheUserClient(userKey(user), client);
+  return { connected: true, personalized: true, status: 'connected', method: 'browser-session' };
 }
 
 export function validateVerificationUrl(value) {
@@ -180,7 +299,6 @@ async function beginAccountLink(user, token) {
       const credentials = receivedCredentials ?? client.session.oauth?.oauth2_tokens;
       if (!credentials) throw new Error('YouTube no devolvió credenciales válidas.');
       await saveCredentials(user, credentials);
-      cacheUserClient(key, client);
       pendingLinks.delete(key);
     })
     .catch((error) => {
@@ -220,20 +338,17 @@ export async function getYoutubeForUser(user) {
     return cached;
   }
 
-  const credentials = await readCredentials(user);
-  if (!credentials) return null;
-
-  const client = await Innertube.create();
-  watchCredentialUpdates(client, user);
-  try {
-    await client.session.signIn(credentials);
-    cacheUserClient(key, client);
-    return client;
-  } catch (error) {
-    userClients.delete(key);
-    await clearCredentials(user);
-    throw new Error(`La vinculación de YouTube Music dejó de ser válida: ${error.message}`);
+  const browserAuth = await readBrowserAuth(user);
+  if (browserAuth) {
+    try {
+      const client = await createBrowserClient(browserAuth);
+      cacheUserClient(key, client);
+      return client;
+    } catch {
+      await clearBrowserAuth(user);
+    }
   }
+  return null;
 }
 
 export async function unlinkAccount(user) {
@@ -250,5 +365,5 @@ export async function unlinkAccount(user) {
     });
   }
   await clearCredentials(user);
-  return { connected: false, status: 'disconnected', method: 'anonymous' };
+  return { connected: false, personalized: false, youtubeConnected: false, status: 'disconnected', method: 'anonymous' };
 }

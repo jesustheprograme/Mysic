@@ -244,6 +244,22 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
     }
   }
 
+  async function connectMusicSession(requestText) {
+    setAccountBusy(true)
+    setAccountError('')
+    try {
+      const nextAccount = await api.connectMusicSession(requestText)
+      setAccount(nextAccount)
+      browse.showHome()
+      return true
+    } catch (error) {
+      setAccountError(error.message || 'No se pudo validar la sesión de YouTube Music.')
+      return false
+    } finally {
+      setAccountBusy(false)
+    }
+  }
+
   async function disconnectAccount() {
     setAccountBusy(true)
     setAccountError('')
@@ -258,7 +274,7 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
   }
 
   const controller = {
-    account, accountBusy, accountError, accountHelpOpen, actionError, browse, changeTab, disconnectAccount, downloads, goBack, likedAlbumIds,
+    account, accountBusy, accountError, accountHelpOpen, actionError, browse, changeTab, connectMusicSession, disconnectAccount, downloads, goBack, likedAlbumIds,
     likedArtistIds, likedSongIds, onAddToPlaylist, openAlbum, openArtist, player, playSongs,
     renderSongActions, searchType: browse.searchType, selectSearchEntity, setAccountHelpOpen, startAccountLink,
     showDownloads, startPlaylist, toggleAlbumFavorite, toggleArtistFavorite, toggleSongFavorite,

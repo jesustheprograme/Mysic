@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { decryptCredentials, encryptCredentials, validateVerificationUrl } from './accountLink.mjs';
+import { decryptCredentials, encryptCredentials, parseBrowserAuth, validateVerificationUrl } from './accountLink.mjs';
 
 test('cifra y descifra credenciales de YouTube Music sin exponer el contenido', () => {
   const credentials = { access_token: 'token-secreto', refresh_token: 'refresh-secreto', expiry_date: '2030-01-01' };
@@ -21,4 +21,22 @@ test('solo acepta direcciones HTTPS oficiales de YouTube para activar el disposi
   assert.throws(() => validateVerificationUrl('http://www.youtube.com/activate'));
   assert.throws(() => validateVerificationUrl('https://youtube.com.example.test/activate'));
   assert.throws(() => validateVerificationUrl('javascript:alert(1)'));
+});
+
+test('extrae únicamente la autenticación necesaria de una solicitud cURL de Music', () => {
+  const parsed = parseBrowserAuth(`curl 'https://music.youtube.com/youtubei/v1/browse' \\
+    -H 'x-goog-authuser: 2' \\
+    -H 'x-goog-pageid: canal-123' \\
+    -H 'cookie: PREF=hl=es; SAPISID=secreto; SID=otro-secreto'`);
+
+  assert.deepEqual(parsed, {
+    cookie: 'PREF=hl=es; SAPISID=secreto; SID=otro-secreto',
+    accountIndex: 2,
+    onBehalfOfUser: 'canal-123',
+  });
+});
+
+test('rechaza texto sin cookie SAPISID y entradas excesivas', () => {
+  assert.throws(() => parseBrowserAuth('cookie: SID=no-es-suficiente'), /sesión válida/);
+  assert.throws(() => parseBrowserAuth(`cookie: SAPISID=x\n${'a'.repeat(33_000)}`), /demasiado grande/);
 });

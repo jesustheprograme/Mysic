@@ -63,15 +63,15 @@ function SearchResults({ controller }) {
 }
 
 function AccountIntro({ account, pending }) {
-  let title = 'Personaliza Mysic con YouTube Music'
-  let description = 'La autorización ocurre directamente en Google. Mysic nunca ve tu contraseña.'
+  let title = 'Conecta tus recomendaciones reales'
+  let description = 'El acceso con Google identifica YouTube, pero no permite leer el Inicio privado de YouTube Music. Añade una sesión verificada para usar tus gustos reales.'
   if (pending) {
     title = 'Autoriza este dispositivo'
     description = 'Abre YouTube, inicia sesión si hace falta e introduce el código temporal.'
   }
   if (account?.connected) {
-    title = 'Tu YouTube Music está conectado'
-    description = 'Inicio, radios y recomendaciones usan los gustos de esta cuenta.'
+    title = 'Tu Inicio real de YouTube Music está conectado'
+    description = 'La sesión fue comprobada contra el feed personal. Inicio, radios y recomendaciones ya usan esta cuenta.'
   }
   return <div className="yt-account-help__copy"><strong>{title}</strong><p>{description}</p></div>
 }
@@ -97,17 +97,40 @@ function AccountCode({ account }) {
   )
 }
 
-function AccountActions({ account, busy, onDisconnect, onStart, pending }) {
+function MusicSessionForm({ busy, onConnect }) {
+  const [requestText, setRequestText] = useState('')
+  async function submit(event) {
+    event.preventDefault()
+    if (await onConnect(requestText)) setRequestText('')
+  }
+  return (
+    <form className="yt-account-session" onSubmit={submit}>
+      <ol>
+        <li>Abre <a href="https://music.youtube.com" target="_blank" rel="noreferrer">music.youtube.com</a> con la cuenta correcta.</li>
+        <li>En DevTools → Red, recarga la página y selecciona una solicitud llamada <code>browse</code>.</li>
+        <li>Clic derecho → Copiar → Copiar como cURL, y pégala aquí.</li>
+      </ol>
+      <label htmlFor="yt-music-request">Solicitud de YouTube Music</label>
+      <textarea id="yt-music-request" value={requestText} onChange={(event) => setRequestText(event.target.value)} autoComplete="off" spellCheck="false" placeholder="curl 'https://music.youtube.com/youtubei/v1/browse?...' ..." />
+      <div className="yt-account-session__footer">
+        <span>Contiene una sesión sensible: no la compartas. Mysic la cifra y no guarda este texto en el navegador.</span>
+        <button className="yt-account-action yt-account-action--primary" type="submit" disabled={busy || !requestText.trim()}>{busy ? <LoaderCircle className="yt-spin" size={16} aria-hidden="true" /> : <UserRound size={16} aria-hidden="true" />} Verificar y conectar</button>
+      </div>
+    </form>
+  )
+}
+
+function AccountActions({ account, busy, onDisconnect, pending }) {
   if (account?.connected) {
     return <div className="yt-account-help__actions"><span className="yt-account-connected"><Check size={15} aria-hidden="true" /> Vinculación activa</span><button className="yt-account-action" type="button" disabled={busy} onClick={onDisconnect}><Link2Off size={15} aria-hidden="true" /> Desvincular</button></div>
   }
   if (pending) {
     return <div className="yt-account-help__actions"><a className="yt-account-action yt-account-action--primary" href={account.verificationUrl} target="_blank" rel="noreferrer">Abrir YouTube <ExternalLink size={15} aria-hidden="true" /></a></div>
   }
-  return <div className="yt-account-help__actions"><button className="yt-account-action yt-account-action--primary" type="button" disabled={busy} onClick={onStart}>{busy ? <LoaderCircle className="yt-spin" size={16} aria-hidden="true" /> : <UserRound size={16} aria-hidden="true" />} Vincular cuenta</button></div>
+  return null
 }
 
-function AccountHelp({ account, busy, error, onDisconnect, onStart, open }) {
+function AccountHelp({ account, busy, error, onConnect, onDisconnect, open }) {
   const pending = account?.status === 'pending'
 
   return (
@@ -115,34 +138,48 @@ function AccountHelp({ account, busy, error, onDisconnect, onStart, open }) {
       <div>
         <AccountIntro account={account} pending={pending} />
         {pending && <AccountCode account={account} />}
-        <AccountActions account={account} busy={busy} onDisconnect={onDisconnect} onStart={onStart} pending={pending} />
+        <AccountActions account={account} busy={busy} onDisconnect={onDisconnect} pending={pending} />
+        {!account?.connected && !pending && <MusicSessionForm busy={busy} onConnect={onConnect} />}
         {error && <p className="yt-account-help__error" role="alert">{error}</p>}
       </div>
     </div>
   )
 }
 
+function getCatalogHeading(kind, personalized) {
+  if (kind === 'explore') return 'Explorar'
+  if (kind === 'home') return personalized ? 'Hecho para ti' : 'Descubre música'
+  if (kind === 'recommendations') return personalized ? 'Recomendado para ti' : 'Música relacionada'
+  return 'Mysic global'
+}
+
+function CatalogTabs({ browse, downloads, player, showDownloads, showingDownloads }) {
+  return (
+    <nav className="yt-hub__navigation" aria-label="Navegación de YouTube Music">
+      <button className={browse.view.kind === 'home' ? 'is-active' : ''} type="button" onClick={browse.showHome}><Headphones size={16} aria-hidden="true" /> Inicio</button>
+      <button className={browse.view.kind === 'explore' ? 'is-active' : ''} type="button" onClick={browse.showExplore}><Compass size={16} aria-hidden="true" /> Explorar</button>
+      {player.currentSong && <button className={browse.view.kind === 'recommendations' ? 'is-active' : ''} type="button" onClick={() => browse.showRecommendations(player.currentSong.id)}><Sparkles size={16} aria-hidden="true" /> Recomendado</button>}
+      <button className={showingDownloads ? 'is-active' : ''} type="button" onClick={showDownloads}><Download size={16} aria-hidden="true" /> Descargas{downloads.downloads.items.length ? ` (${downloads.downloads.items.length})` : ''}</button>
+    </nav>
+  )
+}
+
 function CatalogNavigation({ controller }) {
-  const { account, accountBusy, accountError, accountHelpOpen, actionError, browse, changeTab, disconnectAccount, downloads, player, searchType, selectSearchEntity, setAccountHelpOpen, showDownloads, startAccountLink } = controller
+  const { account, accountBusy, accountError, accountHelpOpen, actionError, browse, changeTab, connectMusicSession, disconnectAccount, downloads, player, searchType, selectSearchEntity, setAccountHelpOpen, showDownloads } = controller
   const showingDownloads = browse.view.kind === 'downloads'
-  const headings = { explore: 'Explorar', home: 'Hecho para ti', recommendations: 'Recomendado para ti' }
+  const heading = getCatalogHeading(browse.view.kind, account?.personalized)
 
   return (
     <header className="yt-hub">
       <div className="yt-hub__topline">
-        <div><span className="yt-hub__eyebrow">YOUTUBE MUSIC</span><h1>{headings[browse.view.kind] ?? 'Mysic global'}</h1></div>
+        <div><span className="yt-hub__eyebrow">YOUTUBE MUSIC</span><h1>{heading}</h1></div>
         <button className={`yt-account${account?.connected ? ' yt-account--connected' : ''}`} type="button" aria-controls="yt-account-help" aria-expanded={accountHelpOpen} onClick={() => setAccountHelpOpen((open) => !open)}>
-          <UserRound size={17} aria-hidden="true" /><span>{account?.connected ? 'Cuenta conectada' : 'Activar personalización'}</span><Info size={15} aria-hidden="true" />
+          <UserRound size={17} aria-hidden="true" /><span>{account?.connected ? 'Personalización verificada' : 'Conectar recomendaciones'}</span><Info size={15} aria-hidden="true" />
         </button>
       </div>
-      <AccountHelp account={account} busy={accountBusy} error={accountError} onDisconnect={disconnectAccount} onStart={startAccountLink} open={accountHelpOpen} />
+      <AccountHelp account={account} busy={accountBusy} error={accountError} onConnect={connectMusicSession} onDisconnect={disconnectAccount} open={accountHelpOpen} />
       <MusicSearchPanel history={browse.history} onEntitySelect={selectSearchEntity} onHistoryRemove={browse.removeFromHistory} onQueryChange={browse.setQuery} onSubmit={(text) => browse.runSearch(text, searchType)} query={browse.query} />
-      <nav className="yt-hub__navigation" aria-label="Navegación de YouTube Music">
-        <button className={browse.view.kind === 'home' ? 'is-active' : ''} type="button" onClick={browse.showHome}><Headphones size={16} aria-hidden="true" /> Inicio</button>
-        <button className={browse.view.kind === 'explore' ? 'is-active' : ''} type="button" onClick={browse.showExplore}><Compass size={16} aria-hidden="true" /> Explorar</button>
-        {player.currentSong && <button className={browse.view.kind === 'recommendations' ? 'is-active' : ''} type="button" onClick={() => browse.showRecommendations(player.currentSong.id)}><Sparkles size={16} aria-hidden="true" /> Recomendado</button>}
-        <button className={showingDownloads ? 'is-active' : ''} type="button" onClick={showDownloads}><Download size={16} aria-hidden="true" /> Descargas{downloads.downloads.items.length ? ` (${downloads.downloads.items.length})` : ''}</button>
-      </nav>
+      <CatalogTabs browse={browse} downloads={downloads} player={player} showDownloads={showDownloads} showingDownloads={showingDownloads} />
       {actionError && <div className="collection-empty" role="alert">{actionError}</div>}
       {(browse.view.kind === 'search' || showingDownloads) && (
         <CatalogSearchControls activeType={searchType} downloadsActive={showingDownloads} downloadsLabel={`Descargas${downloads.downloads.items.length ? ` (${downloads.downloads.items.length})` : ''}`} onDownloadsSelect={showDownloads} onQueryChange={browse.setQuery} onSubmit={() => browse.runSearch(browse.query, searchType)} onTypeSelect={changeTab} query={browse.query} showField={false} showDownloads={false} />
