@@ -43,6 +43,8 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
   const [likedAlbumIds, toggleAlbumFavorite] = useFavoriteIds('mysic:youtube:favorite-albums')
   const [account, setAccount] = useState(null)
   const [accountHelpOpen, setAccountHelpOpen] = useState(false)
+  const [accountBusy, setAccountBusy] = useState(false)
+  const [accountError, setAccountError] = useState('')
   const [actionError, setActionError] = useState('')
   const [queueLoadingKey, setQueueLoadingKey] = useState(null)
   const player = usePlayer({ enabled: active, isDownloaded: downloads.isDownloaded, onPlayerVisibilityChange })
@@ -51,6 +53,7 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
   const playerUsesLocalAudio = player.isLocal
   const [playerAnalyser, setPlayerAnalyser] = useState(null)
   const openMiniPlayer = useGlobalMiniPlayer(player, browse)
+  const refreshPersonalizedHome = useEffectEvent(() => browse.showHome())
 
   useEffect(() => {
     const controller = new AbortController()
@@ -59,6 +62,35 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
     })
     return () => controller.abort()
   }, [])
+
+  useEffect(() => {
+    if (account?.status !== 'pending') return undefined
+    const controller = new AbortController()
+    let polling = false
+    const poll = () => {
+      if (polling) return
+      polling = true
+      api.accountLinkStatus(controller.signal).then((nextAccount) => {
+        setAccount(nextAccount)
+        if (nextAccount.connected) {
+          setAccountError('')
+          refreshPersonalizedHome()
+        }
+      }).catch((error) => {
+        if (error.name !== 'AbortError') {
+          setAccountError(error.message || 'No se pudo comprobar la vinculación.')
+        }
+      }).finally(() => {
+        polling = false
+      })
+    }
+    const timer = setInterval(poll, Math.max(2000, Number(account.interval || 3) * 1000))
+    poll()
+    return () => {
+      clearInterval(timer)
+      controller.abort()
+    }
+  }, [account?.status, account?.interval])
 
   useEffect(() => () => queueRequestRef.current?.abort(), [])
   useEffect(() => { setActionError('') }, [browse.view.kind])
@@ -198,10 +230,35 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
     if (entity.kind === 'album') openAlbum(entity.id)
   }
 
+  async function startAccountLink() {
+    setAccountBusy(true)
+    setAccountError('')
+    try {
+      setAccount(await api.startAccountLink())
+    } catch (error) {
+      setAccountError(error.message || 'No se pudo iniciar la vinculación.')
+    } finally {
+      setAccountBusy(false)
+    }
+  }
+
+  async function disconnectAccount() {
+    setAccountBusy(true)
+    setAccountError('')
+    try {
+      setAccount(await api.unlinkAccount())
+      browse.showHome()
+    } catch (error) {
+      setAccountError(error.message || 'No se pudo desvincular la cuenta.')
+    } finally {
+      setAccountBusy(false)
+    }
+  }
+
   const controller = {
-    account, accountHelpOpen, actionError, browse, changeTab, downloads, goBack, likedAlbumIds,
+    account, accountBusy, accountError, accountHelpOpen, actionError, browse, changeTab, disconnectAccount, downloads, goBack, likedAlbumIds,
     likedArtistIds, likedSongIds, onAddToPlaylist, openAlbum, openArtist, player, playSongs,
-    renderSongActions, searchType: browse.searchType, selectSearchEntity, setAccountHelpOpen,
+    renderSongActions, searchType: browse.searchType, selectSearchEntity, setAccountHelpOpen, startAccountLink,
     showDownloads, startPlaylist, toggleAlbumFavorite, toggleArtistFavorite, toggleSongFavorite,
   }
   const root = document.getElementById('music-home')

@@ -1080,6 +1080,17 @@
   background: rgba(255, 255, 255, 0.025);
 }
 
+.yt-account-help--open > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px 20px;
+}
+
+.yt-account-help__copy {
+  min-width: 0;
+}
+
 .yt-account-help--open {
   grid-template-rows: 1fr;
   opacity: 1;
@@ -1100,6 +1111,81 @@
   margin: 4px 0 0;
   font-size: 12px;
   line-height: 1.55;
+}
+
+.yt-account-code {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(94, 214, 159, 0.26);
+  border-radius: 10px;
+  background: rgba(49, 154, 107, 0.08);
+}
+
+.yt-account-code span {
+  color: #f6faf8;
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+}
+
+.yt-account-code button,
+.yt-account-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  color: #dce5e1;
+  background: rgba(255, 255, 255, 0.045);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.yt-account-code button:hover,
+.yt-account-action:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.yt-account-help__actions,
+.yt-account-connected {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.yt-account-action--primary {
+  border-color: rgba(94, 214, 159, 0.3);
+  color: #f3fff9;
+  background: rgba(49, 154, 107, 0.18);
+}
+
+.yt-account-connected {
+  color: #7fdda9;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.yt-account-help .yt-account-help__error {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #ff9186;
+}
+
+@media (max-width: 720px) {
+  .yt-account-help--open > div {
+    grid-template-columns: 1fr;
+  }
+
+  .yt-account-help__actions {
+    flex-wrap: wrap;
+  }
 }
 
 .yt-hub__navigation {

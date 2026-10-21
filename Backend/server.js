@@ -135,11 +135,14 @@ async function start() {
 
   // Los feeds personales nunca se exponen sin una sesión válida de Mysic.
   app.use(
-    ['/api/youtube/account', '/api/youtube/home', '/api/youtube/radio', '/api/youtube/recommendations'],
+    ['/api/youtube/account', '/api/youtube/link', '/api/youtube/home', '/api/youtube/radio', '/api/youtube/recommendations'],
     async (req, res, next) => {
       try {
         const user = await getAuthenticatedUser(req, res, config)
-        if (user) next()
+        if (user) {
+          req.mysicUser = user
+          next()
+        }
       } catch (error) {
         next(error)
       }

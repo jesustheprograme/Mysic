@@ -1,4 +1,5 @@
-import { Compass, Download, Headphones, Info, Sparkles, UserRound, WifiOff } from 'lucide-react'
+import { Check, Compass, Copy, Download, ExternalLink, Headphones, Info, Link2Off, LoaderCircle, Sparkles, UserRound, WifiOff } from 'lucide-react'
+import { useState } from 'react'
 import ArtistView from '../collections/ArtistView.jsx'
 import CollectionDetailView from '../collections/CollectionDetailView.jsx'
 import CatalogSearchControls from '../discovery/CatalogSearchControls.jsx'
@@ -61,19 +62,47 @@ function SearchResults({ controller }) {
   )
 }
 
-function AccountHelp({ account, open }) {
+function AccountHelp({ account, busy, error, onDisconnect, onStart, open }) {
+  const [copiedCode, setCopiedCode] = useState('')
+  const pending = account?.status === 'pending'
+
+  async function copyCode() {
+    try {
+      await navigator.clipboard.writeText(account.userCode)
+      setCopiedCode(account.userCode)
+    } catch {
+      setCopiedCode('error')
+    }
+  }
+
   return (
     <div className={`yt-account-help${open ? ' yt-account-help--open' : ''}`} id="yt-account-help" inert={!open}>
       <div>
-        <strong>{account?.connected ? 'Tu sesión de YouTube Music está activa.' : 'Conecta YouTube Music de forma segura.'}</strong>
-        <p>{account?.connected ? 'Inicio, mixes y recomendaciones usan el historial de la cuenta configurada en el servidor.' : 'Configura YOUTUBE_COOKIE_BASE64 en el servidor. Mysic nunca solicita ni guarda cookies en el navegador.'}</p>
+        <div className="yt-account-help__copy">
+          <strong>{account?.connected ? 'Tu YouTube Music está conectado' : pending ? 'Autoriza este dispositivo' : 'Personaliza Mysic con YouTube Music'}</strong>
+          <p>{account?.connected ? 'Inicio, radios y recomendaciones usan los gustos de esta cuenta.' : pending ? 'Abre YouTube, inicia sesión si hace falta e introduce el código temporal.' : 'La autorización ocurre directamente en Google. Mysic nunca ve tu contraseña.'}</p>
+        </div>
+        {pending && (
+          <div className="yt-account-code" role="status">
+            <span>{account.userCode}</span>
+            <button type="button" onClick={copyCode}><Copy size={15} aria-hidden="true" /> {copiedCode === account.userCode ? 'Copiado' : 'Copiar'}</button>
+          </div>
+        )}
+        <div className="yt-account-help__actions">
+          {!account?.connected && !pending && <button className="yt-account-action yt-account-action--primary" type="button" disabled={busy} onClick={onStart}>{busy ? <LoaderCircle className="yt-spin" size={16} aria-hidden="true" /> : <UserRound size={16} aria-hidden="true" />} Vincular cuenta</button>}
+          {pending && <a className="yt-account-action yt-account-action--primary" href={account.verificationUrl} target="_blank" rel="noreferrer">Abrir YouTube <ExternalLink size={15} aria-hidden="true" /></a>}
+          {account?.connected && <span className="yt-account-connected"><Check size={15} aria-hidden="true" /> Vinculación activa</span>}
+          {account?.connected && <button className="yt-account-action" type="button" disabled={busy} onClick={onDisconnect}><Link2Off size={15} aria-hidden="true" /> Desvincular</button>}
+        </div>
+        {error && <p className="yt-account-help__error" role="alert">{error}</p>}
+        {copiedCode === 'error' && <p className="yt-account-help__error" role="alert">No se pudo copiar. Selecciona el código manualmente.</p>}
       </div>
     </div>
   )
 }
 
 function CatalogNavigation({ controller }) {
-  const { account, accountHelpOpen, actionError, browse, changeTab, downloads, player, searchType, selectSearchEntity, setAccountHelpOpen, showDownloads } = controller
+  const { account, accountBusy, accountError, accountHelpOpen, actionError, browse, changeTab, disconnectAccount, downloads, player, searchType, selectSearchEntity, setAccountHelpOpen, showDownloads, startAccountLink } = controller
   const showingDownloads = browse.view.kind === 'downloads'
   const headings = { explore: 'Explorar', home: 'Hecho para ti', recommendations: 'Recomendado para ti' }
 
@@ -85,7 +114,7 @@ function CatalogNavigation({ controller }) {
           <UserRound size={17} aria-hidden="true" /><span>{account?.connected ? 'Cuenta conectada' : 'Activar personalización'}</span><Info size={15} aria-hidden="true" />
         </button>
       </div>
-      <AccountHelp account={account} open={accountHelpOpen} />
+      <AccountHelp account={account} busy={accountBusy} error={accountError} onDisconnect={disconnectAccount} onStart={startAccountLink} open={accountHelpOpen} />
       <MusicSearchPanel history={browse.history} onEntitySelect={selectSearchEntity} onHistoryRemove={browse.removeFromHistory} onQueryChange={browse.setQuery} onSubmit={(text) => browse.runSearch(text, searchType)} query={browse.query} />
       <nav className="yt-hub__navigation" aria-label="Navegación de YouTube Music">
         <button className={browse.view.kind === 'home' ? 'is-active' : ''} type="button" onClick={browse.showHome}><Headphones size={16} aria-hidden="true" /> Inicio</button>

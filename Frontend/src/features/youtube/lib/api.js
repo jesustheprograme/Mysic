@@ -75,6 +75,9 @@ export const imageUrl = (url) => {
 /* ---------- Endpoints ---------- */
 export const api = {
   account: (signal) => fetchJson('/account', signal),
+  startAccountLink: () => send('/link/start', 'POST'),
+  accountLinkStatus: (signal) => fetchJson('/link/status', signal),
+  unlinkAccount: () => send('/link', 'DELETE'),
   home: (signal) => fetchJson('/home', signal),
   explore: (signal) => fetchJson('/explore', signal),
   radio: (id, signal) => fetchJson(`/radio/${encodeURIComponent(id)}`, signal),

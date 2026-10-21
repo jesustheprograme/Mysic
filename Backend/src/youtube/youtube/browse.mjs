@@ -50,8 +50,7 @@ function mapShelves(sections) {
   return (sections || []).map(mapShelf).filter(Boolean);
 }
 
-export async function getHome() {
-  const youtube = getYoutube();
+export async function getHome(youtube = getYoutube()) {
   const home = await youtube.music.getHomeFeed();
   return {
     personalized: youtube.session.logged_in,
@@ -60,16 +59,16 @@ export async function getHome() {
   };
 }
 
-export async function getExplore() {
-  const explore = await getYoutube().music.getExplore();
+export async function getExplore(youtube = getYoutube()) {
+  const explore = await youtube.music.getExplore();
   return {
     categories: (explore.top_buttons || []).map((item) => plainText(item.button_text)).filter(Boolean),
     shelves: mapShelves(explore.sections),
   };
 }
 
-export async function getRadio(videoId) {
-  const queue = await getYoutube().music.getUpNext(videoId, true);
+export async function getRadio(videoId, youtube = getYoutube()) {
+  const queue = await youtube.music.getUpNext(videoId, true);
   return {
     title: plainText(queue.title_text) || 'Radio de la canción',
     songs: (queue.contents || []).map(mapBrowseItem).filter((item) => item?.kind === 'song'),
@@ -86,7 +85,7 @@ export async function getPlaylistQueue(playlistId) {
   });
 }
 
-export async function getRecommendations(videoId) {
-  const related = await getYoutube().music.getRelated(videoId);
+export async function getRecommendations(videoId, youtube = getYoutube()) {
+  const related = await youtube.music.getRelated(videoId);
   return { shelves: mapShelves(related.contents) };
 }
