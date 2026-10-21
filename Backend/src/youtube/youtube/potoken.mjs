@@ -20,6 +20,9 @@ function ensureDom() {
     referrer: 'https://www.youtube.com/',
     userAgent: USER_AGENT,
   });
+  // Otras librerías del backend pueden detectar este window simulado. Debe
+  // ofrecer el mismo fetch que Node para no romper, por ejemplo, Google OAuth.
+  dom.window.fetch = globalThis.fetch.bind(globalThis);
   Object.assign(globalThis, {
     window: dom.window,
     document: dom.window.document,

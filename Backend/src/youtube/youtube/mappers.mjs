@@ -10,17 +10,28 @@ export function pickThumbnail(thumbnails) {
   return best?.url || '';
 }
 
+// youtubei.js mezcla strings con instancias Text según el tipo de tarjeta.
+// El contrato HTTP debe contener siempre valores primitivos renderizables.
+export function plainText(value) {
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  if (typeof value?.text === 'string') return value.text;
+  if (Array.isArray(value?.runs)) {
+    return value.runs.map((run) => plainText(run?.text)).join('');
+  }
+  return '';
+}
+
 // `defaults` rellena campos que faltan en algunos contextos (pistas de álbum sin carátula ni artista).
 export function mapSong(song, defaults = {}) {
-  const artistNames = song.artists?.map((a) => a.name).filter(Boolean) || [];
+  const artistNames = song.artists?.map((artist) => plainText(artist.name)).filter(Boolean) || [];
   return {
     id: song.id,
-    title: song.title || 'Canción sin título',
-    artist: artistNames.join(', ') || defaults.artist || 'Artista desconocido',
+    title: plainText(song.title) || 'Canción sin título',
+    artist: artistNames.join(', ') || plainText(defaults.artist) || 'Artista desconocido',
     artistId: song.artists?.[0]?.channel_id || defaults.artistId || null,
-    album: song.album?.name || defaults.album || 'Sencillo',
+    album: plainText(song.album?.name) || plainText(defaults.album) || 'Sencillo',
     albumId: song.album?.id || defaults.albumId || null,
-    duration: song.duration?.text || '--:--',
+    duration: plainText(song.duration) || '--:--',
     durationSeconds: song.duration?.seconds || 0,
     thumbnail: pickThumbnail(song.thumbnail ?? song.thumbnails) || defaults.thumbnail || '',
   };
@@ -28,26 +39,28 @@ export function mapSong(song, defaults = {}) {
 
 export function mapArtistItem(item) {
   // El subtítulo llega como "Artist • 74.4M monthly audience"; quitamos la etiqueta
-  const subtitle = (item.subtitle?.text || '').replace(/^[^•]*•\s*/, '');
+  const subtitle = plainText(item.subtitle).replace(/^[^•]*•\s*/, '');
   return {
     id: item.id,
-    name: item.name || item.title || 'Artista',
+    name: plainText(item.name) || plainText(item.title) || 'Artista',
     subtitle,
     thumbnail: pickThumbnail(item.thumbnail ?? item.thumbnails),
   };
 }
 
 export function mapAlbumItem(item) {
-  const subtitle = item.subtitle?.text || '';
+  const subtitle = plainText(item.subtitle);
   // El subtítulo puede ser "Album • Daft Punk • 2001", "Single • 2023" o solo "2023"
   const firstPart = subtitle.split('•')[0].trim();
   const kind = firstPart && !/^\d{4}$/.test(firstPart) ? firstPart : 'Álbum';
   return {
     id: item.id,
-    title: item.title?.text ?? item.title ?? 'Álbum',
-    artist: item.author?.name || item.artists?.map((a) => a.name).join(', ') || '',
+    title: plainText(item.title) || 'Álbum',
+    artist: plainText(item.author?.name)
+      || item.artists?.map((artist) => plainText(artist.name)).filter(Boolean).join(', ')
+      || '',
     artistId: item.author?.channel_id || item.artists?.[0]?.channel_id || null,
-    year: item.year || subtitle.match(/\b(19|20)\d{2}\b/)?.[0] || '',
+    year: plainText(item.year) || subtitle.match(/\b(19|20)\d{2}\b/)?.[0] || '',
     kind,
     thumbnail: pickThumbnail(item.thumbnail ?? item.thumbnails),
   };
@@ -57,8 +70,8 @@ export function mapAlbumItem(item) {
 export function mapTopResult(card) {
   if (!card) return null;
   const payload = card.title?.endpoint?.payload || card.on_tap?.payload || {};
-  const title = card.title?.text || '';
-  const subtitle = card.subtitle?.text || '';
+  const title = plainText(card.title);
+  const subtitle = plainText(card.subtitle);
   const thumbnail = pickThumbnail(card.thumbnail);
   const pageType =
     payload.browseEndpointContextSupportedConfigs?.browseEndpointContextMusicConfig?.pageType || '';

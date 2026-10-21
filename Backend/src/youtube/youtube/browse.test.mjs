@@ -62,3 +62,34 @@ test('normaliza las pistas de una playlist de YouTube Music', () => {
   assert.equal(item.album, 'Álbum');
   assert.equal(item.durationSeconds, 190);
 });
+
+test('convierte objetos Text de feeds personalizados en valores primitivos', () => {
+  const text = (value) => ({ text: value, runs: [{ text: value }], rtl: false });
+  const song = mapBrowseItem({
+    item_type: 'song',
+    id: 'abcdefghijk',
+    title: text('Canción personal'),
+    artists: [{ name: text('Artista personal'), channel_id: 'UC123' }],
+    album: { id: 'MPRE123', name: text('Álbum personal') },
+    duration: { text: '3:10', seconds: 190 },
+  });
+  const artist = mapBrowseItem({
+    item_type: 'artist',
+    id: 'UC12345',
+    title: text('Artista recomendado'),
+    subtitle: text('Artista • 2 M oyentes'),
+  });
+  const album = mapBrowseItem({
+    item_type: 'album',
+    id: 'MPRE12345',
+    title: text('Álbum recomendado'),
+    author: { name: text('Autor recomendado'), channel_id: 'UC123' },
+    year: text('2026'),
+  });
+
+  assert.deepEqual(
+    [song.title, song.artist, song.album, artist.name, artist.subtitle, album.title, album.artist, album.year]
+      .map((value) => typeof value),
+    Array(8).fill('string'),
+  );
+});
