@@ -1,24 +1,19 @@
-import { Download, LoaderCircle, Trash2, WifiOff } from 'lucide-react'
+import { Download, LoaderCircle, Radio, Trash2 } from 'lucide-react'
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import PlayerDock from '../../components/PlayerDock.jsx'
-import ArtistView from '../collections/ArtistView.jsx'
-import CollectionDetailView from '../collections/CollectionDetailView.jsx'
-import CatalogSearchControls from '../discovery/CatalogSearchControls.jsx'
-import HomeRail from '../discovery/HomeRail.jsx'
-import SongList from '../discovery/SongList.jsx'
-import useGlobalMiniPlayer from '../mini-player/useGlobalMiniPlayer.js'
 import { connectAudioAnalyser, disconnectAudioAnalyser, resumeAudioContext } from '../../lib/audioAnalyser.js'
+import useGlobalMiniPlayer from '../mini-player/useGlobalMiniPlayer.js'
 import { useBrowse } from './hooks/useBrowse.js'
 import { useDownloads } from './hooks/useDownloads.js'
 import { usePlayer } from './hooks/usePlayer.js'
+import { adaptSong } from './lib/adapters.js'
+import { api } from './lib/api.js'
 import { readStorage, writeStorage } from './lib/storage.js'
-
-const ignorePreview = () => {}
+import YoutubeCatalogContent from './YoutubeCatalogContent.jsx'
 
 function useFavoriteIds(storageKey) {
   const [ids, setIds] = useState(() => new Set(readStorage(storageKey, [])))
-
   function toggle(id, liked) {
     setIds((current) => {
       const next = new Set(current)
@@ -28,89 +23,45 @@ function useFavoriteIds(storageKey) {
       return next
     })
   }
-
   return [ids, toggle]
-}
-
-function adaptSong(song, index = 0) {
-  return {
-    ...song,
-    albumTitle: song.album,
-    artwork: song.thumbnail ?? song.artwork,
-    source: 'youtube',
-    trackNo: song.index ?? index + 1,
-  }
-}
-
-function adaptArtist(artist) {
-  return {
-    artwork: artist.thumbnail,
-    id: artist.id,
-    meta: artist.subtitle,
-    title: artist.name,
-  }
-}
-
-function adaptAlbum(album) {
-  return {
-    artwork: album.thumbnail,
-    artist: album.kind !== 'Álbum' ? album.kind : album.artist,
-    detail: album.year,
-    id: album.id,
-    title: album.title,
-  }
-}
-
-function getReleaseType(title, kind) {
-  if (/ep/i.test(kind) || /ep/i.test(title)) return 'ep'
-  if (/single/i.test(title)) return 'single'
-  return 'album'
-}
-
-function adaptReleases(shelves) {
-  return shelves.flatMap((shelf) => shelf.items.map((release) => ({
-    artwork: release.thumbnail,
-    id: release.id,
-    releaseDate: release.year ? `${release.year}-01-01` : null,
-    releaseType: getReleaseType(shelf.title, release.kind),
-    songCount: null,
-    songs: [],
-    subtitle: release.kind !== 'Álbum' ? release.kind : release.artist,
-    title: release.title,
-  })))
 }
 
 function getScrollTargets(workspace) {
   const content = workspace?.closest('.music-app__content')
   if (!workspace || !content) return []
-
-  return [
-    content,
-    workspace.querySelector('.artist-profile__content'),
-    workspace.querySelector('.collection-detail__tracks'),
-  ].filter(Boolean)
+  return [content, workspace.querySelector('.artist-profile__content'), workspace.querySelector('.collection-detail__tracks')].filter(Boolean)
 }
 
 function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, onPlayerVisibilityChange, playerCollapsed = false }) {
   const scrollPositionsRef = useRef(new Map())
   const workspaceRef = useRef(null)
+  const queueRequestRef = useRef(null)
   const browse = useBrowse({ progressive: true })
-  const { loadSection } = browse
   const downloads = useDownloads()
   const [likedSongIds, toggleSongFavorite] = useFavoriteIds('mysic:youtube:favorite-songs')
   const [likedArtistIds, toggleArtistFavorite] = useFavoriteIds('mysic:youtube:favorite-artists')
   const [likedAlbumIds, toggleAlbumFavorite] = useFavoriteIds('mysic:youtube:favorite-albums')
-  const player = usePlayer({
-    enabled: active,
-    isDownloaded: downloads.isDownloaded,
-    onPlayerVisibilityChange,
-  })
+  const [account, setAccount] = useState(null)
+  const [accountHelpOpen, setAccountHelpOpen] = useState(false)
+  const [actionError, setActionError] = useState('')
+  const [queueLoadingKey, setQueueLoadingKey] = useState(null)
+  const player = usePlayer({ enabled: active, isDownloaded: downloads.isDownloaded, onPlayerVisibilityChange })
   const playerAudioRef = player.audioProps.ref
   const playerSongId = player.currentSong?.id
   const playerUsesLocalAudio = player.isLocal
   const [playerAnalyser, setPlayerAnalyser] = useState(null)
-  const { error, loading, results, searchType, view } = browse
   const openMiniPlayer = useGlobalMiniPlayer(player, browse)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    api.account(controller.signal).then(setAccount).catch((error) => {
+      if (error.name !== 'AbortError') setAccount(null)
+    })
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => () => queueRequestRef.current?.abort(), [])
+  useEffect(() => { setActionError('') }, [browse.view.kind])
 
   useEffect(() => {
     const audio = playerAudioRef.current
@@ -118,12 +69,10 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
       setPlayerAnalyser(null)
       return undefined
     }
-
     const analyser = connectAudioAnalyser(audio)
     const resumeAnalyser = () => resumeAudioContext().catch(() => {})
     audio.addEventListener('play', resumeAnalyser)
     setPlayerAnalyser(analyser)
-
     return () => {
       audio.removeEventListener('play', resumeAnalyser)
       disconnectAudioAnalyser(audio)
@@ -131,16 +80,17 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
     }
   }, [playerAudioRef, playerSongId, playerUsesLocalAudio])
 
+  const { loadSection } = browse
+  const { results } = browse
   useEffect(() => {
     if (results?.type !== 'all') return
     if (results.pending?.includes('artist')) void loadSection('artist')
     if (results.pending?.includes('album')) void loadSection('album')
-  }, [loadSection, results?.query, results?.type, results?.pending])
+  }, [loadSection, results?.pending, results?.query, results?.type])
 
   const playExternalSong = useEffectEvent((event) => {
     if (event.detail?.id) player.playFrom([event.detail], 0)
   })
-
   useEffect(() => {
     const listener = (event) => playExternalSong(event)
     window.addEventListener('mysic:play-youtube-song', listener)
@@ -153,235 +103,82 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
   }
 
   function toggleDownload(song) {
-    if (downloads.downloadedIds.has(song.id)) {
-      downloads.deleteDownload(song.id)
-      return
-    }
-    downloads.downloadSong(song)
+    if (downloads.downloadedIds.has(song.id)) downloads.deleteDownload(song.id)
+    else downloads.downloadSong(song)
   }
 
-  function renderDownloadAction(song) {
+  async function loadQueue(key, loader) {
+    queueRequestRef.current?.abort()
+    const controller = new AbortController()
+    queueRequestRef.current = controller
+    setActionError('')
+    setQueueLoadingKey(key)
+    try {
+      const queue = await loader(controller.signal)
+      if (!queue.songs?.length) throw new Error('Esta selección no tiene canciones reproducibles.')
+      if (queueRequestRef.current === controller) player.playFrom(queue.songs, 0)
+    } catch (error) {
+      if (error.name !== 'AbortError') setActionError(error.message || 'No se pudo iniciar la reproducción.')
+    } finally {
+      if (queueRequestRef.current === controller) {
+        queueRequestRef.current = null
+        setQueueLoadingKey(null)
+      }
+    }
+  }
+
+  function startRadio(song) {
+    void loadQueue(`radio:${song.id}`, (signal) => api.radio(song.id, signal))
+  }
+  function startPlaylist(playlistId) {
+    void loadQueue(`playlist:${playlistId}`, (signal) => api.playlist(playlistId, signal))
+  }
+
+  function renderSongActions(song) {
     const job = downloads.downloads.jobs[song.id]
     const downloaded = downloads.downloadedIds.has(song.id)
     const busy = job?.status === 'downloading'
     const Icon = busy ? LoaderCircle : downloaded ? Trash2 : Download
     const label = downloaded ? `Eliminar descarga de ${song.title}` : `Descargar ${song.title}`
-
-    return (
-      <button
-        className="song-row__action collection-detail__track-action"
-        type="button"
-        aria-label={label}
-        title={label}
-        disabled={busy || (!downloads.online && !downloaded)}
-        onClick={() => toggleDownload(song)}
-      >
-        <Icon size={16} strokeWidth={1.8} aria-hidden="true" />
-      </button>
-    )
-  }
-
-  function renderSongResults(sourceSongs, title = 'Canciones') {
-    const songs = sourceSongs.map(adaptSong)
-    return (
-      <SongList
-        emptyMessage="No se encontraron canciones."
-        likedSongIds={likedSongIds}
-        onAddToPlaylist={onAddToPlaylist}
-        onAlbumSelect={openAlbum}
-        onArtistSelect={openArtist}
-        onPlaybackToggle={player.togglePlay}
-        onPreviewStart={ignorePreview}
-        onPreviewStop={ignorePreview}
-        onSongSelect={(songId) => playSongs(sourceSongs, songId)}
-        onToggleFavorite={toggleSongFavorite}
-        preview={null}
-        renderSongActions={renderDownloadAction}
-        selectedSongId={player.currentSong?.id}
-        selectedSongPlaying={player.isPlaying}
-        songs={songs}
-        title={title}
-      />
-    )
-  }
-
-  function renderSearchResults() {
-    if (!results) return <div className="collection-empty">Busca canciones, artistas o álbumes para comenzar.</div>
-
-    const songs = results.type === 'all' ? results.songs : results.type === 'song' ? results.items : []
-    const artists = results.type === 'all' ? results.artists : results.type === 'artist' ? results.items : []
-    const albums = results.type === 'all' ? results.albums : results.type === 'album' ? results.items : []
-
+    const startingRadio = queueLoadingKey === `radio:${song.id}`
     return (
       <>
-        {songs.length > 0 && renderSongResults(songs)}
-        {(results.type === 'all' || artists.length > 0) && (
-          <HomeRail items={artists.map(adaptArtist)} onSelect={openArtist} title="Artistas" variant="artist"
-            emptyMessage={results.pending?.includes('artist') ? 'Cargando artistas…' : 'No se encontraron artistas.'} />
-        )}
-        {(results.type === 'all' || albums.length > 0) && (
-          <HomeRail items={albums.map(adaptAlbum)} onSelect={openAlbum} title="Álbumes"
-            emptyMessage={results.pending?.includes('album') ? 'Cargando álbumes…' : 'No se encontraron álbumes.'} />
-        )}
+        <button className="song-row__action collection-detail__track-action" type="button" aria-label={`Iniciar radio de ${song.title}`} title="Iniciar radio" disabled={startingRadio} onClick={() => startRadio(song)}>
+          {startingRadio ? <LoaderCircle className="yt-spin" size={16} aria-hidden="true" /> : <Radio size={16} strokeWidth={1.8} aria-hidden="true" />}
+        </button>
+        <button className="song-row__action collection-detail__track-action" type="button" aria-label={label} title={label} disabled={busy || (!downloads.online && !downloaded)} onClick={() => toggleDownload(song)}>
+          <Icon className={busy ? 'yt-spin' : undefined} size={16} strokeWidth={1.8} aria-hidden="true" />
+        </button>
       </>
     )
   }
 
-  function renderCatalogNavigation() {
-    const showingDownloads = view.kind === 'downloads'
-
-    return (
-      <>
-        <div className="collection-heading">
-          <div>
-            <span>CATÁLOGO GLOBAL</span>
-            <h1>Mysic global</h1>
-          </div>
-        </div>
-
-        <section className="catalog-search" aria-labelledby="catalog-search-title">
-          <div className="collection-heading catalog-search__heading">
-            <h2 id="catalog-search-title">Buscar</h2>
-          </div>
-
-          <CatalogSearchControls
-            activeType={searchType}
-            downloadsActive={showingDownloads}
-            downloadsLabel={`Descargas${downloads.downloads.items.length ? ` (${downloads.downloads.items.length})` : ''}`}
-            onDownloadsSelect={showDownloads}
-            onQueryChange={browse.setQuery}
-            onSubmit={() => browse.runSearch(browse.query, searchType)}
-            onTypeSelect={changeTab}
-            query={browse.query}
-          />
-        </section>
-      </>
-    )
-  }
-
-  function renderSearchView() {
-    return (
-      <div className="home-page">
-        {renderCatalogNavigation()}
-
-        {!downloads.online && (
-          <div className="collection-empty" role="status">
-            <WifiOff aria-hidden="true" /> Sin conexión. Solo están disponibles las descargas.
-          </div>
-        )}
-        {error && <div className="collection-empty" role="alert">{error}</div>}
-        {loading && !results ? <div className="collection-empty" role="status">Cargando canciones…</div> : renderSearchResults()}
-      </div>
-    )
-  }
-
-  function renderDownloadsView() {
-    return (
-      <div className="home-page">
-        {renderCatalogNavigation()}
-        {!downloads.online && (
-          <div className="collection-empty" role="status">
-            <WifiOff aria-hidden="true" /> Sin conexión. Solo están disponibles las descargas.
-          </div>
-        )}
-        {error && <div className="collection-empty" role="alert">{error}</div>}
-        {renderSongResults(downloads.downloads.items, 'Descargas')}
-      </div>
-    )
-  }
-
-  function renderArtistView() {
-    const sourceSongs = view.data.topSongs
-    const songs = sourceSongs.map(adaptSong)
-    return (
-      <ArtistView
-        artist={{
-          artistId: view.data.id,
-          artwork: view.data.thumbnail,
-          images: view.data.images?.map((image) => image.url ?? image).filter(Boolean),
-          title: view.data.name,
-        }}
-        likedArtistIds={likedArtistIds}
-        likedSongIds={likedSongIds}
-        onAddToPlaylist={onAddToPlaylist}
-        onAlbumSelect={openAlbum}
-        onBack={goBack}
-        onPlaybackToggle={player.togglePlay}
-        onReleasePlay={(release) => openAlbum(release.id)}
-        onSongSelect={(songId) => playSongs(sourceSongs, songId)}
-        onToggleArtistFavorite={toggleArtistFavorite}
-        onToggleFavorite={toggleSongFavorite}
-        releases={adaptReleases(view.data.shelves)}
-        renderSongActions={renderDownloadAction}
-        selectedSongId={player.currentSong?.id}
-        selectedSongPlaying={player.isPlaying}
-        songs={songs}
-      />
-    )
-  }
-
-  function renderAlbumView() {
-    const sourceSongs = view.data.tracks
-    const songs = sourceSongs.map(adaptSong)
-    return (
-      <CollectionDetailView
-        collection={{
-          albumId: view.data.id,
-          artist: view.data.artist,
-          artistArtwork: view.data.thumbnail,
-          artistId: view.data.artistId,
-          artwork: view.data.thumbnail,
-          kind: 'Álbum',
-          title: view.data.title,
-          year: view.data.year,
-        }}
-        collectionFavorite={likedAlbumIds.has(view.data.id)}
-        likedSongIds={likedSongIds}
-        onAddToPlaylist={onAddToPlaylist}
-        onArtistSelect={openArtist}
-        onBack={goBack}
-        onDownloadCollection={() => downloads.downloadMany(sourceSongs)}
-        onPlaybackToggle={player.togglePlay}
-        onSongSelect={(songId) => playSongs(sourceSongs, songId)}
-        onToggleCollectionFavorite={(liked) => toggleAlbumFavorite(view.data.id, liked)}
-        onToggleFavorite={toggleSongFavorite}
-        renderTrackActions={renderDownloadAction}
-        selectedSongId={player.currentSong?.id}
-        selectedSongPlaying={player.isPlaying}
-        songs={songs}
-      />
-    )
-  }
-
-  const root = document.getElementById('music-home')
-  const currentTrack = player.currentSong ? adaptSong(player.currentSong) : null
-  const workspaceKey = view.data?.id ? `${view.kind}-${view.data.id}` : view.kind
+  const workspaceKey = browse.view.data?.id
+    ? `${browse.view.kind}-${browse.view.data.id}`
+    : browse.view.kind === 'recommendations' && playerSongId
+      ? `${browse.view.kind}-${playerSongId}`
+      : browse.view.kind
 
   function saveCurrentScrollPosition() {
     const positions = getScrollTargets(workspaceRef.current).map((target) => target.scrollTop)
     scrollPositionsRef.current.set(workspaceKey, positions)
   }
-
   function openArtist(artistId) {
     saveCurrentScrollPosition()
     browse.openArtist(artistId)
   }
-
   function openAlbum(albumId) {
     saveCurrentScrollPosition()
     browse.openAlbum(albumId)
   }
-
   function showDownloads() {
     saveCurrentScrollPosition()
     browse.showDownloads()
   }
-
   function changeTab(type) {
     saveCurrentScrollPosition()
     browse.changeTab(type)
   }
-
   function goBack() {
     saveCurrentScrollPosition()
     browse.goBack()
@@ -389,50 +186,40 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
 
   useLayoutEffect(() => {
     if (!active) return undefined
-
-    const workspace = workspaceRef.current
-    const scrollTargets = getScrollTargets(workspace)
+    const scrollTargets = getScrollTargets(workspaceRef.current)
     if (!scrollTargets.length) return undefined
     const savedPositions = scrollPositionsRef.current.get(workspaceKey)
-
-    scrollTargets.forEach((target, index) => {
-      target.scrollTo({
-        top: savedPositions?.[index] ?? 0,
-        behavior: 'instant',
-      })
-    })
+    scrollTargets.forEach((target, index) => target.scrollTo({ top: savedPositions?.[index] ?? 0, behavior: 'instant' }))
   }, [active, workspaceKey])
+
+  function selectSearchEntity(entity) {
+    if (entity.kind === 'song' && entity.song) player.playFrom([entity.song], 0)
+    if (entity.kind === 'artist') openArtist(entity.id)
+    if (entity.kind === 'album') openAlbum(entity.id)
+  }
+
+  const controller = {
+    account, accountHelpOpen, actionError, browse, changeTab, downloads, goBack, likedAlbumIds,
+    likedArtistIds, likedSongIds, onAddToPlaylist, openAlbum, openArtist, player, playSongs,
+    renderSongActions, searchType: browse.searchType, selectSearchEntity, setAccountHelpOpen,
+    showDownloads, startPlaylist, toggleAlbumFavorite, toggleArtistFavorite, toggleSongFavorite,
+  }
+  const root = document.getElementById('music-home')
+  const currentTrack = player.currentSong ? adaptSong(player.currentSong) : null
 
   return (
     <div className="youtube-catalog">
       <main className="music-app__main">
         <div className="music-workspace" key={workspaceKey} ref={workspaceRef}>
-          {view.kind === 'search' && renderSearchView()}
-          {view.kind === 'artist' && renderArtistView()}
-          {view.kind === 'album' && renderAlbumView()}
-          {view.kind === 'downloads' && renderDownloadsView()}
+          <YoutubeCatalogContent controller={controller} />
         </div>
       </main>
-
-      <audio {...player.audioProps} />
+      <audio {...player.audioProps}><track default kind="captions" label="Sin contenido hablado" src="/music-captions.vtt" srcLang="es" /></audio>
       <div ref={player.iframeHostRef} className="youtube-player-engine" aria-hidden="true" />
       {active && currentTrack && root && createPortal(
         <PlayerDock
           collapsed={playerCollapsed}
-          externalPlayback={{
-            analyser: playerAnalyser,
-            commitSeek: player.commitSeek,
-            currentIndex: player.currentIndex,
-            currentTime: player.currentTime,
-            duration: player.progressMax,
-            error: player.playerError,
-            handleSeek: player.handleSeek,
-            isBuffering: player.isBuffering,
-            isPlaying: player.isPlaying,
-            setVolume: player.setVolume,
-            togglePlayback: player.togglePlay,
-            volume: player.volume,
-          }}
+          externalPlayback={{ analyser: playerAnalyser, commitSeek: player.commitSeek, currentIndex: player.currentIndex, currentTime: player.currentTime, duration: player.progressMax, error: player.playerError, handleSeek: player.handleSeek, isBuffering: player.isBuffering, isPlaying: player.isPlaying, setVolume: player.setVolume, togglePlayback: player.togglePlay, volume: player.volume }}
           onClose={player.closePlayer}
           onOpenMiniPlayer={() => openMiniPlayer().catch(() => {})}
           onNext={player.playNext}

@@ -190,3 +190,9 @@ npm.cmd run music:cloudinary:apply
 ```
 
 Si una portada aparece como «Álbum todavía no catalogado», primero cataloga los MP3 de ese lanzamiento mediante `music:filezilla:apply` y vuelve a ejecutar `music:cloudinary:apply`. El proceso de imágenes no sube ni borra archivos en Cloudinary.
+
+## YouTube Music
+
+La sección Mysic global incluye Inicio, Explorar, radio, recomendaciones y búsqueda
+predictiva mediante YouTube.js. La configuración segura de una cuenta para obtener
+resultados personalizados está descrita en [docs/youtube-music.md](docs/youtube-music.md).

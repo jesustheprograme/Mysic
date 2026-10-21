@@ -37,7 +37,311 @@ import {
   shuffleSongs,
 } from './utilidades/navegacionDescubrimiento.js'
 
-function DiscoveryView({
+function useSongPreview(disabled) {
+  const [preview, setPreview] = useState(null)
+  const audioRef = useRef(null)
+  const unlockedRef = useRef(false)
+  const itemIdRef = useRef(null)
+  const timerRef = useRef(null)
+
+  useEffect(() => {
+    const audio = new Audio()
+    const clearPreview = () => {
+      itemIdRef.current = null
+      setPreview(null)
+    }
+    const removeUnlockListeners = () => {
+      document.removeEventListener('click', unlockAudio, true)
+      document.removeEventListener('keydown', unlockAudio, true)
+    }
+    const unlockAudio = () => {
+      if (unlockedRef.current || !audio.src) return
+      audio.volume = 0
+      audio.play().then(() => {
+        audio.pause()
+        audio.currentTime = 0
+        audio.volume = 0.35
+        unlockedRef.current = true
+        removeUnlockListeners()
+      }).catch(() => { audio.volume = 0.35 })
+    }
+
+    audio.preload = 'metadata'
+    audio.addEventListener('ended', clearPreview)
+    document.addEventListener('click', unlockAudio, true)
+    document.addEventListener('keydown', unlockAudio, true)
+    audioRef.current = audio
+    return () => {
+      clearTimeout(timerRef.current)
+      itemIdRef.current = null
+      audio.pause()
+      audio.removeEventListener('ended', clearPreview)
+      removeUnlockListeners()
+      audio.removeAttribute('src')
+      audio.load()
+      audioRef.current = null
+    }
+  }, [])
+
+  function startPreview(item) {
+    const audio = audioRef.current
+    if (disabled || !audio || !item.audioUrl || itemIdRef.current === item.id) return
+    clearTimeout(timerRef.current)
+    audio.pause()
+    itemIdRef.current = item.id
+    setPreview({ itemId: item.id, status: 'loading' })
+    timerRef.current = setTimeout(async () => {
+      if (itemIdRef.current !== item.id) return
+      if (audio.src !== new URL(item.audioUrl, window.location.href).href) {
+        audio.src = item.audioUrl
+        audio.load()
+      }
+      audio.currentTime = 0
+      audio.volume = 0.35
+      try {
+        await audio.play()
+        if (itemIdRef.current === item.id) setPreview({ itemId: item.id, status: 'playing' })
+      } catch {
+        if (itemIdRef.current === item.id) {
+          itemIdRef.current = null
+          setPreview(null)
+        }
+      }
+    }, 3000)
+  }
+
+  function stopPreview() {
+    const audio = audioRef.current
+    clearTimeout(timerRef.current)
+    itemIdRef.current = null
+    setPreview(null)
+    if (!audio) return
+    audio.pause()
+    audio.removeAttribute('src')
+    audio.load()
+  }
+
+  return { preview, startPreview, stopPreview }
+}
+
+function usePlaylistActions({
+  activePlaylist, addSongToPlaylist, createPlaylist, navigateTo, navigateToPlaylist,
+  onDeletePlaylist, onSetExternalSongInPlaylist, onUpdatePlaylist, setActivePlaylistId,
+  setPlaylistPickerSong,
+}) {
+  const [playlistEditor, setPlaylistEditor] = useState(null)
+
+  function openCreatePlaylist(pendingSong = null) {
+    setPlaylistPickerSong(null)
+    setPlaylistEditor({ mode: 'create', initialPlaylist: null, pendingSong })
+  }
+
+  function openEditPlaylist(playlist) {
+    const target = playlist?.id ? playlist : activePlaylist
+    if (target) setPlaylistEditor({ mode: 'edit', initialPlaylist: target, pendingSong: null })
+  }
+
+  async function savePlaylist(details) {
+    if (!playlistEditor) return
+    if (playlistEditor.mode === 'create') {
+      const playlistId = await createPlaylist(details)
+      if (!playlistId) return
+      const pendingSong = playlistEditor.pendingSong
+      if (pendingSong?.source === 'youtube') await onSetExternalSongInPlaylist(playlistId, pendingSong, true)
+      else if (pendingSong?.id) await addSongToPlaylist(playlistId, pendingSong.id)
+      setPlaylistEditor(null)
+      navigateToPlaylist(playlistId)
+      return
+    }
+    const updated = await onUpdatePlaylist(playlistEditor.initialPlaylist.id, details)
+    if (updated) setPlaylistEditor(null)
+  }
+
+  function togglePlaylistPinned(playlist) {
+    const target = playlist?.id ? playlist : activePlaylist
+    if (target) onUpdatePlaylist(target.id, { pinned: !target.pinned })
+  }
+
+  async function deletePlaylist(playlist) {
+    const deleted = await onDeletePlaylist?.(playlist.id)
+    if (!deleted) return false
+    setActivePlaylistId(null)
+    navigateTo('playlists')
+    return true
+  }
+
+  return { deletePlaylist, openCreatePlaylist, openEditPlaylist, playlistEditor, savePlaylist, setPlaylistEditor, togglePlaylistPinned }
+}
+
+function useSongSelection({
+  autoSpotlightBlockedRef, discoveryLoadingTimerRef, onSongSelect, playbackSongs, selectedSongId,
+  setDiscoveryLoading, setDiscoveryMix, setPlayerAnimationNonce, setPlayerFadeInNonce,
+  setSelectedSongContext, setSelectedSongPlaying, songs, stopPreview,
+}) {
+  function selectSong(songId, {
+    animatePlayer = true,
+    contextSong = null,
+    contextSongs = null,
+    fadeIn = false,
+    preserveDiscoveryMix = false,
+  } = {}) {
+    if (songId !== null) autoSpotlightBlockedRef.current = true
+    clearTimeout(discoveryLoadingTimerRef.current)
+    setDiscoveryLoading(false)
+    if (contextSongs) setDiscoveryMix(contextSongs)
+    else if (!preserveDiscoveryMix) setDiscoveryMix([])
+    setSelectedSongContext(contextSong?.id === songId ? contextSong : null)
+    stopPreview()
+    setSelectedSongPlaying(false)
+    if (songId !== null && animatePlayer) setPlayerAnimationNonce((nonce) => nonce + 1)
+    if (songId !== null && fadeIn) setPlayerFadeInNonce((nonce) => nonce + 1)
+    onSongSelect(songId)
+  }
+
+  function selectRelativeSong(offset) {
+    const currentIndex = playbackSongs.findIndex((song) => song.id === selectedSongId)
+    const startIndex = currentIndex >= 0 ? currentIndex : 0
+    const nextIndex = (startIndex + offset + playbackSongs.length) % playbackSongs.length
+    selectSong(playbackSongs[nextIndex].id, { animatePlayer: false, contextSong: playbackSongs[nextIndex], preserveDiscoveryMix: true })
+  }
+
+  function startWeeklyDiscovery() {
+    const weeklyMix = shuffleSongs(songs)
+    const firstSong = weeklyMix[0]
+    if (!firstSong) return
+    autoSpotlightBlockedRef.current = true
+    clearTimeout(discoveryLoadingTimerRef.current)
+    stopPreview()
+    setDiscoveryMix(weeklyMix)
+    setSelectedSongContext(null)
+    setDiscoveryLoading(false)
+    setSelectedSongPlaying(false)
+    setPlayerAnimationNonce((nonce) => nonce + 1)
+    onSongSelect(firstSong.id)
+  }
+
+  return { selectRelativeSong, selectSong, startWeeklyDiscovery }
+}
+
+function useMiniPlayerCommandListener({ playbackSongs, selectRelativeSong, selectSong }) {
+  const handleCommand = useEffectEvent((command) => {
+    if (!ownsMiniPlayer('mysic')) return
+    if (command.type === 'next') return selectRelativeSong(1)
+    if (command.type === 'previous') return selectRelativeSong(-1)
+    if (command.type === 'select') {
+      selectSong(command.songId, {
+        animatePlayer: false,
+        contextSong: playbackSongs.find((song) => song.id === command.songId) ?? null,
+        preserveDiscoveryMix: true,
+      })
+    }
+  })
+
+  useEffect(() => {
+    let unlisten = () => {}
+    let disposed = false
+    listenToMiniPlayerCommands(handleCommand).then((cleanup) => {
+      if (disposed) cleanup()
+      else unlisten = cleanup
+    })
+    return () => {
+      disposed = true
+      unlisten()
+    }
+  }, [])
+}
+
+function useDiscoveryNavigation({
+  activeSection, autoSpotlightBlockedRef, mayImportMusic, setActiveAlbumId, setActiveArtistId,
+  setActivePlaylistId, setActiveSection, setYoutubeVisited,
+}) {
+  function pushHash(nextHash, fallbackHash) {
+    if (window.location.hash !== nextHash) {
+      window.history.pushState({ previousAppHash: window.location.hash || fallbackHash }, '', nextHash)
+    }
+  }
+
+  function resetDetailIds() {
+    setActiveAlbumId(null)
+    setActiveArtistId(null)
+    setActivePlaylistId(null)
+  }
+
+  function navigateTo(section) {
+    if (section === 'import' && !mayImportMusic) return
+    const nextHash = sectionHashes[section]
+    if (!nextHash) return
+    autoSpotlightBlockedRef.current = true
+    if (section === 'youtube') {
+      setYoutubeVisited(true)
+      if (activeSection === 'youtube') window.dispatchEvent(new CustomEvent('mysic:global-home'))
+    }
+    setActiveSection(section)
+    resetDetailIds()
+    pushHash(nextHash, sectionHashes.home)
+  }
+
+  function navigateToPlaylist(playlistId) {
+    autoSpotlightBlockedRef.current = true
+    setActiveSection('playlist')
+    setActiveAlbumId(null)
+    setActiveArtistId(null)
+    setActivePlaylistId(playlistId)
+    pushHash(`#playlist-${playlistId}`, sectionHashes.playlists)
+  }
+
+  function navigateToAlbum(albumId) {
+    autoSpotlightBlockedRef.current = true
+    setActiveSection('album')
+    setActiveAlbumId(albumId)
+    setActiveArtistId(null)
+    setActivePlaylistId(null)
+    pushHash(`#${albumId}`, sectionHashes.albums)
+  }
+
+  function navigateToArtist(artistId) {
+    if (!artistId) return
+    autoSpotlightBlockedRef.current = true
+    setActiveSection('artist')
+    setActiveArtistId(artistId)
+    setActiveAlbumId(null)
+    setActivePlaylistId(null)
+    pushHash(`#artist-${artistId}`, sectionHashes.artists)
+  }
+
+  function navigateBack(fallbackSection) {
+    autoSpotlightBlockedRef.current = true
+    if (window.history.state?.previousAppHash) window.history.back()
+    else navigateTo(fallbackSection)
+  }
+
+  return { navigateBack, navigateTo, navigateToAlbum, navigateToArtist, navigateToPlaylist }
+}
+
+function resolveSelectedSong(selectedSongContext, selectedSongId, songs) {
+  if (selectedSongContext?.id === selectedSongId) return selectedSongContext
+  return songs.find((song) => song.id === selectedSongId) ?? null
+}
+
+function resolveActiveArtist(activeArtistItem, activeArtistProfile, activeArtistId) {
+  if (!activeArtistItem || activeArtistProfile?.id !== activeArtistId) return activeArtistItem
+  return {
+    ...activeArtistItem,
+    artwork: activeArtistProfile.artwork,
+    images: activeArtistProfile.images,
+  }
+}
+
+function getMobileContextTitle(activeSection, activeArtist, activeAlbum, activePlaylist) {
+  const contextTitles = {
+    artist: activeArtist?.title,
+    album: activeAlbum?.title,
+    playlist: activePlaylist?.title,
+  }
+  return contextTitles[activeSection] ?? null
+}
+
+function useDiscoveryPage({
   addSongToPlaylist,
   catalogHasMore,
   catalogLoadingMore,
@@ -72,9 +376,8 @@ function DiscoveryView({
     return requestedSection === 'import' && !mayImportMusic ? 'home' : requestedSection
   })
   // YouTube Music se monta la primera vez que se visita y ya no se desmonta (la música sigue al cambiar de sección)
-  const [youtubeVisited, setYoutubeVisited] = useState(false)
+  const [youtubeVisited, setYoutubeVisited] = useState(activeSection === 'youtube')
   const [youtubePlayerVisible, setYoutubePlayerVisible] = useState(false)
-  if (activeSection === 'youtube' && !youtubeVisited) setYoutubeVisited(true)
   const [activeAlbumId, setActiveAlbumId] = useState(getAlbumIdFromHash)
   const [activeArtistId, setActiveArtistId] = useState(getArtistIdFromHash)
   const [activeArtistProfile, setActiveArtistProfile] = useState(null)
@@ -84,7 +387,6 @@ function DiscoveryView({
   const [mobileBrandHidden, setMobileBrandHidden] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [playerCollapsed, setPlayerCollapsed] = useState(false)
-  const [preview, setPreview] = useState(null)
   const [discoveryLoading, setDiscoveryLoading] = useState(false)
   const [discoveryMix, setDiscoveryMix] = useState([])
   const [selectedSongContext, setSelectedSongContext] = useState(null)
@@ -93,22 +395,15 @@ function DiscoveryView({
   const [playerFadeInNonce, setPlayerFadeInNonce] = useState(0)
   const [playbackToggleNonce, setPlaybackToggleNonce] = useState(0)
   const [playerAnalyser, setPlayerAnalyser] = useState(null)
-  const [playlistEditor, setPlaylistEditor] = useState(null)
   const [playlistPickerSong, setPlaylistPickerSong] = useState(null)
   const autoSpotlightBlockedRef = useRef(false)
   const playbackStateRef = useRef({ currentTime: 0, duration: 0, isPlaying: false, volume: 75 })
   const contentRef = useRef(null)
   const discoveryLoadingTimerRef = useRef(null)
-  const previewAudioRef = useRef(null)
-  const previewAudioUnlockedRef = useRef(false)
-  const previewItemIdRef = useRef(null)
-  const previewTimerRef = useRef(null)
   const scrollPositionsRef = useRef(new Map())
   const mobileBrandHiddenRef = useRef(false)
   const activeRouteKey = `${activeSection}-${activePlaylistId ?? activeAlbumId ?? activeArtistId ?? ''}`
-  const selectedSong = selectedSongContext?.id === selectedSongId
-    ? selectedSongContext
-    : songs.find((song) => song.id === selectedSongId) ?? null
+  const selectedSong = resolveSelectedSong(selectedSongContext, selectedSongId, songs)
   const playbackSongs = discoveryMix.length ? discoveryMix : songs
   const nextSongs = getFollowingSongs(playbackSongs, selectedSongId)
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase()
@@ -183,17 +478,8 @@ function DiscoveryView({
   const activeAlbum = allAlbumItems.find((album) => album.id === activeAlbumId) ?? null
   const allArtistItems = createArtistItems(songs)
   const activeArtistItem = allArtistItems.find((artist) => artist.artistId === activeArtistId) ?? null
-  const activeArtist = activeArtistItem && activeArtistProfile?.id === activeArtistId
-    ? {
-        ...activeArtistItem,
-        artwork: activeArtistProfile.artwork,
-        images: activeArtistProfile.images,
-      }
-    : activeArtistItem
-  let mobileContextTitle = null
-  if (activeSection === 'artist') mobileContextTitle = activeArtist?.title
-  if (activeSection === 'album') mobileContextTitle = activeAlbum?.title
-  if (activeSection === 'playlist') mobileContextTitle = activePlaylist?.title
+  const activeArtist = resolveActiveArtist(activeArtistItem, activeArtistProfile, activeArtistId)
+  const mobileContextTitle = getMobileContextTitle(activeSection, activeArtist, activeAlbum, activePlaylist)
 
   useEffect(() => {
     function syncSectionFromHash() {
@@ -203,6 +489,7 @@ function DiscoveryView({
         window.history.replaceState(window.history.state, '', sectionHashes.home)
       }
       if (nextSection !== 'home') autoSpotlightBlockedRef.current = true
+      if (nextSection === 'youtube') setYoutubeVisited(true)
       setActiveSection(nextSection)
       setActiveAlbumId(getAlbumIdFromHash)
       setActiveArtistId(getArtistIdFromHash)
@@ -321,174 +608,23 @@ function DiscoveryView({
     }
   }, [activeSection, user])
 
-  useEffect(() => {
-    const previewAudio = new Audio()
-    const clearFinishedPreview = () => {
-      previewItemIdRef.current = null
-      setPreview(null)
-    }
-    const removeUnlockListeners = () => {
-      document.removeEventListener('click', unlockPreviewAudio, true)
-      document.removeEventListener('keydown', unlockPreviewAudio, true)
-    }
-    const unlockPreviewAudio = () => {
-      if (previewAudioUnlockedRef.current || !previewAudio.src) return
-
-      previewAudio.volume = 0
-      previewAudio.play().then(() => {
-        previewAudio.pause()
-        previewAudio.currentTime = 0
-        previewAudio.volume = 0.35
-        previewAudioUnlockedRef.current = true
-        removeUnlockListeners()
-      }).catch(() => {
-        previewAudio.volume = 0.35
-      })
-    }
-
-    previewAudio.preload = 'metadata'
-    previewAudio.addEventListener('ended', clearFinishedPreview)
-    document.addEventListener('click', unlockPreviewAudio, true)
-    document.addEventListener('keydown', unlockPreviewAudio, true)
-    previewAudioRef.current = previewAudio
-
-    return () => {
-      clearTimeout(previewTimerRef.current)
-      previewItemIdRef.current = null
-      previewAudio.pause()
-      previewAudio.removeEventListener('ended', clearFinishedPreview)
-      removeUnlockListeners()
-      previewAudio.removeAttribute('src')
-      previewAudio.load()
-      previewAudioRef.current = null
-    }
-  }, [])
-
-  function selectRelativeSong(offset) {
-    const currentIndex = playbackSongs.findIndex((song) => song.id === selectedSongId)
-    const startIndex = currentIndex >= 0 ? currentIndex : 0
-    const nextIndex = (startIndex + offset + playbackSongs.length) % playbackSongs.length
-    selectSong(playbackSongs[nextIndex].id, {
-      animatePlayer: false,
-      contextSong: playbackSongs[nextIndex],
-      preserveDiscoveryMix: true,
-    })
-  }
-
-  function startPreview(item) {
-    if (selectedSongPlaying) return
-
-    const audio = previewAudioRef.current
-    if (!audio || !item.audioUrl) return
-    if (previewItemIdRef.current === item.id) return
-
-    clearTimeout(previewTimerRef.current)
-    audio.pause()
-    previewItemIdRef.current = item.id
-    setPreview({ itemId: item.id, status: 'loading' })
-
-    previewTimerRef.current = setTimeout(async () => {
-      if (previewItemIdRef.current !== item.id) return
-      if (audio.src !== new URL(item.audioUrl, window.location.href).href) {
-        audio.src = item.audioUrl
-        audio.load()
-      }
-      audio.currentTime = 0
-      audio.volume = 0.35
-
-      try {
-        await audio.play()
-        if (previewItemIdRef.current === item.id) setPreview({ itemId: item.id, status: 'playing' })
-      } catch {
-        if (previewItemIdRef.current === item.id) {
-          previewItemIdRef.current = null
-          setPreview(null)
-        }
-      }
-    }, 3000)
-  }
-
-  function stopPreview() {
-    const audio = previewAudioRef.current
-    clearTimeout(previewTimerRef.current)
-    previewItemIdRef.current = null
-    setPreview(null)
-    if (!audio) return
-    audio.pause()
-    audio.removeAttribute('src')
-    audio.load()
-  }
-
-  function selectSong(songId, {
-    animatePlayer = true,
-    contextSong = null,
-    contextSongs = null,
-    fadeIn = false,
-    preserveDiscoveryMix = false,
-  } = {}) {
-    if (songId !== null) autoSpotlightBlockedRef.current = true
-    clearTimeout(discoveryLoadingTimerRef.current)
-    setDiscoveryLoading(false)
-    if (contextSongs) setDiscoveryMix(contextSongs)
-    else if (!preserveDiscoveryMix) setDiscoveryMix([])
-    setSelectedSongContext(contextSong?.id === songId ? contextSong : null)
-    stopPreview()
-    setSelectedSongPlaying(false)
-    if (songId !== null && animatePlayer) setPlayerAnimationNonce((nonce) => nonce + 1)
-    if (songId !== null && fadeIn) setPlayerFadeInNonce((nonce) => nonce + 1)
-    onSongSelect(songId)
-  }
-
-  function startWeeklyDiscovery() {
-    const weeklyMix = shuffleSongs(songs)
-    const firstSong = weeklyMix[0]
-    if (!firstSong) return
-
-    autoSpotlightBlockedRef.current = true
-
-    clearTimeout(discoveryLoadingTimerRef.current)
-    stopPreview()
-    setDiscoveryMix(weeklyMix)
-    setSelectedSongContext(null)
-    setDiscoveryLoading(false)
-    setSelectedSongPlaying(false)
-    setPlayerAnimationNonce((nonce) => nonce + 1)
-    onSongSelect(firstSong.id)
-  }
-
-  const handleMiniPlayerCommand = useEffectEvent((command) => {
-    if (!ownsMiniPlayer('mysic')) return
-    if (command.type === 'next') {
-      selectRelativeSong(1)
-      return
-    }
-    if (command.type === 'previous') {
-      selectRelativeSong(-1)
-      return
-    }
-    if (command.type === 'select') {
-      selectSong(command.songId, {
-        animatePlayer: false,
-        contextSong: playbackSongs.find((song) => song.id === command.songId) ?? null,
-        preserveDiscoveryMix: true,
-      })
-    }
+  const { preview, startPreview, stopPreview } = useSongPreview(selectedSongPlaying)
+  const { selectRelativeSong, selectSong, startWeeklyDiscovery } = useSongSelection({
+    autoSpotlightBlockedRef,
+    discoveryLoadingTimerRef,
+    onSongSelect,
+    playbackSongs,
+    selectedSongId,
+    setDiscoveryLoading,
+    setDiscoveryMix,
+    setPlayerAnimationNonce,
+    setPlayerFadeInNonce,
+    setSelectedSongContext,
+    setSelectedSongPlaying,
+    songs,
+    stopPreview,
   })
-
-  useEffect(() => {
-    let unlisten = () => {}
-    let disposed = false
-
-    listenToMiniPlayerCommands(handleMiniPlayerCommand).then((cleanup) => {
-      if (disposed) cleanup()
-      else unlisten = cleanup
-    })
-
-    return () => {
-      disposed = true
-      unlisten()
-    }
-  }, [])
+  useMiniPlayerCommandListener({ playbackSongs, selectRelativeSong, selectSong })
 
   const publishMiniPlayerSnapshot = useCallback((playbackState) => {
     playbackStateRef.current = playbackState
@@ -526,59 +662,16 @@ function DiscoveryView({
     }).catch(() => {})
   }, [playbackSongs, selectedSong])
 
-  function navigateTo(section) {
-    if (section === 'import' && !mayImportMusic) return
-    const nextHash = sectionHashes[section]
-    if (!nextHash) return
-    autoSpotlightBlockedRef.current = true
-    if (section === 'youtube' && activeSection === 'youtube') {
-      window.dispatchEvent(new CustomEvent('mysic:global-home'))
-    }
-    setActiveSection(section)
-    setActiveAlbumId(null)
-    setActiveArtistId(null)
-    setActivePlaylistId(null)
-    if (window.location.hash !== nextHash) {
-      window.history.pushState({ previousAppHash: window.location.hash || sectionHashes.home }, '', nextHash)
-    }
-  }
-
-  function navigateToPlaylist(playlistId) {
-    const nextHash = `#playlist-${playlistId}`
-    autoSpotlightBlockedRef.current = true
-    setActiveSection('playlist')
-    setActiveAlbumId(null)
-    setActiveArtistId(null)
-    setActivePlaylistId(playlistId)
-    if (window.location.hash !== nextHash) {
-      window.history.pushState({ previousAppHash: window.location.hash || sectionHashes.playlists }, '', nextHash)
-    }
-  }
-
-  function navigateToAlbum(albumId) {
-    const nextHash = `#${albumId}`
-    autoSpotlightBlockedRef.current = true
-    setActiveSection('album')
-    setActiveAlbumId(albumId)
-    setActivePlaylistId(null)
-    setActiveArtistId(null)
-    if (window.location.hash !== nextHash) {
-      window.history.pushState({ previousAppHash: window.location.hash || sectionHashes.albums }, '', nextHash)
-    }
-  }
-
-  function navigateToArtist(artistId) {
-    if (!artistId) return
-    const nextHash = `#artist-${artistId}`
-    autoSpotlightBlockedRef.current = true
-    setActiveSection('artist')
-    setActiveArtistId(artistId)
-    setActiveAlbumId(null)
-    setActivePlaylistId(null)
-    if (window.location.hash !== nextHash) {
-      window.history.pushState({ previousAppHash: window.location.hash || sectionHashes.artists }, '', nextHash)
-    }
-  }
+  const { navigateBack, navigateTo, navigateToAlbum, navigateToArtist, navigateToPlaylist } = useDiscoveryNavigation({
+    activeSection,
+    autoSpotlightBlockedRef,
+    mayImportMusic,
+    setActiveAlbumId,
+    setActiveArtistId,
+    setActivePlaylistId,
+    setActiveSection,
+    setYoutubeVisited,
+  })
 
   function dismissArtistSpotlight() {
     const artistId = spotlightArtist?.artistId
@@ -593,52 +686,6 @@ function DiscoveryView({
       .catch(() => {})
   }
 
-  function navigateBack(fallbackSection) {
-    autoSpotlightBlockedRef.current = true
-    if (window.history.state?.previousAppHash) {
-      window.history.back()
-      return
-    }
-
-    navigateTo(fallbackSection)
-  }
-
-  function openCreatePlaylist(pendingSong = null) {
-    setPlaylistPickerSong(null)
-    setPlaylistEditor({ mode: 'create', initialPlaylist: null, pendingSong })
-  }
-
-  function openEditPlaylist(playlist) {
-    const playlistToEdit = playlist?.id ? playlist : activePlaylist
-    if (playlistToEdit) setPlaylistEditor({ mode: 'edit', initialPlaylist: playlistToEdit, pendingSong: null })
-  }
-
-  async function savePlaylist(details) {
-    if (!playlistEditor) return
-
-    if (playlistEditor.mode === 'create') {
-      const playlistId = await createPlaylist(details)
-      if (!playlistId) return
-      if (playlistEditor.pendingSong?.source === 'youtube') {
-        await onSetExternalSongInPlaylist(playlistId, playlistEditor.pendingSong, true)
-      } else if (playlistEditor.pendingSong?.id) {
-        await addSongToPlaylist(playlistId, playlistEditor.pendingSong.id)
-      }
-      setPlaylistEditor(null)
-      navigateToPlaylist(playlistId)
-      return
-    }
-
-    const updated = await onUpdatePlaylist(playlistEditor.initialPlaylist.id, details)
-    if (!updated) return
-    setPlaylistEditor(null)
-  }
-
-  function togglePlaylistPinned(playlist) {
-    const playlistToUpdate = playlist?.id ? playlist : activePlaylist
-    if (playlistToUpdate) onUpdatePlaylist(playlistToUpdate.id, { pinned: !playlistToUpdate.pinned })
-  }
-
   function playExternalSong(song) {
     navigateTo('youtube')
     requestAnimationFrame(() => {
@@ -646,20 +693,29 @@ function DiscoveryView({
     })
   }
 
-  async function deletePlaylist(playlist) {
-    const deleted = await onDeletePlaylist?.(playlist.id)
-    if (!deleted) return false
-    setActivePlaylistId(null)
-    navigateTo('playlists')
-    return true
-  }
+  const {
+    deletePlaylist, openCreatePlaylist, openEditPlaylist, playlistEditor, savePlaylist,
+    setPlaylistEditor, togglePlaylistPinned,
+  } = usePlaylistActions({
+    activePlaylist,
+    addSongToPlaylist,
+    createPlaylist,
+    navigateTo,
+    navigateToPlaylist,
+    onDeletePlaylist,
+    onSetExternalSongInPlaylist,
+    onUpdatePlaylist,
+    setActivePlaylistId,
+    setPlaylistPickerSong,
+  })
 
   const playerVisible = Boolean(
     (selectedSong && !spotlightArtist && activeSection !== 'youtube')
     || (activeSection === 'youtube' && youtubePlayerVisible),
   )
 
-  return (
+  function renderPage() {
+    return (
     <div className={`music-app${sidebarCollapsed ? ' music-app--sidebar-collapsed' : ''}${playerVisible ? ' music-app--player-open' : ''}${playerVisible && playerCollapsed ? ' music-app--player-collapsed' : ''}`} id="music-home">
       <AppHeader
         collapsed={sidebarCollapsed}
@@ -1013,7 +1069,14 @@ function DiscoveryView({
         />
       )}
     </div>
-  )
+    )
+  }
+
+  return renderPage()
+}
+
+function DiscoveryView(props) {
+  return useDiscoveryPage(props)
 }
 
 export default DiscoveryView

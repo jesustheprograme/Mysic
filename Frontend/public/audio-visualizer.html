@@ -83,7 +83,6 @@
     let mediaElementSource
     let microphoneSource
     let microphoneStream
-    let objectUrl
     let mode = 'simulation'
     let frequencyData
     let levels = new Float32Array(Number(barsInput.value))
@@ -216,22 +215,29 @@
       else await document.documentElement.requestFullscreen()
     }
 
+    function readFileAsDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.addEventListener('load', () => resolve(reader.result), { once: true })
+        reader.addEventListener('error', () => reject(reader.error), { once: true })
+        reader.readAsDataURL(file)
+      })
+    }
+
     fileInput.addEventListener('change', async () => {
       const file = fileInput.files?.[0]
       if (!file) return
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-      objectUrl = URL.createObjectURL(file)
-      audio.src = objectUrl
-      useMediaElement()
-      playButton.disabled = false
-      await audio.play()
-      playButton.textContent = 'Pausar'
-      status.textContent = file.name
+      try {
+        audio.src = await readFileAsDataUrl(file)
+        useMediaElement()
+        playButton.disabled = false
+        await audio.play()
+        playButton.textContent = 'Pausar'
+        status.textContent = file.name
+      } catch {
+        status.textContent = 'No se pudo leer el archivo'
+      }
     })
-
-    window.addEventListener('pagehide', () => {
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-    }, { once: true })
 
     playButton.addEventListener('click', async () => {
       if (audio.paused) {
@@ -269,7 +275,6 @@
     window.addEventListener('resize', resize)
     window.addEventListener('beforeunload', () => {
       disconnectMicrophone()
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
     })
 
     resize()

@@ -1,5 +1,32 @@
 const ESTADOS_TERMINALES = new Set(['completed', 'completed_with_errors', 'failed', 'cancelled'])
 
+function EstadoAdquisicion({ job }) {
+  if (!job) return null
+
+  const completed = job.progress?.completed ?? 0
+  const total = job.progress?.total ?? 0
+  const prepared = job.results?.filter((item) => item.status === 'staged').length ?? 0
+
+  return (
+    <div className={`mi-acquisition-job mi-acquisition-job--${job.status}`}>
+      <div className="mi-acquisition-job__summary">
+        <strong>{job.status}</strong>
+        <span>{completed} de {total} enlaces</span>
+        <span>{prepared} MP3 preparados</span>
+      </div>
+      <progress value={completed} max={total || 1} />
+      {job.currentUrl && <div className="mi-acquisition-job__current" title={job.currentUrl}>{job.currentUrl}</div>}
+      {job.errors?.length > 0 && (
+        <ul className="mi-acquisition-job__errors">
+          {job.errors.map((item) => (
+            <li key={`${item.url || 'error'}-${item.file || ''}-${item.message}`}>{item.message}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 export default function PanelAdquisicion({
   acquisitionJob,
   cancellingAcquisition,
@@ -55,24 +82,7 @@ export default function PanelAdquisicion({
           </button>
         )}
       </div>
-      {acquisitionJob && (
-        <div className={`mi-acquisition-job mi-acquisition-job--${acquisitionJob.status}`}>
-          <div className="mi-acquisition-job__summary">
-            <strong>{acquisitionJob.status}</strong>
-            <span>{acquisitionJob.progress?.completed ?? 0} de {acquisitionJob.progress?.total ?? 0} enlaces</span>
-            <span>{acquisitionJob.results?.filter((item) => item.status === 'staged').length ?? 0} MP3 preparados</span>
-          </div>
-          <progress value={acquisitionJob.progress?.completed ?? 0} max={acquisitionJob.progress?.total || 1} />
-          {acquisitionJob.currentUrl && <div className="mi-acquisition-job__current" title={acquisitionJob.currentUrl}>{acquisitionJob.currentUrl}</div>}
-          {acquisitionJob.errors?.length > 0 && (
-            <ul className="mi-acquisition-job__errors">
-              {acquisitionJob.errors.map((item) => (
-                <li key={`${item.url || 'error'}-${item.file || ''}-${item.message}`}>{item.message}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+      <EstadoAdquisicion job={acquisitionJob} />
     </section>
   )
 }

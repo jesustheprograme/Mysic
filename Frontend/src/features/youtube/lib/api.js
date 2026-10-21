@@ -6,22 +6,57 @@ import { API_URL } from '../../../lib/api.js';
 
 export const API_BASE = `${API_URL}/youtube`;
 
-export async function fetchJson(path, signal) {
-  const response = await fetch(`${API_BASE}${path}`, { signal });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || `Error del servidor (${response.status})`);
-  return data;
+function apiError(data, status) {
+  const error = new Error(data.error || data.message || data.detail || `Error del servidor (${status})`);
+  error.status = status;
+  return error;
+}
+
+function readJson(response) {
+  return response.json().catch(() => ({}));
+}
+
+async function readError(response) {
+  return apiError(await readJson(response), response.status);
+}
+
+function waitForRetry(delayMs, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason ?? new DOMException('Solicitud cancelada', 'AbortError'));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', abort);
+      resolve();
+    }, delayMs);
+    const abort = () => {
+      clearTimeout(timer);
+      reject(signal.reason ?? new DOMException('Solicitud cancelada', 'AbortError'));
+    };
+    signal?.addEventListener('abort', abort, { once: true });
+  });
+}
+
+export async function fetchJson(path, signal, retries = 2) {
+  const response = await fetch(`${API_BASE}${path}`, { credentials: 'include', signal });
+  if (!response.ok && response.status === 503 && retries > 0) {
+    await waitForRetry(500, signal);
+    return fetchJson(path, signal, retries - 1);
+  }
+  if (!response.ok) throw await readError(response);
+  return readJson(response);
 }
 
 async function send(path, method, body) {
   const response = await fetch(`${API_BASE}${path}`, {
+    credentials: 'include',
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || `Error del servidor (${response.status})`);
-  return data;
+  if (!response.ok) throw await readError(response);
+  return readJson(response);
 }
 
 /* ---------- URLs de medios ---------- */
@@ -39,11 +74,17 @@ export const imageUrl = (url) => {
 
 /* ---------- Endpoints ---------- */
 export const api = {
+  account: (signal) => fetchJson('/account', signal),
+  home: (signal) => fetchJson('/home', signal),
+  explore: (signal) => fetchJson('/explore', signal),
+  radio: (id, signal) => fetchJson(`/radio/${encodeURIComponent(id)}`, signal),
+  playlist: (id, signal) => fetchJson(`/playlist/${encodeURIComponent(id)}`, signal),
+  recommendations: (id, signal) => fetchJson(`/recommendations/${encodeURIComponent(id)}`, signal),
   search: (q, type, signal) => fetchJson(`/search?q=${encodeURIComponent(q)}&type=${type}`, signal),
   suggest: (q, signal) => fetchJson(`/suggest?q=${encodeURIComponent(q)}`, signal),
-  artist: (id) => fetchJson(`/artist/${id}`),
+  artist: (id, signal) => fetchJson(`/artist/${encodeURIComponent(id)}`, signal),
   artistImages: (id, signal) => fetchJson(`/artist/${id}/images`, signal),
-  album: (id) => fetchJson(`/album/${id}`),
+  album: (id, signal) => fetchJson(`/album/${encodeURIComponent(id)}`, signal),
   downloads: {
     list: () => fetchJson('/downloads'),
     add: (song) => send('/downloads', 'POST', { song }),

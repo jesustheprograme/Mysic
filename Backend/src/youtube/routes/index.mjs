@@ -8,6 +8,7 @@ import { collectChannelMedia, getArtistNameAndMedia } from '../youtube/artist.mj
 import { invalidateStream, resolveAudioStream } from '../youtube/stream.mjs';
 import { createAlbumRouter } from './album.mjs';
 import { createArtistRouter } from './artist.mjs';
+import { createBrowseRouter } from './browse.mjs';
 import { createDownloadsRouter } from './downloads.mjs';
 import { createHealthRouter } from './health.mjs';
 import { createImagesRouter } from './images.mjs';
@@ -31,6 +32,7 @@ export function createApiRouter() {
   };
 
   api.use('/health', createHealthRouter());
+  api.use('/', createBrowseRouter());
   api.use('/', createSearchRouter({ warmArtistImages })); // /search y /suggest
   api.use('/artist', createArtistRouter({ getArtistImages }));
   api.use('/album', createAlbumRouter());

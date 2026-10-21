@@ -27,14 +27,14 @@ export function useDownloads() {
     }
   }, []);
 
-  // Carga inicial (y cuando cambia el número de descargas en curso) más sondeo mientras haya alguna
   useEffect(() => {
-    const initial = setTimeout(refresh, 0);
-    const timer = activeJobs > 0 ? setInterval(refresh, POLL_MS) : null;
-    return () => {
-      clearTimeout(initial);
-      if (timer) clearInterval(timer);
-    };
+    void refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    if (activeJobs === 0) return undefined;
+    const timer = window.setInterval(refresh, POLL_MS);
+    return () => window.clearInterval(timer);
   }, [activeJobs, refresh]);
 
   useEffect(() => {

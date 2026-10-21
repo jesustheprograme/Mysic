@@ -121,10 +121,9 @@ function NewArtistSpotlight({
     <div className="artist-intro artist-intro--spotlight" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onDismiss?.()
     }}>
-      <section
+      <dialog
         className="artist-intro__dialog artist-spotlight-card"
-        role="dialog"
-        aria-modal="true"
+        open
         aria-labelledby="artist-intro-title"
         aria-describedby="artist-intro-description"
         tabIndex={-1}
@@ -229,7 +228,7 @@ function NewArtistSpotlight({
             />
           </div>
         </div>
-      </section>
+      </dialog>
     </div>,
     document.body,
   )

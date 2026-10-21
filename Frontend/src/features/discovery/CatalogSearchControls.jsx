@@ -18,6 +18,8 @@ export default function CatalogSearchControls({
   onTypeSelect,
   onQueryChange,
   query,
+  showField = true,
+  showDownloads = true,
 }) {
   return (
     <div className={`catalog-search__controls${className ? ` ${className}` : ''}`}>
@@ -33,18 +35,22 @@ export default function CatalogSearchControls({
             {tab.label}
           </button>
         ))}
-        <button
-          className={downloadsActive ? 'catalog-search__filter catalog-search__filter--active' : 'catalog-search__filter'}
-          type="button"
-          aria-pressed={downloadsActive}
-          onClick={onDownloadsSelect}
-        >
-          {downloadsLabel}
-        </button>
+        {showDownloads && (
+          <button
+            className={downloadsActive ? 'catalog-search__filter catalog-search__filter--active' : 'catalog-search__filter'}
+            type="button"
+            aria-pressed={downloadsActive}
+            onClick={onDownloadsSelect}
+          >
+            {downloadsLabel}
+          </button>
+        )}
       </nav>
-      <form className="catalog-search__form" onSubmit={(event) => { event.preventDefault(); onSubmit() }}>
-        <FavoriteSearch label={label} value={query} onChange={onQueryChange} />
-      </form>
+      {showField && (
+        <form className="catalog-search__form" onSubmit={(event) => { event.preventDefault(); onSubmit() }}>
+          <FavoriteSearch label={label} value={query} onChange={onQueryChange} />
+        </form>
+      )}
     </div>
   )
 }

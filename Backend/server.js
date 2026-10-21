@@ -24,7 +24,7 @@ const express = require('express')
 const rateLimit = require('express-rate-limit')
 const helmet = require('helmet')
 const morgan = require('morgan')
-const { createAuthHandlers } = require('./src/auth')
+const { createAuthHandlers, getAuthenticatedUser } = require('./src/auth')
 const { createCatalogRouter } = require('./src/catalog')
 const { createFavoritesRouter } = require('./src/favorites')
 const { createPlaylistsRouter } = require('./src/playlists')
@@ -133,7 +133,20 @@ async function start() {
   app.use('/api/favorites', createFavoritesRouter(config))
   app.use('/api/playlists', createPlaylistsRouter(config))
 
-  // YouTube Music (Yotubei). Rutas públicas, sin sesión. Código en src/youtube (ESM, generado).
+  // Los feeds personales nunca se exponen sin una sesión válida de Mysic.
+  app.use(
+    ['/api/youtube/account', '/api/youtube/home', '/api/youtube/radio', '/api/youtube/recommendations'],
+    async (req, res, next) => {
+      try {
+        const user = await getAuthenticatedUser(req, res, config)
+        if (user) next()
+      } catch (error) {
+        next(error)
+      }
+    },
+  )
+
+  // YouTube Music (Yotubei). Código en src/youtube (ESM, generado).
   const { createApiRouter: createYoutubeRouter } = await import('./src/youtube/routes/index.mjs')
   app.use('/api/youtube', createYoutubeRouter())
 

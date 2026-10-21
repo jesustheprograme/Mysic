@@ -13,10 +13,12 @@ globalThis.BroadcastChannel = class {
 }
 const server = await createServer({ configFile: false, server: { middlewareMode: true, hmr: false }, optimizeDeps: { noDiscovery: true }, appType: 'custom' })
 try {
-  const React = await import('react')
-  const { createRoot } = await import('react-dom/client')
-  const bridge = await server.ssrLoadModule('/src/features/mini-player/playerBridge.ts')
-  const { default: useGlobalMiniPlayer } = await server.ssrLoadModule('/src/features/mini-player/useGlobalMiniPlayer.js')
+  const [React, { createRoot }, bridge, { default: useGlobalMiniPlayer }] = await Promise.all([
+    import('react'),
+    import('react-dom/client'),
+    server.ssrLoadModule('/src/features/mini-player/playerBridge.ts'),
+    server.ssrLoadModule('/src/features/mini-player/useGlobalMiniPlayer.js'),
+  ])
   const calls = []
   const player = { currentSong: { id: 'g1', title: 'Global', thumbnail: '/cover.jpg' }, queue: [{ id: 'g1' }, { id: 'g2' }], currentTime: 12, progressMax: 100, volume: 0.4, isPlaying: true,
     togglePlay: () => calls.push('toggle'), playNext: () => calls.push('next'), playPrev: () => calls.push('previous'),
@@ -30,7 +32,14 @@ try {
   await React.act(async () => window.dispatchEvent(new dom.window.CustomEvent('yotubei:play')))
   assert.equal(bridge.readPlaybackSnapshot().track.id, 'g1')
   assert.equal(bridge.readPlaybackSnapshot().volume, 40)
-  for (const command of [{ type: 'toggle' }, { type: 'next' }, { type: 'previous' }, { type: 'volume', value: 75 }, { type: 'seek', time: 42 }, { type: 'select', songId: 'g2' }]) await bridge.sendMiniPlayerCommand(command)
+  await Promise.all([
+    { type: 'toggle' },
+    { type: 'next' },
+    { type: 'previous' },
+    { type: 'volume', value: 75 },
+    { type: 'seek', time: 42 },
+    { type: 'select', songId: 'g2' },
+  ].map((command) => bridge.sendMiniPlayerCommand(command)))
   assert.deepEqual(calls, ['toggle', 'next', 'previous', ['volume', 0.75], ['seek', 42], ['select', 1]])
   await bridge.publishPlaybackState({ track: { id: 'local' }, isPlaying: false })
   assert.equal(bridge.readPlaybackSnapshot().track.id, 'g1', 'paused library cannot replace global snapshot')

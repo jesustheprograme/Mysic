@@ -22,8 +22,8 @@ function scheduleWhenIdle(callback) {
   return () => globalThis.clearTimeout(id);
 }
 
-async function loadArtist(id) {
-  return api.artist(id);
+async function loadArtist(id, signal) {
+  return api.artist(id, signal);
 }
 
 export const SEARCH_TABS = [
@@ -46,18 +46,27 @@ export function useBrowse({ progressive = false } = {}) {
   const [loading, setLoading] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [error, setError] = useState('');
-  const [view, setView] = useState({ kind: 'search' });
+  const [view, setView] = useState({ kind: 'home', data: null });
   const { history, add: addHistory, remove: removeFromHistory } = useSearchHistory();
   const searchControllerRef = useRef(null);
+  const detailControllerRef = useRef(null);
   const enrichmentCancelRef = useRef(null);
   const searchSequenceRef = useRef(0);
   const sectionRequestsRef = useRef(new Map());
   const searchContextRef = useRef(null);
+  const viewRef = useRef(view);
+  const viewHistoryRef = useRef([]);
 
-  const cancelSearch = useCallback(() => {
+  useEffect(() => {
+    viewRef.current = view;
+  }, [view]);
+
+  const cancelRequests = useCallback(() => {
     searchSequenceRef.current += 1;
     searchControllerRef.current?.abort();
     searchControllerRef.current = null;
+    detailControllerRef.current?.abort();
+    detailControllerRef.current = null;
     enrichmentCancelRef.current?.();
     enrichmentCancelRef.current = null;
     setLoading(false);
@@ -67,32 +76,16 @@ export function useBrowse({ progressive = false } = {}) {
   useEffect(() => () => {
     searchSequenceRef.current += 1;
     searchControllerRef.current?.abort();
+    detailControllerRef.current?.abort();
     enrichmentCancelRef.current?.();
   }, []);
-
-  const showCatalog = useCallback(() => {
-    cancelSearch();
-    // Returning from a detail view must allow unfinished sections to load again.
-    if (searchContextRef.current) {
-      const controller = new AbortController();
-      searchControllerRef.current = controller;
-      searchContextRef.current = {
-        ...searchContextRef.current, controller, sequence: searchSequenceRef.current, pending: false,
-      };
-      sectionRequestsRef.current.clear();
-    }
-    setError('');
-    setView({ kind: 'search' });
-  }, [cancelSearch]);
-
-  useEffect(() => {
-    globalThis.addEventListener?.('mysic:global-home', showCatalog);
-    return () => globalThis.removeEventListener?.('mysic:global-home', showCatalog);
-  }, [showCatalog]);
 
   const runSearch = useCallback(async (text, type) => {
     const trimmed = text.trim();
     if (!trimmed) return;
+    detailControllerRef.current?.abort();
+    detailControllerRef.current = null;
+    viewHistoryRef.current = [];
     const current = searchContextRef.current;
     if (current?.pending && current.type === type
       && current.query.toLocaleLowerCase() === trimmed.toLocaleLowerCase()
@@ -130,7 +123,6 @@ export function useBrowse({ progressive = false } = {}) {
       if (hasResults(indexed)) {
         indexedResultsShown = true;
         setResults({ ...indexed, query: trimmed });
-        setLoading(false);
         setEnriching(true);
       }
 
@@ -205,13 +197,12 @@ export function useBrowse({ progressive = false } = {}) {
         );
       }
     } finally {
-      if (sequence === searchSequenceRef.current) {
-        searchContextRef.current.pending = false;
-        setLoading(false);
-        if (!deferredEnrichment) {
-          if (!progressive) searchControllerRef.current = null;
-          setEnriching(false);
-        }
+      const isCurrentSearch = sequence === searchSequenceRef.current;
+      if (isCurrentSearch) searchContextRef.current.pending = false;
+      setLoading((current) => isCurrentSearch ? false : current);
+      if (isCurrentSearch && !deferredEnrichment) {
+        if (!progressive) searchControllerRef.current = null;
+        setEnriching(false);
       }
     }
   }, [addHistory, progressive]);
@@ -246,32 +237,76 @@ export function useBrowse({ progressive = false } = {}) {
     else setView({ kind: 'search' });
   };
 
-  const openDetail = useCallback(async (kind, load) => {
-    cancelSearch();
+  const openDetail = useCallback(async (kind, load, rememberCurrent = true) => {
+    cancelRequests();
+    const controller = new AbortController();
+    detailControllerRef.current = controller;
     const sequence = searchSequenceRef.current;
+    if (rememberCurrent && viewHistoryRef.current.at(-1) !== viewRef.current) {
+      viewHistoryRef.current.push(viewRef.current);
+    }
     setLoading(true);
     setError('');
     try {
-      const data = await load();
+      const data = await load(controller.signal);
       if (sequence !== searchSequenceRef.current) return;
       setView({ kind, data });
     } catch (err) {
+      if (err.name === 'AbortError') return;
       if (sequence === searchSequenceRef.current) setError(err.message);
     } finally {
-      if (sequence === searchSequenceRef.current) setLoading(false);
+      if (detailControllerRef.current === controller) detailControllerRef.current = null;
+      setLoading((current) => sequence === searchSequenceRef.current ? false : current);
     }
-  }, [cancelSearch]);
+  }, [cancelRequests]);
 
-  const openArtist = useCallback((id) => id && openDetail('artist', () => loadArtist(id)), [openDetail]);
-  const openAlbum = useCallback((id) => id && openDetail('album', () => api.album(id)), [openDetail]);
+  const openLanding = useCallback((kind, load) => {
+    viewHistoryRef.current = [];
+    setView({ kind, data: null });
+    return openDetail(kind, load, false);
+  }, [openDetail]);
+  const showHome = useCallback(() => openLanding('home', (signal) => api.home(signal)), [openLanding]);
+  const showExplore = useCallback(() => openLanding('explore', (signal) => api.explore(signal)), [openLanding]);
+  const showRecommendations = useCallback((id) => (
+    id && openLanding('recommendations', (signal) => api.recommendations(id, signal))
+  ), [openLanding]);
+
+  useEffect(() => {
+    showHome();
+    globalThis.addEventListener?.('mysic:global-home', showHome);
+    return () => globalThis.removeEventListener?.('mysic:global-home', showHome);
+  }, [showHome]);
+
+  const openArtist = useCallback((id) => id && openDetail('artist', (signal) => loadArtist(id, signal)), [openDetail]);
+  const openAlbum = useCallback((id) => id && openDetail('album', (signal) => api.album(id, signal)), [openDetail]);
 
   const showDownloads = () => {
-    cancelSearch();
+    cancelRequests();
+    if (viewHistoryRef.current.at(-1) !== viewRef.current) viewHistoryRef.current.push(viewRef.current);
     setError('');
     setView({ kind: 'downloads' });
   };
 
-  const goBack = showCatalog;
+  const goBack = useCallback(() => {
+    const previous = viewHistoryRef.current.pop();
+    if (!previous) {
+      showHome();
+      return;
+    }
+    cancelRequests();
+    if (previous.kind === 'search' && searchContextRef.current) {
+      const controller = new AbortController();
+      searchControllerRef.current = controller;
+      searchContextRef.current = {
+        ...searchContextRef.current,
+        controller,
+        pending: false,
+        sequence: searchSequenceRef.current,
+      };
+    }
+    setError('');
+    setView(previous);
+  }, [cancelRequests, showHome]);
 
   return {
     query,
@@ -289,6 +324,9 @@ export function useBrowse({ progressive = false } = {}) {
     changeTab,
     openArtist,
     openAlbum,
+    showHome,
+    showExplore,
+    showRecommendations,
     showDownloads,
     goBack,
   };

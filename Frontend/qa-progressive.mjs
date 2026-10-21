@@ -21,13 +21,16 @@ globalThis.fetch = async (url, { signal } = {}) => {
 }
 const server = await createServer({ configFile: false, server: { middlewareMode: true, hmr: false }, optimizeDeps: { noDiscovery: true }, appType: 'custom' })
 try {
-  const React = await import('react')
-  const { createRoot } = await import('react-dom/client')
-  const { useBrowse } = await server.ssrLoadModule('/src/features/youtube/hooks/useBrowse.js')
+  const [React, { createRoot }, { useBrowse }] = await Promise.all([
+    import('react'),
+    import('react-dom/client'),
+    server.ssrLoadModule('/src/features/youtube/hooks/useBrowse.js'),
+  ])
   let browse
   function Harness() { browse = useBrowse({ progressive: true }); return null }
   const root = createRoot(document.getElementById('root'))
   await React.act(async () => root.render(React.createElement(Harness)))
+  requests.length = 0
   await React.act(async () => Promise.all([browse.runSearch('Ado', 'all'), browse.runSearch('Ado', 'all')]))
   assert.equal(requests.length, 1, 'repeated Enter shares the in-flight search')
   requests.length = 0
@@ -72,8 +75,10 @@ try {
   assert.equal(document.querySelectorAll('img').length, 1)
   await React.act(async () => sectionRoot.unmount())
   assert.ok(observers.every(observer => observer.disconnected), 'observers cleaned on unmount')
-  const youtubeViewSource = await readFile(new URL('./src/features/youtube/YoutubeView.jsx', import.meta.url), 'utf8')
-  const homeRailSource = await readFile(new URL('./src/features/discovery/HomeRail.jsx', import.meta.url), 'utf8')
+  const [youtubeViewSource, homeRailSource] = await Promise.all([
+    readFile(new URL('./src/features/youtube/YoutubeView.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/features/discovery/HomeRail.jsx', import.meta.url), 'utf8'),
+  ])
   assert.doesNotMatch(youtubeViewSource, /VisibleContent|deferArtwork/, 'global results must not wait for viewport observers')
   assert.match(youtubeViewSource, /void loadSection\('artist'\)/, 'artist enrichment starts after song results')
   assert.match(youtubeViewSource, /void loadSection\('album'\)/, 'album enrichment starts after song results')

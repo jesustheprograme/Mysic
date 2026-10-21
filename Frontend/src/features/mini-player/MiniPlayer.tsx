@@ -70,7 +70,7 @@ type CatalogResults = {
   albums: CatalogItem[]
 }
 
-function MiniPlayer({ hostDocument = document, hostWindow = window }: MiniPlayerProps) {
+function useMiniPlayerController({ hostDocument = document, hostWindow = window }: MiniPlayerProps) {
   const [snapshot, setSnapshot] = useState<PlaybackSnapshot | null>(readPlaybackSnapshot)
   const [expanded, setExpanded] = useState(() => readStoredBoolean(MINI_PLAYER_EXPANDED_KEY, false))
   const [nativeExpanded, setNativeExpanded] = useState(expanded)
@@ -217,7 +217,7 @@ function MiniPlayer({ hostDocument = document, hostWindow = window }: MiniPlayer
     } catch (error) {
       if (!controller.signal.aborted) setCatalogError(error instanceof Error ? error.message : 'No se pudo buscar.')
     } finally {
-      if (searchControllerRef.current === controller) setCatalogLoading(false)
+      setCatalogLoading((current) => searchControllerRef.current === controller ? false : current)
     }
   }
 
@@ -445,6 +445,28 @@ function MiniPlayer({ hostDocument = document, hostWindow = window }: MiniPlayer
       </div>
     )
   }
+
+  return {
+    activeQueueTab, catalogDownloads, catalogType, changeCatalogType, changeVolume, changingVolumeRef,
+    closeWindow, currentTime, expanded, expandedRef, finishCollapse, flushPendingCommands,
+    isPictureInPicture, pinned, playNext, progress, queue, queueSearch, relatedAlbums,
+    relatedAlbumsRef, relatedArtists, relatedArtistsRef, relatedSongColumns, relatedSongsRef,
+    renderCatalogResults, renderQueue, scrollRelatedCarousel, searchCatalog, seekingRef, seekTo,
+    selectQueueSong, setActiveQueueTab, setPinned, setQueueSearch, showCatalogDownloads, snapshot,
+    surfaceOpen, toggleExpanded, togglePlayback, track, visibleQueue, visualAnchor,
+  }
+}
+
+function renderMiniPlayer(controller: ReturnType<typeof useMiniPlayerController>) {
+  const {
+    activeQueueTab, catalogDownloads, catalogType, changeCatalogType, changeVolume, changingVolumeRef,
+    closeWindow, currentTime, expanded, expandedRef, finishCollapse, flushPendingCommands,
+    isPictureInPicture, pinned, playNext, progress, queue, queueSearch, relatedAlbums,
+    relatedAlbumsRef, relatedArtists, relatedArtistsRef, relatedSongColumns, relatedSongsRef,
+    renderCatalogResults, renderQueue, scrollRelatedCarousel, searchCatalog, seekingRef, seekTo,
+    selectQueueSong, setActiveQueueTab, setPinned, setQueueSearch, showCatalogDownloads, snapshot,
+    surfaceOpen, toggleExpanded, togglePlayback, track, visibleQueue, visualAnchor,
+  } = controller
 
   return (
     <main
@@ -707,6 +729,15 @@ function MiniPlayer({ hostDocument = document, hostWindow = window }: MiniPlayer
       </section>
     </main>
   )
+}
+
+function MiniPlayerView({ controller }: { controller: ReturnType<typeof useMiniPlayerController> }) {
+  return renderMiniPlayer(controller)
+}
+
+function MiniPlayer(props: MiniPlayerProps) {
+  const controller = useMiniPlayerController(props)
+  return <MiniPlayerView controller={controller} />
 }
 
 export default MiniPlayer

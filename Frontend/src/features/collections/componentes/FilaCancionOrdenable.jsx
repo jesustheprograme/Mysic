@@ -14,6 +14,71 @@ function formatTrackNumber(song, index, displayTrackNumber) {
   return String(song.trackNumber ?? song.trackNo ?? index + 1).padStart(2, '0')
 }
 
+function TrackPlaybackButton({ displayTrackNumber, index, isPlaying, onToggle, song, withArtwork }) {
+  const label = isPlaying ? `Pausar ${song.title}` : `Reproducir ${song.title}`
+  const content = withArtwork
+    ? <img src={song.artwork} alt="" loading="lazy" />
+    : <span className="collection-detail__track-number" aria-hidden="true">{formatTrackNumber(song, index, displayTrackNumber)}</span>
+
+  return (
+    <button
+      className={`${withArtwork ? 'collection-detail__track-artwork' : 'collection-detail__track-index'} collection-detail__track-playback playback-hover${isPlaying ? ' collection-detail__track-playback--playing' : ''}`}
+      type="button"
+      aria-label={label}
+      aria-pressed={isPlaying}
+      title={label}
+      onClick={onToggle}
+    >
+      {content}
+      <span className="collection-detail__track-playback-status" aria-hidden="true">
+        <PreviewIndicator status={isPlaying ? 'playing' : null} />
+      </span>
+    </button>
+  )
+}
+
+function TrackMetadata({ albumId, albumTitle, artistId, onAlbumSelect, onArtistSelect, onSongSelect, song, variant }) {
+  return (
+    <div className="collection-detail__track-main">
+      <button className="collection-detail__track-title" type="button" onClick={() => onSongSelect(song.id)}>{song.title}</button>
+      {variant !== 'album' && (
+        <small>
+          <button className="collection-detail__catalog-link collection-detail__catalog-link--artist" type="button" disabled={!artistId} onClick={() => onArtistSelect?.(artistId)}>{song.artist}</button>
+          {albumId && albumTitle && (
+            <>
+              <span className="collection-detail__catalog-separator" aria-hidden="true">·</span>
+              <button className="collection-detail__catalog-link collection-detail__catalog-link--album" type="button" title={albumTitle} onClick={() => onAlbumSelect?.(albumId)}>{albumTitle}</button>
+            </>
+          )}
+        </small>
+      )}
+    </div>
+  )
+}
+
+function TrackActions({ isLiked, onAddToPlaylist, onToggleFavorite, renderTrackActions, song }) {
+  return (
+    <span className="collection-detail__track-actions">
+      {onToggleFavorite && (
+        <HeartToggle
+          className="heart-container--song-row"
+          label={`Me gusta ${song.title}`}
+          liked={isLiked}
+          onToggle={(liked) => onToggleFavorite(song.id, liked)}
+          removeLabel={`Quitar ${song.title} de favoritas`}
+          size={17}
+        />
+      )}
+      {onAddToPlaylist && (
+        <button className="collection-detail__track-action" type="button" aria-label={`Añadir ${song.title} a una playlist`} title="Añadir a playlist" onClick={() => onAddToPlaylist(song)}>
+          <ListPlus size={17} strokeWidth={1.8} aria-hidden="true" />
+        </button>
+      )}
+      {renderTrackActions?.(song)}
+    </span>
+  )
+}
+
 export default function FilaCancionOrdenable({
   displayTrackNumber,
   index,
@@ -66,7 +131,6 @@ export default function FilaCancionOrdenable({
     isDragging && 'collection-detail__track--dragging',
     isOver && !isDragging && 'collection-detail__track--drop-target',
   ].filter(Boolean).join(' ')
-  const playbackLabel = isPlaying ? `Pausar ${song.title}` : `Reproducir ${song.title}`
   const artistId = song.artistId ?? song.artists?.[0]?.id
   const albumId = song.albumId ?? song.album?.id ?? song.albumMemberships?.[0]?.id
   const albumTitle = song.albumTitle ?? song.album?.title ?? song.albumMemberships?.[0]?.title
@@ -100,65 +164,9 @@ export default function FilaCancionOrdenable({
           <GripVertical size={19} strokeWidth={2.2} aria-hidden="true" />
         </button>
       )}
-      {showsTrackArtwork ? (
-        <button
-          className={`collection-detail__track-artwork collection-detail__track-playback playback-hover${isPlaying ? ' collection-detail__track-playback--playing' : ''}`}
-          type="button"
-          aria-label={playbackLabel}
-          aria-pressed={isPlaying}
-          title={playbackLabel}
-          onClick={toggleTrackPlayback}
-        >
-          <img src={song.artwork} alt="" loading="lazy" />
-          <span className="collection-detail__track-playback-status" aria-hidden="true">
-            <PreviewIndicator status={isPlaying ? 'playing' : null} />
-          </span>
-        </button>
-      ) : (
-        <button
-          className={`collection-detail__track-index collection-detail__track-playback playback-hover${isPlaying ? ' collection-detail__track-playback--playing' : ''}`}
-          type="button"
-          aria-label={playbackLabel}
-          aria-pressed={isPlaying}
-          title={playbackLabel}
-          onClick={toggleTrackPlayback}
-        >
-          <span className="collection-detail__track-number" aria-hidden="true">{formatTrackNumber(song, index, displayTrackNumber)}</span>
-          <span className="collection-detail__track-playback-status" aria-hidden="true">
-            <PreviewIndicator status={isPlaying ? 'playing' : null} />
-          </span>
-        </button>
-      )}
-      <div className="collection-detail__track-main">
-        <button className="collection-detail__track-title" type="button" onClick={() => onSongSelect(song.id)}>{song.title}</button>
-        {variant !== 'album' && <small>
-          <button className="collection-detail__catalog-link collection-detail__catalog-link--artist" type="button" disabled={!artistId} onClick={() => onArtistSelect?.(artistId)}>{song.artist}</button>
-          {albumId && albumTitle && (
-            <>
-              <span className="collection-detail__catalog-separator" aria-hidden="true">·</span>
-              <button className="collection-detail__catalog-link collection-detail__catalog-link--album" type="button" title={albumTitle} onClick={() => onAlbumSelect?.(albumId)}>{albumTitle}</button>
-            </>
-          )}
-        </small>}
-      </div>
-      <span className="collection-detail__track-actions">
-        {onToggleFavorite && (
-          <HeartToggle
-            className="heart-container--song-row"
-            label={`Me gusta ${song.title}`}
-            liked={isLiked}
-            onToggle={(liked) => onToggleFavorite(song.id, liked)}
-            removeLabel={`Quitar ${song.title} de favoritas`}
-            size={17}
-          />
-        )}
-        {onAddToPlaylist && (
-          <button className="collection-detail__track-action" type="button" aria-label={`Añadir ${song.title} a una playlist`} title="Añadir a playlist" onClick={() => onAddToPlaylist(song)}>
-            <ListPlus size={17} strokeWidth={1.8} aria-hidden="true" />
-          </button>
-        )}
-        {renderTrackActions?.(song)}
-      </span>
+      <TrackPlaybackButton displayTrackNumber={displayTrackNumber} index={index} isPlaying={isPlaying} onToggle={toggleTrackPlayback} song={song} withArtwork={showsTrackArtwork} />
+      <TrackMetadata albumId={albumId} albumTitle={albumTitle} artistId={artistId} onAlbumSelect={onAlbumSelect} onArtistSelect={onArtistSelect} onSongSelect={onSongSelect} song={song} variant={variant} />
+      <TrackActions isLiked={isLiked} onAddToPlaylist={onAddToPlaylist} onToggleFavorite={onToggleFavorite} renderTrackActions={renderTrackActions} song={song} />
       <time>{formatDuration(song.durationSeconds)}</time>
     </li>
   )

@@ -1,7 +1,6 @@
 let primedAudio = null
-let silentAudioUrl = null
 
-function createSilentAudioUrl() {
+function createSilentAudioDataUrl() {
   const sampleRate = 8000
   const samples = sampleRate
   const bytes = new Uint8Array(44 + samples)
@@ -26,22 +25,15 @@ function createSilentAudioUrl() {
   view.setUint32(40, samples, true)
   bytes.fill(128, 44)
 
-  return URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }))
+  let binary = ''
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte) })
+  return `data:audio/wav;base64,${btoa(binary)}`
 }
-
-function releaseSilentAudioUrl() {
-  if (!silentAudioUrl) return
-  URL.revokeObjectURL(silentAudioUrl)
-  silentAudioUrl = null
-}
-
-window.addEventListener('pagehide', releaseSilentAudioUrl, { once: true })
 
 export function primeAutoplay() {
   if (primedAudio) return
 
-  silentAudioUrl ??= createSilentAudioUrl()
-  const audio = new Audio(silentAudioUrl)
+  const audio = new Audio(createSilentAudioDataUrl())
   audio.loop = true
   audio.preload = 'auto'
   audio.volume = 0.001
@@ -62,6 +54,5 @@ export function takePrimedAudio(audioUrl) {
   audio.volume = 1
   audio.crossOrigin = 'anonymous'
   audio.src = audioUrl
-  releaseSilentAudioUrl()
   return audio
 }

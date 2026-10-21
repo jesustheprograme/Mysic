@@ -157,7 +157,7 @@ function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = fal
   )
 }
 
-function AudioPlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoading = false, liked = false, onAnalyserChange, onClose, onNext, onOpenMiniPlayer, onPlaybackChange, onPlaybackStateChange, onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, playbackToggleNonce, queue, suppressed = false, track }) {
+function useAudioPlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoading = false, onAnalyserChange, onNext, onPlaybackChange, onPlaybackStateChange, onPrevious, playbackToggleNonce, queue, track }) {
   const PAUSE_FADE_DURATION_MS = 400
   const START_FADE_DURATION_MS = 1200
   const waveformRef = useRef(null)
@@ -631,13 +631,38 @@ function AudioPlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, i
     ...(collapsed && track.artwork ? { '--compact-artwork': `url(${track.artwork})` } : {}),
   }
 
+  return {
+    analyser,
+    changeVolume,
+    currentTime,
+    duration,
+    handleWaveformKeyDown,
+    hasAudio,
+    isPlaying,
+    playerStyle,
+    setVolumeExpanded,
+    togglePlayback,
+    trackChangeAnimationEnabled,
+    volume,
+    volumeExpanded,
+    waveformRef,
+  }
+}
+
+function AudioPlayerDock(props) {
+  const {
+    collapsed = false, isLoading = false, liked = false, onClose, onNext, onOpenMiniPlayer,
+    onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, queue, suppressed = false, track,
+  } = props
+  const player = useAudioPlayerDock(props)
+
   return (
     <aside
-      className={`player-dock player-dock--animated${collapsed ? ' player-dock--collapsed' : ''}${trackChangeAnimationEnabled ? ' player-dock--track-changing' : ''}${suppressed ? ' player-dock--suppressed' : ''}`}
+      className={`player-dock player-dock--animated${collapsed ? ' player-dock--collapsed' : ''}${player.trackChangeAnimationEnabled ? ' player-dock--track-changing' : ''}${suppressed ? ' player-dock--suppressed' : ''}`}
       aria-label={`Reproductor de ${track.title}`}
       aria-hidden={suppressed || undefined}
       inert={suppressed || undefined}
-      style={playerStyle}
+      style={player.playerStyle}
     >
       <button
         className="player-dock__collapse"
@@ -652,15 +677,15 @@ function AudioPlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, i
       {collapsed && !isLoading && (
         <div className="player-dock__compact">
           <CompactNowPlaying
-            analyser={analyser}
-            currentTime={currentTime}
-            duration={duration}
-            hasAudio={hasAudio}
-            isPlaying={isPlaying}
+            analyser={player.analyser}
+            currentTime={player.currentTime}
+            duration={player.duration}
+            hasAudio={player.hasAudio}
+            isPlaying={player.isPlaying}
             onExpand={onToggleCollapsed}
             onNext={onNext}
             onPrevious={onPrevious}
-            onTogglePlayback={togglePlayback}
+            onTogglePlayback={player.togglePlayback}
             track={track}
           />
         </div>
@@ -688,25 +713,25 @@ function AudioPlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, i
           <PlayerPanelContent
             artwork={track.artwork}
             artist={track.artist}
-            currentTime={currentTime}
-            duration={duration}
-            hasAudio={hasAudio}
-            isPlaying={isPlaying}
+            currentTime={player.currentTime}
+            duration={player.duration}
+            hasAudio={player.hasAudio}
+            isPlaying={player.isPlaying}
             onNext={onNext}
             onPrevious={onPrevious}
-            onTogglePlayback={togglePlayback}
+            onTogglePlayback={player.togglePlayback}
             progress={(
               <div
-                className={`waveform-timeline__wave${hasAudio ? '' : ' waveform-timeline__wave--empty'}`}
-                ref={waveformRef}
+                className={`waveform-timeline__wave${player.hasAudio ? '' : ' waveform-timeline__wave--empty'}`}
+                ref={player.waveformRef}
                 role="slider"
-                tabIndex={hasAudio ? 0 : -1}
+                tabIndex={player.hasAudio ? 0 : -1}
                 aria-label="Progreso de reproduccion"
                 aria-valuemin="0"
-                aria-valuemax={duration}
-                aria-valuenow={currentTime}
-                aria-valuetext={`${formatTime(currentTime)} de ${formatTime(duration)}`}
-                onKeyDown={handleWaveformKeyDown}
+                aria-valuemax={player.duration}
+                aria-valuenow={player.currentTime}
+                aria-valuetext={`${formatTime(player.currentTime)} de ${formatTime(player.duration)}`}
+                onKeyDown={player.handleWaveformKeyDown}
               />
             )}
             title={track.title}
@@ -741,10 +766,10 @@ function AudioPlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, i
             </button>
             <div className="player-dock__volume">
               <VolumeControl
-                expanded={volumeExpanded}
-                onExpandedChange={setVolumeExpanded}
-                onVolumeChange={changeVolume}
-                volume={volume}
+                expanded={player.volumeExpanded}
+                onExpandedChange={player.setVolumeExpanded}
+                onVolumeChange={player.changeVolume}
+                volume={player.volume}
               />
             </div>
           </div>
