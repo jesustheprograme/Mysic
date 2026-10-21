@@ -4,8 +4,12 @@ import database from '../../database.js';
 
 const { getUsersCollection } = database;
 const pendingLinks = new Map();
+const linkStarts = new Map();
+const linkTokens = new Map();
+const linkFailures = new Map();
 const userClients = new Map();
 const KEY_CONTEXT = Buffer.from('mysic-youtube-oauth-v1');
+const MAX_USER_CLIENTS = 100;
 
 function userKey(user) {
   return user._id.toString();
@@ -21,12 +25,13 @@ function encryptionKey(secret = encryptionSecret()) {
   return Buffer.from(hkdfSync('sha256', Buffer.from(secret), Buffer.alloc(0), KEY_CONTEXT, 32));
 }
 
-export function encryptCredentials(credentials, secret) {
+export function encryptCredentials(credentials, secret, ownerId = '') {
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', encryptionKey(secret), iv);
+  cipher.setAAD(Buffer.from(ownerId));
   const ciphertext = Buffer.concat([cipher.update(JSON.stringify(credentials), 'utf8'), cipher.final()]);
   return {
-    version: 1,
+    version: 2,
     algorithm: 'aes-256-gcm',
     iv: iv.toString('base64'),
     tag: cipher.getAuthTag().toString('base64'),
@@ -34,11 +39,12 @@ export function encryptCredentials(credentials, secret) {
   };
 }
 
-export function decryptCredentials(encrypted, secret) {
-  if (!encrypted || encrypted.version !== 1 || encrypted.algorithm !== 'aes-256-gcm') {
+export function decryptCredentials(encrypted, secret, ownerId = '') {
+  if (!encrypted || ![1, 2].includes(encrypted.version) || encrypted.algorithm !== 'aes-256-gcm') {
     throw new Error('Formato de credenciales de YouTube Music no compatible.');
   }
   const decipher = createDecipheriv('aes-256-gcm', encryptionKey(secret), Buffer.from(encrypted.iv, 'base64'));
+  if (encrypted.version === 2) decipher.setAAD(Buffer.from(ownerId));
   decipher.setAuthTag(Buffer.from(encrypted.tag, 'base64'));
   const cleartext = Buffer.concat([
     decipher.update(Buffer.from(encrypted.ciphertext, 'base64')),
@@ -50,8 +56,12 @@ export function decryptCredentials(encrypted, secret) {
 async function saveCredentials(user, credentials) {
   await getUsersCollection().updateOne(
     { _id: user._id },
-    { $set: { youtubeMusicAuth: { encrypted: encryptCredentials(credentials), updatedAt: new Date() } } },
+    { $set: { youtubeMusicAuth: { encrypted: encryptCredentials(credentials, undefined, userKey(user)), updatedAt: new Date() } } },
   );
+}
+
+async function clearCredentials(user) {
+  await getUsersCollection().updateOne({ _id: user._id }, { $unset: { youtubeMusicAuth: '' } });
 }
 
 async function readCredentials(user) {
@@ -59,9 +69,14 @@ async function readCredentials(user) {
     { _id: user._id },
     { projection: { youtubeMusicAuth: 1 } },
   );
-  return stored?.youtubeMusicAuth?.encrypted
-    ? decryptCredentials(stored.youtubeMusicAuth.encrypted)
-    : null;
+  if (!stored?.youtubeMusicAuth?.encrypted) return null;
+  try {
+    return decryptCredentials(stored.youtubeMusicAuth.encrypted, undefined, userKey(user));
+  } catch (error) {
+    console.warn(`Se descartó una vinculación de YouTube Music ilegible: ${error.message}`);
+    await clearCredentials(user);
+    return null;
+  }
 }
 
 function watchCredentialUpdates(client, user) {
@@ -83,11 +98,29 @@ function publicPending(link) {
   };
 }
 
+function cacheUserClient(key, client) {
+  userClients.delete(key);
+  userClients.set(key, client);
+  if (userClients.size > MAX_USER_CLIENTS) userClients.delete(userClients.keys().next().value);
+}
+
+function publicLinkError(error) {
+  const reason = error instanceof Error ? error.message : '';
+  if (/denied|rechaz|cancel/i.test(reason)) return 'La autorización fue cancelada o rechazada.';
+  if (/expired|vencid/i.test(reason)) return 'El código venció. Genera uno nuevo para continuar.';
+  return 'No se pudo completar la autorización. Intenta generar un código nuevo.';
+}
+
 export async function getAccountStatus(user) {
   const key = userKey(user);
   const pending = pendingLinks.get(key);
   if (pending && pending.expiresAt > Date.now()) return publicPending(pending);
   if (pending) pendingLinks.delete(key);
+  const failure = linkFailures.get(key);
+  if (failure?.expiresAt > Date.now()) {
+    return { connected: false, status: 'error', method: 'anonymous', error: failure.message };
+  }
+  if (failure) linkFailures.delete(key);
 
   const credentials = await readCredentials(user);
   return credentials
@@ -95,11 +128,21 @@ export async function getAccountStatus(user) {
     : { connected: false, status: 'disconnected', method: 'anonymous' };
 }
 
-export async function startAccountLink(user) {
+export function validateVerificationUrl(value) {
+  const url = new URL(value);
+  const trustedHost = url.hostname === 'youtube.com' || url.hostname.endsWith('.youtube.com');
+  if (url.protocol !== 'https:' || !trustedHost) {
+    throw new Error('YouTube devolvió una dirección de activación no válida.');
+  }
+  return url.toString();
+}
+
+async function beginAccountLink(user, token) {
   const current = await getAccountStatus(user);
   if (current.connected || current.status === 'pending') return current;
 
   const key = userKey(user);
+  linkFailures.delete(key);
   const client = await Innertube.create();
   watchCredentialUpdates(client, user);
 
@@ -112,13 +155,14 @@ export async function startAccountLink(user) {
   let receivedCredentials;
 
   client.session.once('auth-pending', (payload) => {
+    if (linkTokens.get(key) !== token) throw new Error('La vinculación fue cancelada.');
     const expiresAt = Date.now() + Number(payload.expires_in || 900) * 1000;
     const link = {
       client,
       expiresAt,
       interval: Math.max(2, Number(payload.interval || 5)),
       userCode: payload.user_code,
-      verificationUrl: payload.verification_url,
+      verificationUrl: validateVerificationUrl(payload.verification_url),
     };
     pendingLinks.set(key, link);
     resolveCode(publicPending(link));
@@ -136,11 +180,12 @@ export async function startAccountLink(user) {
       const credentials = receivedCredentials ?? client.session.oauth?.oauth2_tokens;
       if (!credentials) throw new Error('YouTube no devolvió credenciales válidas.');
       await saveCredentials(user, credentials);
-      userClients.set(key, client);
+      cacheUserClient(key, client);
       pendingLinks.delete(key);
     })
     .catch((error) => {
       pendingLinks.delete(key);
+      linkFailures.set(key, { message: publicLinkError(error), expiresAt: Date.now() + 60_000 });
       rejectCode(error);
       console.warn(`Vinculación de YouTube Music cancelada o vencida: ${error.message}`);
     });
@@ -151,10 +196,29 @@ export async function startAccountLink(user) {
   ]);
 }
 
+export function startAccountLink(user) {
+  const key = userKey(user);
+  const currentStart = linkStarts.get(key);
+  if (currentStart) return currentStart;
+
+  const token = Symbol(key);
+  linkTokens.set(key, token);
+  let start;
+  start = beginAccountLink(user, token).finally(() => {
+    if (linkStarts.get(key) === start) linkStarts.delete(key);
+    if (linkTokens.get(key) === token) linkTokens.delete(key);
+  });
+  linkStarts.set(key, start);
+  return start;
+}
+
 export async function getYoutubeForUser(user) {
   const key = userKey(user);
   const cached = userClients.get(key);
-  if (cached?.session.logged_in) return cached;
+  if (cached?.session.logged_in) {
+    cacheUserClient(key, cached);
+    return cached;
+  }
 
   const credentials = await readCredentials(user);
   if (!credentials) return null;
@@ -163,17 +227,19 @@ export async function getYoutubeForUser(user) {
   watchCredentialUpdates(client, user);
   try {
     await client.session.signIn(credentials);
-    userClients.set(key, client);
+    cacheUserClient(key, client);
     return client;
   } catch (error) {
     userClients.delete(key);
-    await getUsersCollection().updateOne({ _id: user._id }, { $unset: { youtubeMusicAuth: '' } });
+    await clearCredentials(user);
     throw new Error(`La vinculación de YouTube Music dejó de ser válida: ${error.message}`);
   }
 }
 
 export async function unlinkAccount(user) {
   const key = userKey(user);
+  linkTokens.delete(key);
+  linkFailures.delete(key);
   const client = userClients.get(key) ?? pendingLinks.get(key)?.client;
   pendingLinks.delete(key);
   userClients.delete(key);
@@ -183,6 +249,6 @@ export async function unlinkAccount(user) {
       console.warn(`No se pudo revocar el token de YouTube Music: ${error.message}`);
     });
   }
-  await getUsersCollection().updateOne({ _id: user._id }, { $unset: { youtubeMusicAuth: '' } });
+  await clearCredentials(user);
   return { connected: false, status: 'disconnected', method: 'anonymous' };
 }

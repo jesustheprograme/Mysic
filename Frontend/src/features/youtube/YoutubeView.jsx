@@ -75,6 +75,8 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
         if (nextAccount.connected) {
           setAccountError('')
           refreshPersonalizedHome()
+        } else if (nextAccount.status === 'error') {
+          setAccountError(nextAccount.error || 'No se pudo completar la vinculación.')
         }
       }).catch((error) => {
         if (error.name !== 'AbortError') {

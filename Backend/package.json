@@ -7,7 +7,7 @@
     "test": "node --test scripts/import-music.test.js src/auth.test.js src/catalog.test.js src/object-storage.test.js src/playlists.test.js src/music-import-access.test.js src/youtube/youtube/accountLink.test.mjs src/youtube/youtube/browse.test.mjs src/youtube/utils/asyncCache.test.mjs src/youtube/utils/persistentSearchCache.test.mjs",
     "check": "npm test && npx prisma validate",
     "start": "node server.js",
-    "dev": "nodemon server.js",
+    "dev": "node --watch server.js",
     "music:scan": "node scripts/import-music.js",
     "music:import": "node scripts/import-music.js --apply",
     "music:filezilla": "node scripts/sync-filezilla.js",
@@ -49,7 +49,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14",
     "prisma": "^6.19.3"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.0"
   }
 }

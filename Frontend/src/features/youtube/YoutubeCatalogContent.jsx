@@ -62,10 +62,22 @@ function SearchResults({ controller }) {
   )
 }
 
-function AccountHelp({ account, busy, error, onDisconnect, onStart, open }) {
-  const [copiedCode, setCopiedCode] = useState('')
-  const pending = account?.status === 'pending'
+function AccountIntro({ account, pending }) {
+  let title = 'Personaliza Mysic con YouTube Music'
+  let description = 'La autorización ocurre directamente en Google. Mysic nunca ve tu contraseña.'
+  if (pending) {
+    title = 'Autoriza este dispositivo'
+    description = 'Abre YouTube, inicia sesión si hace falta e introduce el código temporal.'
+  }
+  if (account?.connected) {
+    title = 'Tu YouTube Music está conectado'
+    description = 'Inicio, radios y recomendaciones usan los gustos de esta cuenta.'
+  }
+  return <div className="yt-account-help__copy"><strong>{title}</strong><p>{description}</p></div>
+}
 
+function AccountCode({ account }) {
+  const [copiedCode, setCopiedCode] = useState('')
   async function copyCode() {
     try {
       await navigator.clipboard.writeText(account.userCode)
@@ -74,28 +86,37 @@ function AccountHelp({ account, busy, error, onDisconnect, onStart, open }) {
       setCopiedCode('error')
     }
   }
+  return (
+    <>
+      <div className="yt-account-code" role="status">
+        <span>{account.userCode}</span>
+        <button type="button" onClick={copyCode}><Copy size={15} aria-hidden="true" /> {copiedCode === account.userCode ? 'Copiado' : 'Copiar'}</button>
+      </div>
+      {copiedCode === 'error' && <p className="yt-account-help__error" role="alert">No se pudo copiar. Selecciona el código manualmente.</p>}
+    </>
+  )
+}
+
+function AccountActions({ account, busy, onDisconnect, onStart, pending }) {
+  if (account?.connected) {
+    return <div className="yt-account-help__actions"><span className="yt-account-connected"><Check size={15} aria-hidden="true" /> Vinculación activa</span><button className="yt-account-action" type="button" disabled={busy} onClick={onDisconnect}><Link2Off size={15} aria-hidden="true" /> Desvincular</button></div>
+  }
+  if (pending) {
+    return <div className="yt-account-help__actions"><a className="yt-account-action yt-account-action--primary" href={account.verificationUrl} target="_blank" rel="noreferrer">Abrir YouTube <ExternalLink size={15} aria-hidden="true" /></a></div>
+  }
+  return <div className="yt-account-help__actions"><button className="yt-account-action yt-account-action--primary" type="button" disabled={busy} onClick={onStart}>{busy ? <LoaderCircle className="yt-spin" size={16} aria-hidden="true" /> : <UserRound size={16} aria-hidden="true" />} Vincular cuenta</button></div>
+}
+
+function AccountHelp({ account, busy, error, onDisconnect, onStart, open }) {
+  const pending = account?.status === 'pending'
 
   return (
     <div className={`yt-account-help${open ? ' yt-account-help--open' : ''}`} id="yt-account-help" inert={!open}>
       <div>
-        <div className="yt-account-help__copy">
-          <strong>{account?.connected ? 'Tu YouTube Music está conectado' : pending ? 'Autoriza este dispositivo' : 'Personaliza Mysic con YouTube Music'}</strong>
-          <p>{account?.connected ? 'Inicio, radios y recomendaciones usan los gustos de esta cuenta.' : pending ? 'Abre YouTube, inicia sesión si hace falta e introduce el código temporal.' : 'La autorización ocurre directamente en Google. Mysic nunca ve tu contraseña.'}</p>
-        </div>
-        {pending && (
-          <div className="yt-account-code" role="status">
-            <span>{account.userCode}</span>
-            <button type="button" onClick={copyCode}><Copy size={15} aria-hidden="true" /> {copiedCode === account.userCode ? 'Copiado' : 'Copiar'}</button>
-          </div>
-        )}
-        <div className="yt-account-help__actions">
-          {!account?.connected && !pending && <button className="yt-account-action yt-account-action--primary" type="button" disabled={busy} onClick={onStart}>{busy ? <LoaderCircle className="yt-spin" size={16} aria-hidden="true" /> : <UserRound size={16} aria-hidden="true" />} Vincular cuenta</button>}
-          {pending && <a className="yt-account-action yt-account-action--primary" href={account.verificationUrl} target="_blank" rel="noreferrer">Abrir YouTube <ExternalLink size={15} aria-hidden="true" /></a>}
-          {account?.connected && <span className="yt-account-connected"><Check size={15} aria-hidden="true" /> Vinculación activa</span>}
-          {account?.connected && <button className="yt-account-action" type="button" disabled={busy} onClick={onDisconnect}><Link2Off size={15} aria-hidden="true" /> Desvincular</button>}
-        </div>
+        <AccountIntro account={account} pending={pending} />
+        {pending && <AccountCode account={account} />}
+        <AccountActions account={account} busy={busy} onDisconnect={onDisconnect} onStart={onStart} pending={pending} />
         {error && <p className="yt-account-help__error" role="alert">{error}</p>}
-        {copiedCode === 'error' && <p className="yt-account-help__error" role="alert">No se pudo copiar. Selecciona el código manualmente.</p>}
       </div>
     </div>
   )
