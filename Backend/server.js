@@ -31,6 +31,7 @@ const { createPlaylistsRouter } = require('./src/playlists')
 const { getConfig } = require('./src/config')
 const { checkDatabaseHealth, closeDatabase, connectDatabase } = require('./src/database')
 const { checkPrismaHealth, closePrisma, connectPrisma } = require('./src/prisma')
+const { YOUTUBE_USER_PATHS } = require('./src/youtube/authPaths')
 
 const app = express()
 let server
@@ -135,7 +136,7 @@ async function start() {
 
   // Los feeds personales nunca se exponen sin una sesión válida de Mysic.
   app.use(
-    ['/api/youtube/account', '/api/youtube/link', '/api/youtube/home', '/api/youtube/radio', '/api/youtube/recommendations'],
+    YOUTUBE_USER_PATHS,
     async (req, res, next) => {
       try {
         const user = await getAuthenticatedUser(req, res, config)
