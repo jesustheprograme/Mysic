@@ -107,11 +107,11 @@ function MusicSessionForm({ busy, onConnect }) {
     <form className="yt-account-session" onSubmit={submit}>
       <ol>
         <li>Abre <a href="https://music.youtube.com" target="_blank" rel="noreferrer">music.youtube.com</a> con la cuenta correcta.</li>
-        <li>En DevTools → Red, recarga la página y selecciona una solicitud llamada <code>browse</code>.</li>
-        <li>Clic derecho → Copiar → Copiar como cURL, y pégala aquí.</li>
+        <li>En DevTools → Red → Fetch/XHR, recarga la página y elige <code>account_menu</code>, <code>browse</code> o <code>next</code>.</li>
+        <li>Clic derecho sobre la solicitud → Copiar → Copiar como cURL, y pégala aquí.</li>
       </ol>
       <label htmlFor="yt-music-request">Solicitud de YouTube Music</label>
-      <textarea id="yt-music-request" value={requestText} onChange={(event) => setRequestText(event.target.value)} autoComplete="off" spellCheck="false" placeholder="curl 'https://music.youtube.com/youtubei/v1/browse?...' ..." />
+      <textarea id="yt-music-request" value={requestText} onChange={(event) => setRequestText(event.target.value)} autoComplete="off" spellCheck="false" placeholder="curl 'https://music.youtube.com/youtubei/v1/account/account_menu?...' ..." />
       <div className="yt-account-session__footer">
         <span>Contiene una sesión sensible: no la compartas. Mysic la cifra y no guarda este texto en el navegador.</span>
         <button className="yt-account-action yt-account-action--primary" type="submit" disabled={busy || !requestText.trim()}>{busy ? <LoaderCircle className="yt-spin" size={16} aria-hidden="true" /> : <UserRound size={16} aria-hidden="true" />} Verificar y conectar</button>
