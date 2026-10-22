@@ -63,6 +63,27 @@ test('normaliza las pistas de una playlist de YouTube Music', () => {
   assert.equal(item.durationSeconds, 190);
 });
 
+test('extrae el álbum enlazado de una tarjeta de Inicio', () => {
+  const item = mapBrowseItem({
+    item_type: 'song',
+    id: 'abcdefghijk',
+    title: 'Canción de Inicio',
+    artists: [{ name: 'Artista', channel_id: 'UC456' }],
+    subtitle: {
+      runs: [
+        { text: 'Canción' },
+        { text: ' • ' },
+        { text: 'Artista', endpoint: { payload: { browseId: 'UC456' } } },
+        { text: ' • ' },
+        { text: 'Álbum real', endpoint: { payload: { browseId: 'MPRE123' } } },
+      ],
+    },
+  });
+
+  assert.equal(item.album, 'Álbum real');
+  assert.equal(item.albumId, 'MPRE123');
+});
+
 test('convierte objetos Text de feeds personalizados en valores primitivos', () => {
   const text = (value) => ({ text: value, runs: [{ text: value }], rtl: false });
   const song = mapBrowseItem({

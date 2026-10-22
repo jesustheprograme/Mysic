@@ -9,12 +9,26 @@ function mapQueueSong(item) {
   });
 }
 
+function findAlbum(item) {
+  const metadata = [item.subtitle, ...(item.flex_columns || []).map((column) => column?.title)];
+  for (const text of metadata) {
+    const album = text?.runs?.find((run) => run.endpoint?.payload?.browseId?.startsWith('MPR'));
+    if (album) return { id: album.endpoint.payload.browseId, name: plainText(album.text) };
+  }
+  return null;
+}
+
 export function mapBrowseItem(item) {
   if (!item) return null;
 
   if (item.type === 'PlaylistPanelVideo') return { kind: 'song', ...mapQueueSong(item) };
   if ((item.item_type === 'song' || item.item_type === 'video') && item.id) {
-    return { kind: 'song', ...mapSong(item) };
+    const album = findAlbum(item);
+    const artists = item.artists || (item.author ? [item.author] : undefined);
+    return {
+      kind: 'song',
+      ...mapSong({ ...item, artists }, { album: album?.name, albumId: album?.id }),
+    };
   }
   if (item.item_type === 'artist' && item.id) return { kind: 'artist', ...mapArtistItem(item) };
   if (item.item_type === 'album' && item.id) {
