@@ -6,7 +6,7 @@ import CatalogSearchControls from '../discovery/CatalogSearchControls.jsx'
 import HomeRail from '../discovery/HomeRail.jsx'
 import SongList from '../discovery/SongList.jsx'
 import MusicSearchPanel from './MusicSearchPanel.jsx'
-import { adaptAlbum, adaptArtist, adaptReleases, adaptSong } from './lib/adapters.js'
+import { adaptAlbum, adaptArtist, adaptBrowseItem, adaptReleases, adaptSong } from './lib/adapters.js'
 
 const ignorePreview = () => {}
 
@@ -188,18 +188,12 @@ function CatalogNavigation({ controller }) {
   )
 }
 
-function browseItemToCard(item) {
-  if (item.kind === 'artist') return adaptArtist(item)
-  if (item.kind === 'album') return { artwork: item.thumbnail, artist: item.artist, detail: item.year, id: item.id, title: item.title }
-  return { artwork: item.thumbnail, artist: item.artist ?? item.subtitle ?? item.album, detail: item.kind === 'playlist' ? 'Playlist' : item.duration, id: item.id, title: item.title }
-}
-
 function BrowseShelves({ controller, data }) {
   const { openAlbum, openArtist, player, playSongs, startPlaylist } = controller
   if (!data?.shelves?.length) return <div className="collection-empty">No hay recomendaciones disponibles por ahora.</div>
   return data.shelves.map((shelf) => (
     <HomeRail
-      items={shelf.items.map(browseItemToCard)}
+      items={shelf.items.map(adaptBrowseItem)}
       key={`${shelf.title}-${shelf.items[0]?.id}`}
       onPlaybackToggle={player.togglePlay}
       onSelect={(id) => {

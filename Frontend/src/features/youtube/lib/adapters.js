@@ -22,6 +22,21 @@ export function adaptAlbum(album) {
   }
 }
 
+export function adaptBrowseItem(item) {
+  if (item.kind === 'artist') return adaptArtist(item)
+  if (item.kind === 'album') {
+    return { artwork: item.thumbnail, artist: item.artist, detail: item.year, id: item.id, title: item.title }
+  }
+
+  return {
+    artwork: item.thumbnail,
+    artist: item.artist ?? item.subtitle ?? item.album,
+    detail: item.kind === 'playlist' ? 'Playlist' : item.album || 'Sencillo',
+    id: item.id,
+    title: item.title,
+  }
+}
+
 function getReleaseType(title, kind) {
   if (/ep/i.test(kind) || /ep/i.test(title)) return 'ep'
   if (/single/i.test(title)) return 'single'

@@ -537,7 +537,12 @@
   font-size: 12px;
 }
 
-.home-page .home-shelf-card__meta span,
+.home-page .home-shelf-card__meta span {
+  color: #adb6b3;
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .home-page .home-shelf-card__meta small {
   font-size: 10px;
 }

@@ -139,10 +139,10 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
           width: 320,
           height: 200,
           videoId,
-          host: 'https://www.youtube-nocookie.com',
           playerVars: {
             autoplay: 1,
             controls: 0,
+            enablejsapi: 1,
             playsinline: 1,
             rel: 0,
             origin: window.location.origin,
