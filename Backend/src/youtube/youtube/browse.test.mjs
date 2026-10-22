@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mapBrowseItem, mapShelf, rotateHomeShelves } from './browse.mjs';
+import { getPlaylistQueue, mapBrowseItem, mapShelf, rotateHomeShelves } from './browse.mjs';
 
 test('normaliza una canción de radio al contrato del reproductor', () => {
   const item = mapBrowseItem({
@@ -105,4 +105,30 @@ test('muestra otra ventana del feed sin inventar recomendaciones', () => {
   assert.deepEqual(rotated.map((shelf) => shelf.title), ['Dos', 'Tres']);
   assert.deepEqual(rotated.flatMap((shelf) => shelf.items.map((item) => item.id)), ['d', 'c', 'e', 'f']);
   assert.deepEqual(shelves[1].items.map((item) => item.id), ['c', 'd']);
+});
+
+test('carga playlists con el cliente de la cuenta solicitante', async () => {
+  const calls = [];
+  const youtube = {
+    music: {
+      async getPlaylist(id) {
+        calls.push(id);
+        return {
+          header: { title: { text: 'Playlist privada' } },
+          items: [{
+            type: 'MusicResponsiveListItem',
+            item_type: 'song',
+            id: 'abcdefghijk',
+            title: 'Canción privada',
+            artists: [{ name: 'Artista privado', channel_id: 'UC123' }],
+          }],
+        };
+      },
+    },
+  };
+
+  const playlist = await getPlaylistQueue('PLprivada', youtube);
+  assert.deepEqual(calls, ['PLprivada']);
+  assert.equal(playlist.title, 'Playlist privada');
+  assert.equal(playlist.songs[0].title, 'Canción privada');
 });

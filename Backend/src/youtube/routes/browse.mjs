@@ -57,8 +57,8 @@ export function createBrowseRouter() {
   }, 'No se pudo crear la radio'));
 
   router.get('/playlist/:id', requireYoutube, validateParam('id', BROWSE_ID_RE, 'ID de playlist no válido'), asyncRoute(async (req, res) => {
-    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=900');
-    res.json(await getPlaylistQueue(req.params.id));
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.json(await getPlaylistQueue(req.params.id, await getRequestYoutube(req)));
   }, 'No se pudo cargar la playlist'));
 
   router.get('/recommendations/:id', requireYoutube, validateParam('id', VIDEO_ID_RE, 'ID de video no válido'), asyncRoute(async (req, res) => {

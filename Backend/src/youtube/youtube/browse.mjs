@@ -1,9 +1,5 @@
 import { getYoutube } from './client.mjs';
 import { mapAlbumItem, mapArtistItem, mapSong, pickThumbnail, plainText } from './mappers.mjs';
-import { config } from '../config.mjs';
-import { createAsyncTtlCache } from '../utils/asyncCache.mjs';
-
-const playlistCache = createAsyncTtlCache({ ttlMs: config.browseCacheTtlMs, maxSize: config.requestCacheMax });
 
 function mapQueueSong(item) {
   return mapSong({
@@ -95,14 +91,12 @@ export async function getRadio(videoId, youtube = getYoutube()) {
   };
 }
 
-export async function getPlaylistQueue(playlistId) {
-  return playlistCache.get(playlistId, async () => {
-    const playlist = await getYoutube().music.getPlaylist(playlistId);
-    return {
-      title: plainText(playlist.header?.title) || 'Playlist',
-      songs: (playlist.items || []).map(mapBrowseItem).filter((item) => item?.kind === 'song'),
-    };
-  });
+export async function getPlaylistQueue(playlistId, youtube = getYoutube()) {
+  const playlist = await youtube.music.getPlaylist(playlistId);
+  return {
+    title: plainText(playlist.header?.title) || 'Playlist',
+    songs: (playlist.items || []).map(mapBrowseItem).filter((item) => item?.kind === 'song'),
+  };
 }
 
 export async function getRecommendations(videoId, youtube = getYoutube()) {
