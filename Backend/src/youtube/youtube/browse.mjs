@@ -1,5 +1,10 @@
 import { getYoutube } from './client.mjs';
+import { config } from '../config.mjs';
+import { createAsyncTtlCache } from '../utils/asyncCache.mjs';
 import { mapAlbumItem, mapArtistItem, mapSong, pickThumbnail, plainText } from './mappers.mjs';
+
+const albumCache = createAsyncTtlCache({ ttlMs: 6 * 60 * 60 * 1000, maxSize: config.requestCacheMax });
+const ALBUM_LOOKUP_CONCURRENCY = 4;
 
 function mapQueueSong(item) {
   return mapSong({
@@ -60,6 +65,32 @@ function mapShelves(sections) {
   return (sections || []).map(mapShelf).filter(Boolean);
 }
 
+async function loadAlbumName(videoId, youtube) {
+  try {
+    return await albumCache.get(videoId, async () => {
+      const info = await youtube.music.getInfo(videoId);
+      return plainText(info.player_overlays?.browser_media_session?.album);
+    });
+  } catch (error) {
+    console.warn(`No se pudo identificar el lanzamiento de ${videoId}: ${error.message}`);
+    return '';
+  }
+}
+
+export async function enrichShelfAlbums(shelves, youtube) {
+  const missing = shelves.flatMap((shelf) => shelf.items)
+    .filter((item) => item.kind === 'song' && !item.albumId);
+
+  for (let index = 0; index < missing.length; index += ALBUM_LOOKUP_CONCURRENCY) {
+    const batch = missing.slice(index, index + ALBUM_LOOKUP_CONCURRENCY);
+    await Promise.all(batch.map(async (item) => {
+      const album = await loadAlbumName(item.id, youtube);
+      if (album) item.album = album;
+    }));
+  }
+  return shelves;
+}
+
 export function rotateHomeShelves(shelves, variant, visibleCount = shelves.length) {
   if (shelves.length < 2 || !Number.isFinite(variant)) return shelves.slice(0, visibleCount);
   const offset = Math.abs(Math.trunc(variant)) % shelves.length;
@@ -82,10 +113,12 @@ export async function getHome(youtube = getYoutube(), variant = 0) {
       console.warn(`No se pudo ampliar el Inicio de YouTube Music: ${error.message}`);
     }
   }
+  const shelves = rotateHomeShelves([...initialShelves, ...continuationShelves], variant, initialShelves.length);
+  await enrichShelfAlbums(shelves, youtube);
   return {
     personalized: Boolean(youtube.session.cookie),
     filters: (home.filters || []).map(plainText).filter(Boolean),
-    shelves: rotateHomeShelves([...initialShelves, ...continuationShelves], variant, initialShelves.length),
+    shelves,
   };
 }
 

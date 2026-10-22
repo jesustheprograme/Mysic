@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getPlaylistQueue, mapBrowseItem, mapShelf, rotateHomeShelves } from './browse.mjs';
+import { enrichShelfAlbums, getPlaylistQueue, mapBrowseItem, mapShelf, rotateHomeShelves } from './browse.mjs';
 
 test('normaliza una canción de radio al contrato del reproductor', () => {
   const item = mapBrowseItem({
@@ -82,6 +82,24 @@ test('extrae el álbum enlazado de una tarjeta de Inicio', () => {
 
   assert.equal(item.album, 'Álbum real');
   assert.equal(item.albumId, 'MPRE123');
+});
+
+test('completa lanzamientos ausentes usando la sesión multimedia de YouTube', async () => {
+  const requested = [];
+  const shelves = [{ title: 'Para ti', items: [
+    { id: 'song-a', kind: 'song', album: 'Sencillo', albumId: null },
+    { id: 'song-b', kind: 'song', album: 'Álbum existente', albumId: 'MPRE456' },
+  ] }];
+  const youtube = { music: { getInfo: async (id) => {
+    requested.push(id);
+    return { player_overlays: { browser_media_session: { album: { text: 'Álbum real' } } } };
+  } } };
+
+  await enrichShelfAlbums(shelves, youtube);
+
+  assert.deepEqual(requested, ['song-a']);
+  assert.equal(shelves[0].items[0].album, 'Álbum real');
+  assert.equal(shelves[0].items[1].album, 'Álbum existente');
 });
 
 test('convierte objetos Text de feeds personalizados en valores primitivos', () => {
