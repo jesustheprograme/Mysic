@@ -134,6 +134,17 @@ function findHeader(text, name) {
   return '';
 }
 
+function findCurlCookie(text) {
+  const match = text.match(/(?:^|\s)(?:-b|--cookie)(?:=|\s+)(['"])([\s\S]*?)\1/i);
+  return match ? unescapeCopiedValue(match[2]) : '';
+}
+
+function normalizeSapisid(cookie) {
+  if (/(?:^|;\s*)SAPISID=/i.test(cookie)) return cookie;
+  const secureSapisid = cookie.match(/(?:^|;\s*)__Secure-3PAPISID=([^;]+)/i)?.[1];
+  return secureSapisid ? `${cookie}; SAPISID=${secureSapisid}` : cookie;
+}
+
 export function parseBrowserAuth(requestText) {
   if (typeof requestText !== 'string' || !requestText.trim()) {
     throw new Error('Pega la solicitud copiada desde YouTube Music.');
@@ -141,7 +152,7 @@ export function parseBrowserAuth(requestText) {
   if (Buffer.byteLength(requestText, 'utf8') > MAX_BROWSER_AUTH_LENGTH) {
     throw new Error('La solicitud copiada es demasiado grande.');
   }
-  const cookie = findHeader(requestText, 'cookie');
+  const cookie = normalizeSapisid(findHeader(requestText, 'cookie') || findCurlCookie(requestText));
   if (!/(?:^|;\s*)SAPISID=/i.test(cookie)) {
     throw new Error('La solicitud no contiene una sesión válida de YouTube Music.');
   }

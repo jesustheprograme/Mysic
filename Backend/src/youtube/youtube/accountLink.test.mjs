@@ -40,3 +40,15 @@ test('rechaza texto sin cookie SAPISID y entradas excesivas', () => {
   assert.throws(() => parseBrowserAuth('cookie: SID=no-es-suficiente'), /sesión válida/);
   assert.throws(() => parseBrowserAuth(`cookie: SAPISID=x\n${'a'.repeat(33_000)}`), /demasiado grande/);
 });
+
+test('acepta cookies copiadas por Chrome con -b y normaliza la variante segura', () => {
+  assert.deepEqual(
+    parseBrowserAuth("curl 'https://music.youtube.com/youtubei/v1/account/account_menu' -b 'SID=x; SAPISID=directa'"),
+    { cookie: 'SID=x; SAPISID=directa', accountIndex: 0, onBehalfOfUser: undefined },
+  );
+
+  const secure = parseBrowserAuth(
+    "curl 'https://music.youtube.com/youtubei/v1/browse' --cookie='SID=x; __Secure-3PAPISID=segura'",
+  );
+  assert.match(secure.cookie, /SAPISID=segura$/);
+});

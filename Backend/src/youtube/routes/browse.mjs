@@ -26,10 +26,15 @@ export function createBrowseRouter() {
     res.json(await getAccountStatus(req.mysicUser));
   }, 'No se pudo consultar la vinculación de YouTube Music'));
 
-  router.post('/link/browser', asyncRoute(async (req, res) => {
+  router.post('/link/browser', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
-    res.json(await connectBrowserSession(req.mysicUser, req.body?.requestText));
-  }, 'No se pudo validar la sesión de YouTube Music'));
+    try {
+      res.json(await connectBrowserSession(req.mysicUser, req.body?.requestText));
+    } catch (error) {
+      console.warn(`No se pudo validar la sesión de YouTube Music: ${error.message}`);
+      res.status(400).json({ error: error.message });
+    }
+  });
 
   router.delete('/link', asyncRoute(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
