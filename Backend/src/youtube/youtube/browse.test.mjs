@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mapBrowseItem, mapShelf } from './browse.mjs';
+import { mapBrowseItem, mapShelf, rotateHomeShelves } from './browse.mjs';
 
 test('normaliza una canción de radio al contrato del reproductor', () => {
   const item = mapBrowseItem({
@@ -92,4 +92,17 @@ test('convierte objetos Text de feeds personalizados en valores primitivos', () 
       .map((value) => typeof value),
     Array(8).fill('string'),
   );
+});
+
+test('muestra otra ventana del feed sin inventar recomendaciones', () => {
+  const shelves = [
+    { title: 'Uno', items: [{ id: 'a' }, { id: 'b' }] },
+    { title: 'Dos', items: [{ id: 'c' }, { id: 'd' }] },
+    { title: 'Tres', items: [{ id: 'e' }, { id: 'f' }] },
+  ];
+  const rotated = rotateHomeShelves(shelves, 1, 2);
+
+  assert.deepEqual(rotated.map((shelf) => shelf.title), ['Dos', 'Tres']);
+  assert.deepEqual(rotated.flatMap((shelf) => shelf.items.map((item) => item.id)), ['d', 'c', 'e', 'f']);
+  assert.deepEqual(shelves[1].items.map((item) => item.id), ['c', 'd']);
 });

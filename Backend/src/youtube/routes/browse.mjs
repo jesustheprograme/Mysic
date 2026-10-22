@@ -43,7 +43,7 @@ export function createBrowseRouter() {
 
   router.get('/home', requireYoutube, asyncRoute(async (req, res) => {
     res.setHeader('Cache-Control', 'private, no-store');
-    res.json(await getHome(await getRequestYoutube(req)));
+    res.json(await getHome(await getRequestYoutube(req), Number(req.query.variant) || 0));
   }, 'No se pudo cargar tu inicio de YouTube Music'));
 
   router.get('/explore', requireYoutube, asyncRoute(async (req, res) => {

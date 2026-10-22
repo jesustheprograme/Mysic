@@ -50,12 +50,32 @@ function mapShelves(sections) {
   return (sections || []).map(mapShelf).filter(Boolean);
 }
 
-export async function getHome(youtube = getYoutube()) {
+export function rotateHomeShelves(shelves, variant, visibleCount = shelves.length) {
+  if (shelves.length < 2 || !Number.isFinite(variant)) return shelves.slice(0, visibleCount);
+  const offset = Math.abs(Math.trunc(variant)) % shelves.length;
+  const rotated = [...shelves.slice(offset), ...shelves.slice(0, offset)].slice(0, visibleCount);
+  return rotated.map((shelf, index) => {
+    if (shelf.items.length < 2) return shelf;
+    const itemOffset = Math.abs(Math.trunc(variant + index)) % shelf.items.length;
+    return { ...shelf, items: [...shelf.items.slice(itemOffset), ...shelf.items.slice(0, itemOffset)] };
+  });
+}
+
+export async function getHome(youtube = getYoutube(), variant = 0) {
   const home = await youtube.music.getHomeFeed();
+  const initialShelves = mapShelves(home.sections);
+  let continuationShelves = [];
+  if (home.has_continuation) {
+    try {
+      continuationShelves = mapShelves((await home.getContinuation()).sections);
+    } catch (error) {
+      console.warn(`No se pudo ampliar el Inicio de YouTube Music: ${error.message}`);
+    }
+  }
   return {
     personalized: Boolean(youtube.session.cookie),
     filters: (home.filters || []).map(plainText).filter(Boolean),
-    shelves: mapShelves(home.sections),
+    shelves: rotateHomeShelves([...initialShelves, ...continuationShelves], variant, initialShelves.length),
   };
 }
 
