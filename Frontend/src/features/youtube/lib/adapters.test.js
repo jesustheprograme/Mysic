@@ -14,7 +14,9 @@ test('muestra el lanzamiento de una canción en vez de una duración desconocida
   }), {
     artwork: 'cover.jpg',
     artist: 'the pillows',
+    artistId: undefined,
     detail: 'Little Busters',
+    detailId: undefined,
     id: 'song-1',
     title: 'Patricia',
   })

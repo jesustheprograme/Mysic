@@ -7,6 +7,8 @@ function HomeRail({
   headingAction,
   items,
   onPlaybackToggle,
+  onArtistSelect,
+  onDetailSelect,
   onPreviewStart,
   onPreviewStop,
   onSelect,
@@ -45,6 +47,14 @@ function HomeRail({
           const previewStatus = preview?.itemId === item.id ? preview.status : null
           const isSelected = selectedId === item.id
           const indicatorStatus = previewStatus ?? (isSelected && selectedItemPlaying ? 'playing' : null)
+          const selectItem = () => {
+            if (previewStatus) onPreviewStop?.()
+            if (isSelected && onPlaybackToggle) {
+              onPlaybackToggle()
+              return
+            }
+            onSelect?.(item.id)
+          }
 
           return (
             <article className={`home-shelf-card${isSelected ? ' home-shelf-card--active' : ''}${isSelected && selectedItemPlaying ? ' home-shelf-card--playing' : ''}`} key={item.id}>
@@ -53,16 +63,7 @@ function HomeRail({
                 type="button"
                 aria-label={onSelect ? `Abrir ${item.title}${item.artist ? ` de ${item.artist}` : ''}` : item.title}
                 aria-pressed={onSelect ? isSelected : undefined}
-                onClick={() => {
-                  if (previewStatus) {
-                    onPreviewStop?.()
-                  }
-                  if (isSelected && onPlaybackToggle) {
-                    onPlaybackToggle()
-                    return
-                  }
-                  onSelect?.(item.id)
-                }}
+                onClick={selectItem}
                 onPointerEnter={() => item.audioUrl && !isSelected && onPreviewStart?.(item)}
                 onPointerLeave={onPreviewStop}
               >
@@ -75,12 +76,16 @@ function HomeRail({
                     </span>
                   )}
                 </span>
-                <span className="home-shelf-card__meta">
-                  <strong>{item.title}</strong>
-                  <span>{item.artist ?? item.meta}</span>
-                  {item.detail && <small>{item.detail}</small>}
-                </span>
               </button>
+              <div className="home-shelf-card__meta">
+                <button className="home-shelf-card__title" type="button" onClick={selectItem}>{item.title}</button>
+                {item.artistId && onArtistSelect
+                  ? <button className="home-shelf-card__meta-link" type="button" onClick={() => onArtistSelect(item.artistId)}>{item.artist ?? item.meta}</button>
+                  : <span>{item.artist ?? item.meta}</span>}
+                {item.detail && (item.detailId && onDetailSelect
+                  ? <button className="home-shelf-card__detail-link" type="button" onClick={() => onDetailSelect(item.detailId)}>{item.detail}</button>
+                  : <small>{item.detail}</small>)}
+              </div>
             </article>
           )
         })}

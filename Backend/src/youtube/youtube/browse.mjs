@@ -65,15 +65,21 @@ function mapShelves(sections) {
   return (sections || []).map(mapShelf).filter(Boolean);
 }
 
-async function loadAlbumName(videoId, youtube) {
+async function loadAlbum(videoId, youtube) {
   try {
     return await albumCache.get(videoId, async () => {
       const info = await youtube.music.getInfo(videoId);
-      return plainText(info.player_overlays?.browser_media_session?.album);
+      const queue = await info.getUpNext?.(false);
+      const currentSong = queue?.contents?.find((item) => (item.video_id ?? item.id) === videoId);
+      return {
+        id: currentSong?.album?.id || null,
+        name: plainText(currentSong?.album?.name)
+          || plainText(info.player_overlays?.browser_media_session?.album),
+      };
     });
   } catch (error) {
     console.warn(`No se pudo identificar el lanzamiento de ${videoId}: ${error.message}`);
-    return '';
+    return null;
   }
 }
 
@@ -84,8 +90,9 @@ export async function enrichShelfAlbums(shelves, youtube) {
   for (let index = 0; index < missing.length; index += ALBUM_LOOKUP_CONCURRENCY) {
     const batch = missing.slice(index, index + ALBUM_LOOKUP_CONCURRENCY);
     await Promise.all(batch.map(async (item) => {
-      const album = await loadAlbumName(item.id, youtube);
-      if (album) item.album = album;
+      const album = await loadAlbum(item.id, youtube);
+      if (album?.name) item.album = album.name;
+      if (album?.id) item.albumId = album.id;
     }));
   }
   return shelves;

@@ -92,13 +92,17 @@ test('completa lanzamientos ausentes usando la sesión multimedia de YouTube', a
   ] }];
   const youtube = { music: { getInfo: async (id) => {
     requested.push(id);
-    return { player_overlays: { browser_media_session: { album: { text: 'Álbum real' } } } };
+    return {
+      getUpNext: async () => ({ contents: [{ video_id: id, album: { id: 'MPRE789', name: 'Álbum real' } }] }),
+      player_overlays: { browser_media_session: { album: { text: 'Álbum real' } } },
+    };
   } } };
 
   await enrichShelfAlbums(shelves, youtube);
 
   assert.deepEqual(requested, ['song-a']);
   assert.equal(shelves[0].items[0].album, 'Álbum real');
+  assert.equal(shelves[0].items[0].albumId, 'MPRE789');
   assert.equal(shelves[0].items[1].album, 'Álbum existente');
 });
 

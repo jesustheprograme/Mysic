@@ -530,20 +530,23 @@
 }
 
 .home-page .home-shelf-card__button {
-  gap: 8px;
+  gap: 0;
 }
 
-.home-page .home-shelf-card__meta strong {
+.home-page .home-shelf-card__meta strong,
+.home-page .home-shelf-card__title {
   font-size: 12px;
 }
 
-.home-page .home-shelf-card__meta span {
+.home-page .home-shelf-card__meta span,
+.home-page .home-shelf-card__meta-link {
   color: #adb6b3;
   font-size: 12px;
   font-weight: 500;
 }
 
-.home-page .home-shelf-card__meta small {
+.home-page .home-shelf-card__meta small,
+.home-page .home-shelf-card__detail-link {
   font-size: 10px;
 }
 
@@ -1618,7 +1621,7 @@
   width: 100%;
   min-width: 0;
   display: grid;
-  gap: 10px;
+  gap: 0;
   padding: 0;
   color: inherit;
   text-align: left;
@@ -2199,6 +2202,7 @@
 }
 
 .home-shelf-card__meta strong,
+.home-shelf-card__meta button,
 .home-shelf-card__meta span,
 .home-shelf-card__meta small {
   overflow: hidden;
@@ -2206,19 +2210,41 @@
   white-space: nowrap;
 }
 
-.home-shelf-card__meta strong {
+.home-shelf-card__meta strong,
+.home-shelf-card__title {
   color: #f4f4ef;
   font-size: 13px;
   font-weight: 650;
 }
 
+.home-shelf-card__title,
+.home-shelf-card__meta-link,
+.home-shelf-card__detail-link {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  text-align: left;
+}
+
+.home-shelf-card__meta-link:hover,
+.home-shelf-card__meta-link:focus-visible,
+.home-shelf-card__detail-link:hover,
+.home-shelf-card__detail-link:focus-visible {
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .home-shelf-card__meta span,
-.home-shelf-card__meta small {
+.home-shelf-card__meta small,
+.home-shelf-card__meta-link,
+.home-shelf-card__detail-link {
   color: #8e9895;
   font-size: 11px;
 }
 
-.home-shelf-card__meta small {
+.home-shelf-card__meta small,
+.home-shelf-card__detail-link {
   color: #7d8784;
 }
 

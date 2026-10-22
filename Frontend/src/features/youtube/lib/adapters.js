@@ -25,13 +25,15 @@ export function adaptAlbum(album) {
 export function adaptBrowseItem(item) {
   if (item.kind === 'artist') return adaptArtist(item)
   if (item.kind === 'album') {
-    return { artwork: item.thumbnail, artist: item.artist, detail: item.year, id: item.id, title: item.title }
+    return { artwork: item.thumbnail, artist: item.artist, artistId: item.artistId, detail: item.year, id: item.id, title: item.title }
   }
 
   return {
     artwork: item.thumbnail,
     artist: item.artist ?? item.subtitle ?? item.album,
+    artistId: item.artistId,
     detail: item.kind === 'playlist' ? 'Playlist' : item.album || 'Sencillo',
+    detailId: item.kind === 'song' ? item.albumId : null,
     id: item.id,
     title: item.title,
   }

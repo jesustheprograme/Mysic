@@ -195,6 +195,8 @@ function BrowseShelves({ controller, data }) {
     <HomeRail
       items={shelf.items.map(adaptBrowseItem)}
       key={`${shelf.title}-${shelf.items[0]?.id}`}
+      onArtistSelect={openArtist}
+      onDetailSelect={openAlbum}
       onPlaybackToggle={player.togglePlay}
       onSelect={(id) => {
         const item = shelf.items.find((entry) => entry.id === id)
