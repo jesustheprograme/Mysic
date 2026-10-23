@@ -266,7 +266,7 @@ function ArtistView({
           >
             {artist.title}
           </h1>
-          <p>{artistSongs.length} canciones · {albums.length} lanzamientos</p>
+          <p>{artist.songCount ?? artistSongs.length} canciones · {albums.length} lanzamientos</p>
           <div className="artist-profile__hero-actions">
             <button className="artist-profile__play" type="button" disabled={!artistSongs.length} onClick={playArtist}>
               {artistIsPlaying ? <Pause fill="currentColor" aria-hidden="true" /> : <Play fill="currentColor" aria-hidden="true" />}
@@ -318,10 +318,7 @@ function ArtistView({
         <section className="artist-profile__section" aria-labelledby="artist-songs-title">
           <div className="artist-profile__section-heading">
             <ListMusic aria-hidden="true" />
-            <div>
-              <span>CATÁLOGO</span>
-              <h2 id="artist-songs-title">Canciones destacadas</h2>
-            </div>
+            <h2 id="artist-songs-title">Canciones más escuchadas</h2>
           </div>
           <ol className="artist-profile__songs">
             {featuredSongs.map((song) => {
@@ -342,7 +339,19 @@ function ArtistView({
                       <img src={song.artwork} alt="" loading="lazy" />
                         <PreviewIndicator status={selected && selectedSongPlaying ? 'playing' : null} />
                     </button>
-                    <span className="song-row__copy"><strong>{song.title}</strong></span>
+                    <span className="song-row__copy">
+                      <strong>{song.title}</strong>
+                      {song.album && (
+                        <button
+                          className="song-row__catalog-link song-row__catalog-link--album"
+                          type="button"
+                          disabled={!song.albumId || !onAlbumSelect}
+                          onClick={() => onAlbumSelect?.(song.albumId)}
+                        >
+                          {song.album}
+                        </button>
+                      )}
+                    </span>
                   </div>
                   <span className="song-row__meta">
                     <span className="song-row__actions">
@@ -380,10 +389,7 @@ function ArtistView({
         <section className="artist-profile__section" aria-labelledby="artist-albums-title">
           <div className="artist-profile__section-heading">
             <Disc3 aria-hidden="true" />
-            <div>
-              <span>DISCOGRAFÍA</span>
-              <h2 id="artist-albums-title">Lanzamientos</h2>
-            </div>
+            <h2 id="artist-albums-title">Discografía</h2>
           </div>
           <div className="artist-profile__release-groups">
             {albumReleases.length > 0 && (

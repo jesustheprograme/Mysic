@@ -4,7 +4,7 @@
 import { config } from '../config.mjs';
 import { createAsyncTtlCache } from '../utils/asyncCache.mjs';
 import { getYoutube } from './client.mjs';
-import { mapAlbumItem, mapSong, pickThumbnail } from './mappers.mjs';
+import { mapAlbumItem, mapSong, pickThumbnail, plainText } from './mappers.mjs';
 
 const MAX_VIDEO_THUMBNAILS = 8;
 const artistCache = createAsyncTtlCache({ ttlMs: config.browseCacheTtlMs, maxSize: config.requestCacheMax });
@@ -33,6 +33,32 @@ export async function expandReleaseShelf(section, artist, youtube) {
   } catch (error) {
     console.warn(`[artist] no se pudo ampliar ${section.header?.title?.text || 'discografía'}: ${error.message}`);
     return initialItems;
+  }
+}
+
+export function findSongAlbum(item) {
+  for (const column of item.flex_columns || []) {
+    const run = column?.title?.runs?.find((entry) => entry.endpoint?.payload?.browseId?.startsWith('MPR'));
+    if (run) return { id: run.endpoint.payload.browseId, name: plainText(run.text) };
+  }
+  return null;
+}
+
+export async function countArtistSongs(section, youtube) {
+  const playlistId = section?.endpoint?.payload?.browseId;
+  if (!playlistId) return (section?.contents || []).filter((item) => item.id).length;
+
+  try {
+    let playlist = await youtube.music.getPlaylist(playlistId);
+    const songIds = new Set();
+    while (playlist) {
+      for (const item of playlist.items || []) if (item.id) songIds.add(item.id);
+      playlist = playlist.has_continuation ? await playlist.getContinuation() : null;
+    }
+    return songIds.size;
+  } catch (error) {
+    console.warn(`[artist] no se pudo contar el catálogo de canciones: ${error.message}`);
+    return (section?.contents || []).filter((item) => item.id).length;
   }
 }
 
@@ -116,22 +142,23 @@ async function loadArtistPage(id) {
   const media = collectPageMedia(artist);
   const thumbnail = media.header;
 
-  const topSongs = [];
-  const shelves = [];
-  for (const section of artist.sections || []) {
-    if (section.type === 'MusicShelf') {
-      for (const item of section.contents || []) {
-        if (item.id && (item.item_type === 'song' || item.item_type === 'video')) {
-          topSongs.push(mapSong(item, { artist: name, artistId: id, thumbnail }));
-        }
-      }
-    } else if (section.type === 'MusicCarouselShelf') {
-      const albums = await expandReleaseShelf(section, { id, name }, youtube);
-      if (albums.length > 0) {
-        shelves.push({ title: section.header?.title?.text || 'Álbumes', items: albums });
-      }
-    }
-  }
+  const sections = artist.sections || [];
+  const songSection = sections.find((section) => section.type === 'MusicShelf');
+  const topSongs = (songSection?.contents || [])
+    .filter((item) => item.id && (item.item_type === 'song' || item.item_type === 'video'))
+    .map((item) => {
+      const album = findSongAlbum(item);
+      return mapSong(item, { artist: name, artistId: id, album: album?.name, albumId: album?.id, thumbnail });
+    });
+  const releaseSections = sections.filter((section) => section.type === 'MusicCarouselShelf');
+  const [songCount, releaseGroups] = await Promise.all([
+    countArtistSongs(songSection, youtube),
+    Promise.all(releaseSections.map(async (section) => ({
+      title: section.header?.title?.text || 'Álbumes',
+      items: await expandReleaseShelf(section, { id, name }, youtube),
+    }))),
+  ]);
+  const shelves = releaseGroups.filter((shelf) => shelf.items.length > 0);
 
   return {
     page: {
@@ -142,6 +169,7 @@ async function loadArtistPage(id) {
       // Foto inmediata para la cabecera; el agregador aporta el resto
       images: [media.header].filter(Boolean),
       imagesComplete: false,
+      songCount,
       topSongs,
       shelves,
     },
