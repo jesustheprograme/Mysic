@@ -44,24 +44,6 @@ export function findSongAlbum(item) {
   return null;
 }
 
-export async function countArtistSongs(section, youtube) {
-  const playlistId = section?.endpoint?.payload?.browseId;
-  if (!playlistId) return (section?.contents || []).filter((item) => item.id).length;
-
-  try {
-    let playlist = await youtube.music.getPlaylist(playlistId);
-    const songIds = new Set();
-    while (playlist) {
-      for (const item of playlist.items || []) if (item.id) songIds.add(item.id);
-      playlist = playlist.has_continuation ? await playlist.getContinuation() : null;
-    }
-    return songIds.size;
-  } catch (error) {
-    console.warn(`[artist] no se pudo contar el catálogo de canciones: ${error.message}`);
-    return (section?.contents || []).filter((item) => item.id).length;
-  }
-}
-
 /**
  * Imágenes del artista disponibles en la página de YouTube Music (sin llamadas extra):
  *  - header: cabecera panorámica de YouTube Music
@@ -151,13 +133,12 @@ async function loadArtistPage(id) {
       return mapSong(item, { artist: name, artistId: id, album: album?.name, albumId: album?.id, thumbnail });
     });
   const releaseSections = sections.filter((section) => section.type === 'MusicCarouselShelf');
-  const [songCount, releaseGroups] = await Promise.all([
-    countArtistSongs(songSection, youtube),
-    Promise.all(releaseSections.map(async (section) => ({
+  const releaseGroups = await Promise.all(
+    releaseSections.map(async (section) => ({
       title: section.header?.title?.text || 'Álbumes',
       items: await expandReleaseShelf(section, { id, name }, youtube),
-    }))),
-  ]);
+    }))
+  );
   const shelves = releaseGroups.filter((shelf) => shelf.items.length > 0);
 
   return {
@@ -169,7 +150,6 @@ async function loadArtistPage(id) {
       // Foto inmediata para la cabecera; el agregador aporta el resto
       images: [media.header].filter(Boolean),
       imagesComplete: false,
-      songCount,
       topSongs,
       shelves,
     },

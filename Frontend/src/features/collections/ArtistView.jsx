@@ -266,7 +266,7 @@ function ArtistView({
           >
             {artist.title}
           </h1>
-          <p>{artist.songCount ?? artistSongs.length} canciones · {albums.length} lanzamientos</p>
+          <p>{albumReleases.length} {albumReleases.length === 1 ? 'álbum' : 'álbumes'} · {epReleases.length} {epReleases.length === 1 ? 'EP' : 'EPs'}</p>
           <div className="artist-profile__hero-actions">
             <button className="artist-profile__play" type="button" disabled={!artistSongs.length} onClick={playArtist}>
               {artistIsPlaying ? <Pause fill="currentColor" aria-hidden="true" /> : <Play fill="currentColor" aria-hidden="true" />}

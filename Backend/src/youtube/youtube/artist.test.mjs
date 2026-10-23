@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { countArtistSongs, expandReleaseShelf, findSongAlbum, mergeReleaseItems } from './artist.mjs';
+import { expandReleaseShelf, findSongAlbum, mergeReleaseItems } from './artist.mjs';
 
 test('combina la vista previa y la discografía completa sin duplicar lanzamientos', () => {
   const preview = [{ id: 'album-1', title: 'Uno' }, { id: 'album-2', title: 'Dos' }];
@@ -60,20 +60,3 @@ test('extrae el álbum enlazado de una canción popular', () => {
   assert.deepEqual(findSongAlbum(item), { id: 'MPREalbum', name: 'Álbum real' });
 });
 
-test('cuenta canciones únicas recorriendo las continuaciones de Music', async () => {
-  const secondPage = {
-    items: [{ id: 'song-2' }, { id: 'song-3' }],
-    has_continuation: false,
-  };
-  const firstPage = {
-    items: [{ id: 'song-1' }, { id: 'song-2' }, { type: 'ContinuationItem' }],
-    has_continuation: true,
-    getContinuation: async () => secondPage,
-  };
-  const calls = [];
-  const youtube = { music: { getPlaylist: async (id) => { calls.push(id); return firstPage; } } };
-  const section = { endpoint: { payload: { browseId: 'VLartist-songs' } } };
-
-  assert.equal(await countArtistSongs(section, youtube), 3);
-  assert.deepEqual(calls, ['VLartist-songs']);
-});
