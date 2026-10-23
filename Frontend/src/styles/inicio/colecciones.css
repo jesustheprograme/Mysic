@@ -3371,6 +3371,23 @@
   font-size: clamp(18px, 2vw, 24px);
 }
 
+@media (min-width: 681px) {
+  .artist-profile__song {
+    min-height: 74px;
+    padding: 9px 10px;
+  }
+
+  .artist-profile__song .song-row__main {
+    grid-template-columns: 54px minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .artist-profile__song .song-row__artwork {
+    width: 54px;
+    border-radius: 5px;
+  }
+}
+
 .artist-profile__all-songs {
   justify-self: end;
   padding: 5px 0;
