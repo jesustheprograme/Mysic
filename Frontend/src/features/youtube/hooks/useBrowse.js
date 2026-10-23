@@ -278,6 +278,7 @@ export function useBrowse({ progressive = false } = {}) {
   }, [showHome]);
 
   const openArtist = useCallback((id) => id && openDetail('artist', (signal) => loadArtist(id, signal)), [openDetail]);
+  const openArtistSongs = useCallback((id) => id && openDetail('artist-songs', (signal) => api.artistSongs(id, signal)), [openDetail]);
   const openAlbum = useCallback((id) => id && openDetail('album', (signal) => api.album(id, signal)), [openDetail]);
 
   const showDownloads = () => {
@@ -323,6 +324,7 @@ export function useBrowse({ progressive = false } = {}) {
     loadSection,
     changeTab,
     openArtist,
+    openArtistSongs,
     openAlbum,
     showHome,
     showExplore,

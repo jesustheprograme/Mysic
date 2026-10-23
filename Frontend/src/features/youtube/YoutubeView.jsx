@@ -205,6 +205,10 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
     saveCurrentScrollPosition()
     browse.openAlbum(albumId)
   }
+  function openArtistSongs(artistId) {
+    saveCurrentScrollPosition()
+    browse.openArtistSongs(artistId)
+  }
   function showDownloads() {
     saveCurrentScrollPosition()
     browse.showDownloads()
@@ -275,7 +279,7 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
 
   const controller = {
     account, accountBusy, accountError, accountHelpOpen, actionError, browse, changeTab, connectMusicSession, disconnectAccount, downloads, goBack, likedAlbumIds,
-    likedArtistIds, likedSongIds, onAddToPlaylist, openAlbum, openArtist, player, playSongs,
+    likedArtistIds, likedSongIds, onAddToPlaylist, openAlbum, openArtist, openArtistSongs, player, playSongs,
     renderSongActions, searchType: browse.searchType, selectSearchEntity, setAccountHelpOpen, startAccountLink,
     showDownloads, startPlaylist, toggleAlbumFavorite, toggleArtistFavorite, toggleSongFavorite,
   }

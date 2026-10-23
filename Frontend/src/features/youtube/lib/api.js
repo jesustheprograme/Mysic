@@ -87,6 +87,7 @@ export const api = {
   search: (q, type, signal) => fetchJson(`/search?q=${encodeURIComponent(q)}&type=${type}`, signal),
   suggest: (q, signal) => fetchJson(`/suggest?q=${encodeURIComponent(q)}`, signal),
   artist: (id, signal) => fetchJson(`/artist/${encodeURIComponent(id)}`, signal),
+  artistSongs: (id, signal) => fetchJson(`/artist/${encodeURIComponent(id)}/songs`, signal),
   artistImages: (id, signal) => fetchJson(`/artist/${id}/images`, signal),
   album: (id, signal) => fetchJson(`/album/${encodeURIComponent(id)}`, signal),
   downloads: {

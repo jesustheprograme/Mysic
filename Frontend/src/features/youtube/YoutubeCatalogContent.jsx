@@ -1,5 +1,6 @@
 import { Check, Compass, Copy, Download, ExternalLink, Headphones, Info, Link2Off, LoaderCircle, Sparkles, UserRound, WifiOff } from 'lucide-react'
 import { useState } from 'react'
+import ArtistSongsView from '../collections/ArtistSongsView.jsx'
 import ArtistView from '../collections/ArtistView.jsx'
 import CollectionDetailView from '../collections/CollectionDetailView.jsx'
 import CatalogSearchControls from '../discovery/CatalogSearchControls.jsx'
@@ -241,9 +242,15 @@ function DownloadsView({ controller }) {
 }
 
 function ArtistDetail({ controller }) {
-  const { browse, likedArtistIds, likedSongIds, onAddToPlaylist, openAlbum, player, playSongs, renderSongActions, toggleArtistFavorite, toggleSongFavorite } = controller
+  const { browse, likedArtistIds, likedSongIds, onAddToPlaylist, openAlbum, openArtistSongs, player, playSongs, renderSongActions, toggleArtistFavorite, toggleSongFavorite } = controller
   const sourceSongs = browse.view.data.topSongs
-  return <ArtistView artist={{ artistId: browse.view.data.id, artwork: browse.view.data.thumbnail, images: browse.view.data.images?.map((image) => image.url ?? image).filter(Boolean), title: browse.view.data.name }} likedArtistIds={likedArtistIds} likedSongIds={likedSongIds} onAddToPlaylist={onAddToPlaylist} onAlbumSelect={openAlbum} onBack={controller.goBack} onPlaybackToggle={player.togglePlay} onReleasePlay={(release) => openAlbum(release.id)} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleArtistFavorite={toggleArtistFavorite} onToggleFavorite={toggleSongFavorite} releases={adaptReleases(browse.view.data.shelves)} renderSongActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} songs={sourceSongs.map(adaptSong)} />
+  return <ArtistView artist={{ artistId: browse.view.data.id, artwork: browse.view.data.thumbnail, images: browse.view.data.images?.map((image) => image.url ?? image).filter(Boolean), title: browse.view.data.name }} likedArtistIds={likedArtistIds} likedSongIds={likedSongIds} onAddToPlaylist={onAddToPlaylist} onAlbumSelect={openAlbum} onBack={controller.goBack} onPlaybackToggle={player.togglePlay} onReleasePlay={(release) => openAlbum(release.id)} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleArtistFavorite={toggleArtistFavorite} onToggleFavorite={toggleSongFavorite} onViewAllSongs={() => openArtistSongs(browse.view.data.id)} releases={adaptReleases(browse.view.data.shelves)} renderSongActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} songs={sourceSongs.map(adaptSong)} />
+}
+
+function ArtistSongsDetail({ controller }) {
+  const { browse, openAlbum, player, playSongs } = controller
+  const sourceSongs = browse.view.data.songs
+  return <ArtistSongsView artistName={browse.view.data.name} onAlbumSelect={openAlbum} onBack={controller.goBack} onPlaybackToggle={player.togglePlay} onSongSelect={(songId) => playSongs(sourceSongs, songId)} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} songs={sourceSongs.map(adaptSong)} />
 }
 
 function AlbumDetail({ controller }) {
@@ -258,6 +265,7 @@ export default function YoutubeCatalogContent({ controller }) {
   if (kind === 'search') return <SearchView controller={controller} />
   if (['home', 'explore', 'recommendations'].includes(kind)) return <LandingView controller={controller} />
   if (kind === 'artist') return <ArtistDetail controller={controller} />
+  if (kind === 'artist-songs') return <ArtistSongsDetail controller={controller} />
   if (kind === 'album') return <AlbumDetail controller={controller} />
   if (kind === 'downloads') return <DownloadsView controller={controller} />
   return null

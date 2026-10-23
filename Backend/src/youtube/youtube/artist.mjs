@@ -8,6 +8,7 @@ import { mapAlbumItem, mapSong, pickThumbnail, plainText } from './mappers.mjs';
 
 const MAX_VIDEO_THUMBNAILS = 8;
 const artistCache = createAsyncTtlCache({ ttlMs: config.browseCacheTtlMs, maxSize: config.requestCacheMax });
+const artistSongsCache = createAsyncTtlCache({ ttlMs: config.browseCacheTtlMs, maxSize: config.requestCacheMax });
 
 function mapReleaseItems(items, artist) {
   return (items || [])
@@ -42,6 +43,24 @@ export function findSongAlbum(item) {
     if (run) return { id: run.endpoint.payload.browseId, name: plainText(run.text) };
   }
   return null;
+}
+
+export async function collectArtistSongs(playlist, defaults) {
+  const songs = new Map();
+  let page = playlist;
+  while (page) {
+    for (const item of page.items || []) {
+      if (!item.id || (item.item_type !== 'song' && item.item_type !== 'video')) continue;
+      const album = findSongAlbum(item);
+      songs.set(item.id, mapSong(item, {
+        ...defaults,
+        album: album?.name,
+        albumId: album?.id,
+      }));
+    }
+    page = page.has_continuation ? await page.getContinuation() : null;
+  }
+  return [...songs.values()];
 }
 
 /**
@@ -114,6 +133,26 @@ export async function getArtistNameAndMedia(id) {
 /** Página completa: cabecera, canciones destacadas y estanterías de álbumes/sencillos. */
 export async function getArtistPage(id) {
   return artistCache.get(id, () => loadArtistPage(id));
+}
+
+export async function getArtistSongs(id) {
+  return artistSongsCache.get(id, async () => {
+    const youtube = getYoutube();
+    const artist = await youtube.music.getArtist(id);
+    const name = artist.header?.title?.text || 'Artista';
+    const section = (artist.sections || []).find((item) => item.type === 'MusicShelf');
+    const playlistId = section?.endpoint?.payload?.browseId;
+    if (!playlistId) {
+      return { id, name, songs: [] };
+    }
+    const playlist = await youtube.music.getPlaylist(playlistId);
+    const songs = await collectArtistSongs(playlist, {
+      artist: name,
+      artistId: id,
+      thumbnail: pickThumbnail(artist.header?.thumbnail ?? artist.header?.foreground_thumbnail),
+    });
+    return { id, name, songs };
+  });
 }
 
 async function loadArtistPage(id) {

@@ -146,6 +146,7 @@ function ArtistView({
   onPlaybackToggle,
   onReleasePlay,
   onSongSelect,
+  onViewAllSongs,
   onToggleFavorite,
   onToggleArtistFavorite,
   renderSongActions,
@@ -316,9 +317,14 @@ function ArtistView({
 
       <div className="artist-profile__content">
         <section className="artist-profile__section" aria-labelledby="artist-songs-title">
-          <div className="artist-profile__section-heading">
+          <div className="artist-profile__section-heading artist-profile__section-heading--songs">
             <ListMusic aria-hidden="true" />
             <h2 id="artist-songs-title">Canciones más escuchadas</h2>
+            {onViewAllSongs && (
+              <button className="artist-profile__all-songs" type="button" onClick={onViewAllSongs}>
+                Ver todas las canciones
+              </button>
+            )}
           </div>
           <ol className="artist-profile__songs">
             {featuredSongs.map((song) => {

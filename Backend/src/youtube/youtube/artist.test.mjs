@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { expandReleaseShelf, findSongAlbum, mergeReleaseItems } from './artist.mjs';
+import { collectArtistSongs, expandReleaseShelf, findSongAlbum, mergeReleaseItems } from './artist.mjs';
 
 test('combina la vista previa y la discografía completa sin duplicar lanzamientos', () => {
   const preview = [{ id: 'album-1', title: 'Uno' }, { id: 'album-2', title: 'Dos' }];
@@ -58,5 +58,29 @@ test('extrae el álbum enlazado de una canción popular', () => {
   };
 
   assert.deepEqual(findSongAlbum(item), { id: 'MPREalbum', name: 'Álbum real' });
+});
+
+test('carga todas las páginas de canciones y elimina duplicados', async () => {
+  const song = (id, title, albumId, album) => ({
+    id,
+    item_type: 'song',
+    title: { text: title },
+    flex_columns: [{ title: { runs: [{ text: album, endpoint: { payload: { browseId: albumId } } }] } }],
+  });
+  const secondPage = {
+    items: [song('song-2', 'Dos', 'MPREalbum-2', 'Álbum 2')],
+    has_continuation: false,
+  };
+  const firstPage = {
+    items: [song('song-1', 'Uno', 'MPREalbum-1', 'Álbum 1'), song('song-2', 'Dos', 'MPREalbum-2', 'Álbum 2')],
+    has_continuation: true,
+    getContinuation: async () => secondPage,
+  };
+
+  const songs = await collectArtistSongs(firstPage, { artist: 'Artista', artistId: 'UCartist' });
+
+  assert.deepEqual(songs.map((item) => item.id), ['song-1', 'song-2']);
+  assert.deepEqual(songs.map((item) => item.album), ['Álbum 1', 'Álbum 2']);
+  assert.deepEqual(songs.map((item) => item.albumId), ['MPREalbum-1', 'MPREalbum-2']);
 });
 
