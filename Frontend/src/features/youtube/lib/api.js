@@ -79,7 +79,7 @@ export const api = {
   connectMusicSession: (requestText) => send('/link/browser', 'POST', { requestText }),
   accountLinkStatus: (signal) => fetchJson('/link/status', signal),
   unlinkAccount: () => send('/link', 'DELETE'),
-  home: (signal) => fetchJson(`/home?variant=${Date.now()}`, signal),
+  home: (signal) => fetchJson('/home', signal),
   explore: (signal) => fetchJson('/explore', signal),
   radio: (id, signal) => fetchJson(`/radio/${encodeURIComponent(id)}`, signal),
   playlist: (id, signal) => fetchJson(`/playlist/${encodeURIComponent(id)}`, signal),

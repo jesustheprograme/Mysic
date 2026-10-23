@@ -9,6 +9,33 @@ import { mapAlbumItem, mapSong, pickThumbnail } from './mappers.mjs';
 const MAX_VIDEO_THUMBNAILS = 8;
 const artistCache = createAsyncTtlCache({ ttlMs: config.browseCacheTtlMs, maxSize: config.requestCacheMax });
 
+function mapReleaseItems(items, artist) {
+  return (items || [])
+    .filter((item) => item.item_type === 'album' && item.id)
+    .map((item) => ({ ...mapAlbumItem(item), artist: artist.name, artistId: artist.id }));
+}
+
+export function mergeReleaseItems(initialItems, expandedItems) {
+  const releases = new Map();
+  for (const item of [...initialItems, ...expandedItems]) releases.set(item.id, item);
+  return [...releases.values()];
+}
+
+export async function expandReleaseShelf(section, artist, youtube) {
+  const initialItems = mapReleaseItems(section.contents, artist);
+  const endpoint = section.header?.more_content?.endpoint;
+  if (!endpoint) return initialItems;
+
+  try {
+    const page = await endpoint.call(youtube.actions, { client: 'YTMUSIC', parse: true });
+    const expandedItems = mapReleaseItems(page.contents_memo?.get('MusicTwoRowItem'), artist);
+    return mergeReleaseItems(initialItems, expandedItems);
+  } catch (error) {
+    console.warn(`[artist] no se pudo ampliar ${section.header?.title?.text || 'discografía'}: ${error.message}`);
+    return initialItems;
+  }
+}
+
 /**
  * Imágenes del artista disponibles en la página de YouTube Music (sin llamadas extra):
  *  - header: cabecera panorámica de YouTube Music
@@ -82,7 +109,8 @@ export async function getArtistPage(id) {
 }
 
 async function loadArtistPage(id) {
-  const artist = await getYoutube().music.getArtist(id);
+  const youtube = getYoutube();
+  const artist = await youtube.music.getArtist(id);
   const header = artist.header;
   const name = header?.title?.text || 'Artista';
   const media = collectPageMedia(artist);
@@ -98,9 +126,7 @@ async function loadArtistPage(id) {
         }
       }
     } else if (section.type === 'MusicCarouselShelf') {
-      const albums = (section.contents || [])
-        .filter((item) => item.item_type === 'album' && item.id)
-        .map((item) => ({ ...mapAlbumItem(item), artist: name, artistId: id }));
+      const albums = await expandReleaseShelf(section, { id, name }, youtube);
       if (albums.length > 0) {
         shelves.push({ title: section.header?.title?.text || 'Álbumes', items: albums });
       }

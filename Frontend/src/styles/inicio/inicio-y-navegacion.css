@@ -2199,6 +2199,7 @@
   min-width: 0;
   display: grid;
   gap: 3px;
+  margin-top: 10px;
 }
 
 .home-shelf-card__meta strong,

@@ -6,6 +6,7 @@ import PreviewIndicator from '../../components/PreviewIndicator.jsx'
 const portraitDirections = ['left', 'down', 'right', 'up']
 const PORTRAIT_DURATION = 5600
 const RELEASE_PREVIEW_LIMIT = 6
+const EXPANDED_RELEASE_GROUPS = { albums: true, eps: true, singles: true }
 
 function getArtistTitleScale(title) {
   const length = Array.from(title.trim()).length
@@ -168,10 +169,13 @@ function ArtistView({
   const featuredSongs = artistSongs.slice(0, 8)
   const portraits = artist.images?.length ? artist.images : [artist.artwork].filter(Boolean)
   const [portraitIndex, setPortraitIndex] = useState(0)
-  const [releaseExpansion, setReleaseExpansion] = useState({ artistId: artist.artistId, groups: {} })
+  const [releaseExpansion, setReleaseExpansion] = useState({
+    artistId: artist.artistId,
+    groups: EXPANDED_RELEASE_GROUPS,
+  })
   const expandedReleaseGroups = releaseExpansion.artistId === artist.artistId
     ? releaseExpansion.groups
-    : {}
+    : EXPANDED_RELEASE_GROUPS
   const activePortraitIndex = portraits.length ? portraitIndex % portraits.length : 0
   const selectedSongBelongsToArtist = artistSongs.some((song) => song.id === selectedSongId)
   const artistIsPlaying = selectedSongBelongsToArtist && selectedSongPlaying
@@ -188,7 +192,7 @@ function ArtistView({
 
   function toggleReleaseGroup(group) {
     setReleaseExpansion((current) => {
-      const groups = current.artistId === artist.artistId ? current.groups : {}
+      const groups = current.artistId === artist.artistId ? current.groups : EXPANDED_RELEASE_GROUPS
       return {
         artistId: artist.artistId,
         groups: { ...groups, [group]: !groups[group] },

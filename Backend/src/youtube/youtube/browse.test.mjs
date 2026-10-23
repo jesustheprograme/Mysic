@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { enrichShelfAlbums, getPlaylistQueue, mapBrowseItem, mapShelf, rotateHomeShelves } from './browse.mjs';
+import { enrichShelfAlbums, getPlaylistQueue, mapBrowseItem, mapShelf, mergeHomeShelves } from './browse.mjs';
 
 test('normaliza una canción de radio al contrato del reproductor', () => {
   const item = mapBrowseItem({
@@ -137,17 +137,20 @@ test('convierte objetos Text de feeds personalizados en valores primitivos', () 
   );
 });
 
-test('muestra otra ventana del feed sin inventar recomendaciones', () => {
-  const shelves = [
+test('conserva primero el feed personal y añade continuaciones sin duplicarlo', () => {
+  const initialShelves = [
     { title: 'Uno', items: [{ id: 'a' }, { id: 'b' }] },
     { title: 'Dos', items: [{ id: 'c' }, { id: 'd' }] },
+  ];
+  const continuationShelves = [
+    { title: 'Dos', items: [{ id: 'duplicado' }] },
     { title: 'Tres', items: [{ id: 'e' }, { id: 'f' }] },
   ];
-  const rotated = rotateHomeShelves(shelves, 1, 2);
+  const merged = mergeHomeShelves(initialShelves, continuationShelves);
 
-  assert.deepEqual(rotated.map((shelf) => shelf.title), ['Dos', 'Tres']);
-  assert.deepEqual(rotated.flatMap((shelf) => shelf.items.map((item) => item.id)), ['d', 'c', 'e', 'f']);
-  assert.deepEqual(shelves[1].items.map((item) => item.id), ['c', 'd']);
+  assert.deepEqual(merged.map((shelf) => shelf.title), ['Uno', 'Dos', 'Tres']);
+  assert.deepEqual(merged.flatMap((shelf) => shelf.items.map((item) => item.id)), ['a', 'b', 'c', 'd', 'e', 'f']);
+  assert.deepEqual(initialShelves[1].items.map((item) => item.id), ['c', 'd']);
 });
 
 test('carga playlists con el cliente de la cuenta solicitante', async () => {
