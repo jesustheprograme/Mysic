@@ -5,7 +5,7 @@
 // GET /api/artist/:id/songs   catálogo completo de canciones, bajo demanda
 import express from 'express';
 import { asyncRoute, BROWSE_ID_RE, requireYoutube, validateParam } from '../utils/http.mjs';
-import { getArtistPage, getArtistSongs } from '../youtube/artist.mjs';
+import { getArtistPage, getArtistReleases, getArtistSongs } from '../youtube/artist.mjs';
 
 export function createArtistRouter({ getArtistImages }) {
   const router = express.Router();
@@ -20,6 +20,16 @@ export function createArtistRouter({ getArtistImages }) {
       res.setHeader('Cache-Control', 'public, max-age=3600');
       res.json({ id: req.params.id, name, images });
     }, 'No se pudieron obtener las fotos del artista')
+  );
+
+  router.get(
+    '/:id/releases',
+    requireYoutube,
+    validId,
+    asyncRoute(async (req, res) => {
+      res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800');
+      res.json(await getArtistReleases(req.params.id));
+    }, 'No se pudo completar la discografía del artista')
   );
 
   router.get(

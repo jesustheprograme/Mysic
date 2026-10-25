@@ -7,13 +7,29 @@ import { getYoutube } from './client.mjs';
 import { mapAlbumItem, mapSong, pickThumbnail, plainText } from './mappers.mjs';
 
 const MAX_VIDEO_THUMBNAILS = 8;
+const artistSourceCache = createAsyncTtlCache({ ttlMs: config.browseCacheTtlMs, maxSize: config.requestCacheMax });
 const artistCache = createAsyncTtlCache({ ttlMs: config.browseCacheTtlMs, maxSize: config.requestCacheMax });
+const artistReleasesCache = createAsyncTtlCache({ ttlMs: config.browseCacheTtlMs, maxSize: config.requestCacheMax });
 const artistSongsCache = createAsyncTtlCache({ ttlMs: config.browseCacheTtlMs, maxSize: config.requestCacheMax });
 
 function mapReleaseItems(items, artist) {
   return (items || [])
     .filter((item) => item.item_type === 'album' && item.id)
     .map((item) => ({ ...mapAlbumItem(item), artist: artist.name, artistId: artist.id }));
+}
+
+function getArtistSource(id) {
+  return artistSourceCache.get(id, () => getYoutube().music.getArtist(id));
+}
+
+export function createReleasePreview(sections, artist) {
+  return (sections || [])
+    .filter((section) => section.type === 'MusicCarouselShelf')
+    .map((section) => ({
+      title: section.header?.title?.text || 'Álbumes',
+      items: mapReleaseItems(section.contents, artist),
+    }))
+    .filter((shelf) => shelf.items.length > 0);
 }
 
 export function mergeReleaseItems(initialItems, expandedItems) {
@@ -122,7 +138,7 @@ export async function collectChannelMedia(id) {
 
 /** Nombre e imágenes completas (lo que necesita el agregador de fotos cuando no hay página cargada). */
 export async function getArtistNameAndMedia(id) {
-  const artist = await getYoutube().music.getArtist(id);
+  const artist = await getArtistSource(id);
   const [pageMedia, channelMedia] = await Promise.all([collectPageMedia(artist), collectChannelMedia(id)]);
   return {
     name: artist.header?.title?.text || 'Artista',
@@ -135,10 +151,26 @@ export async function getArtistPage(id) {
   return artistCache.get(id, () => loadArtistPage(id));
 }
 
+export async function getArtistReleases(id) {
+  return artistReleasesCache.get(id, async () => {
+    const youtube = getYoutube();
+    const artist = await getArtistSource(id);
+    const name = artist.header?.title?.text || 'Artista';
+    const releaseSections = (artist.sections || []).filter((section) => section.type === 'MusicCarouselShelf');
+    const shelves = (await Promise.all(
+      releaseSections.map(async (section) => ({
+        title: section.header?.title?.text || 'Álbumes',
+        items: await expandReleaseShelf(section, { id, name }, youtube),
+      }))
+    )).filter((shelf) => shelf.items.length > 0);
+    return { id, shelves };
+  });
+}
+
 export async function getArtistSongs(id) {
   return artistSongsCache.get(id, async () => {
     const youtube = getYoutube();
-    const artist = await youtube.music.getArtist(id);
+    const artist = await getArtistSource(id);
     const name = artist.header?.title?.text || 'Artista';
     const section = (artist.sections || []).find((item) => item.type === 'MusicShelf');
     const playlistId = section?.endpoint?.payload?.browseId;
@@ -156,8 +188,7 @@ export async function getArtistSongs(id) {
 }
 
 async function loadArtistPage(id) {
-  const youtube = getYoutube();
-  const artist = await youtube.music.getArtist(id);
+  const artist = await getArtistSource(id);
   const header = artist.header;
   const name = header?.title?.text || 'Artista';
   const media = collectPageMedia(artist);
@@ -171,14 +202,7 @@ async function loadArtistPage(id) {
       const album = findSongAlbum(item);
       return mapSong(item, { artist: name, artistId: id, album: album?.name, albumId: album?.id, thumbnail });
     });
-  const releaseSections = sections.filter((section) => section.type === 'MusicCarouselShelf');
-  const releaseGroups = await Promise.all(
-    releaseSections.map(async (section) => ({
-      title: section.header?.title?.text || 'Álbumes',
-      items: await expandReleaseShelf(section, { id, name }, youtube),
-    }))
-  );
-  const shelves = releaseGroups.filter((shelf) => shelf.items.length > 0);
+  const shelves = createReleasePreview(sections, { id, name });
 
   return {
     page: {
@@ -189,6 +213,7 @@ async function loadArtistPage(id) {
       // Foto inmediata para la cabecera; el agregador aporta el resto
       images: [media.header].filter(Boolean),
       imagesComplete: false,
+      releasesComplete: false,
       topSongs,
       shelves,
     },

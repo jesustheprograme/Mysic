@@ -50,6 +50,7 @@ export function useBrowse({ progressive = false } = {}) {
   const { history, add: addHistory, remove: removeFromHistory } = useSearchHistory();
   const searchControllerRef = useRef(null);
   const detailControllerRef = useRef(null);
+  const artistEnrichmentControllerRef = useRef(null);
   const enrichmentCancelRef = useRef(null);
   const searchSequenceRef = useRef(0);
   const sectionRequestsRef = useRef(new Map());
@@ -67,6 +68,8 @@ export function useBrowse({ progressive = false } = {}) {
     searchControllerRef.current = null;
     detailControllerRef.current?.abort();
     detailControllerRef.current = null;
+    artistEnrichmentControllerRef.current?.abort();
+    artistEnrichmentControllerRef.current = null;
     enrichmentCancelRef.current?.();
     enrichmentCancelRef.current = null;
     setLoading(false);
@@ -77,8 +80,34 @@ export function useBrowse({ progressive = false } = {}) {
     searchSequenceRef.current += 1;
     searchControllerRef.current?.abort();
     detailControllerRef.current?.abort();
+    artistEnrichmentControllerRef.current?.abort();
     enrichmentCancelRef.current?.();
   }, []);
+
+  useEffect(() => {
+    const artistId = view.kind === 'artist' ? view.data?.id : null;
+    if (!artistId || view.data?.releasesComplete) return undefined;
+
+    const controller = new AbortController();
+    artistEnrichmentControllerRef.current?.abort();
+    artistEnrichmentControllerRef.current = controller;
+    setEnriching(true);
+
+    api.artistReleases(artistId, controller.signal).then((data) => {
+      setView((current) => current.kind === 'artist' && current.data?.id === artistId
+        ? { ...current, data: { ...current.data, shelves: data.shelves, releasesComplete: true } }
+        : current);
+    }).catch((error) => {
+      if (error.name !== 'AbortError') console.warn(`No se pudo completar la discografía: ${error.message}`);
+    }).finally(() => {
+      if (artistEnrichmentControllerRef.current === controller) {
+        artistEnrichmentControllerRef.current = null;
+        setEnriching(false);
+      }
+    });
+
+    return () => controller.abort();
+  }, [view.data?.id, view.data?.releasesComplete, view.kind]);
 
   const runSearch = useCallback(async (text, type) => {
     const trimmed = text.trim();

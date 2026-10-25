@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { collectArtistSongs, expandReleaseShelf, findSongAlbum, mergeReleaseItems } from './artist.mjs';
+import { collectArtistSongs, createReleasePreview, expandReleaseShelf, findSongAlbum, mergeReleaseItems } from './artist.mjs';
 
 test('combina la vista previa y la discografía completa sin duplicar lanzamientos', () => {
   const preview = [{ id: 'album-1', title: 'Uno' }, { id: 'album-2', title: 'Dos' }];
@@ -47,6 +47,24 @@ test('amplía la discografía exclusivamente con el endpoint de YouTube Music', 
   assert.deepEqual(releases.map((item) => item.id), ['album-1', 'album-2']);
   assert.equal(releases[0].artist, 'Artista');
   assert.equal(releases[0].artistId, 'artist-1');
+});
+
+test('la primera vista usa la discografía visible sin esperar la expansión', () => {
+  let expansionCalls = 0;
+  const release = { id: 'album-1', item_type: 'album', title: { text: 'Vista previa' } };
+  const sections = [{
+    type: 'MusicCarouselShelf',
+    contents: [release],
+    header: {
+      title: { text: 'Álbumes' },
+      more_content: { endpoint: { call: () => { expansionCalls += 1; } } },
+    },
+  }];
+
+  const shelves = createReleasePreview(sections, { id: 'artist-1', name: 'Artista' });
+
+  assert.equal(expansionCalls, 0);
+  assert.deepEqual(shelves[0].items.map((item) => item.id), ['album-1']);
 });
 
 test('extrae el álbum enlazado de una canción popular', () => {
