@@ -52,9 +52,9 @@ export function createArtistRouter({ getArtistImages }) {
       // La cabecera de YouTube basta para pintar el perfil. El conjunto ampliado
       // de fotos solo bloquea la respuesta cuando ya estaba preparado en caché.
       const imagesReady = await getArtistImages.isReady(req.params.id);
-      const aggregated = getArtistImages(req.params.id, { prefetched: { name: page.name, media } });
-      aggregated.catch((error) => console.warn(`[artist] fotos de ${req.params.id}: ${error.message}`));
-      const full = imagesReady ? await aggregated.catch(() => null) : null;
+      const full = imagesReady
+        ? await getArtistImages(req.params.id, { prefetched: { name: page.name, media } }).catch(() => null)
+        : null;
 
       if (full?.images?.length) {
         page.images = full.images;
