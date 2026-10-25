@@ -4,6 +4,8 @@ import Spinner from './Spinner.jsx'
 function PreviewIndicator({ status }) {
   if (status === 'loading') return <Spinner />
 
+  if (status === 'paused') return <Pause size={17} fill="currentColor" aria-hidden="true" />
+
   if (status === 'playing') {
     return (
       <span className="preview-indicator preview-indicator--playing" aria-label="Reproduciendo">

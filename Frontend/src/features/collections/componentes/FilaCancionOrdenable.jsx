@@ -14,7 +14,7 @@ function formatTrackNumber(song, index, displayTrackNumber) {
   return String(song.trackNumber ?? song.trackNo ?? index + 1).padStart(2, '0')
 }
 
-function TrackPlaybackButton({ displayTrackNumber, index, isPlaying, onToggle, song, withArtwork }) {
+function TrackPlaybackButton({ displayTrackNumber, index, isPlaying, isSelected, onToggle, song, withArtwork }) {
   const label = isPlaying ? `Pausar ${song.title}` : `Reproducir ${song.title}`
   const content = withArtwork
     ? <img src={song.artwork} alt="" loading="lazy" />
@@ -22,7 +22,7 @@ function TrackPlaybackButton({ displayTrackNumber, index, isPlaying, onToggle, s
 
   return (
     <button
-      className={`${withArtwork ? 'collection-detail__track-artwork' : 'collection-detail__track-index'} collection-detail__track-playback playback-hover${isPlaying ? ' collection-detail__track-playback--playing' : ''}`}
+      className={`${withArtwork ? 'collection-detail__track-artwork' : 'collection-detail__track-index'} collection-detail__track-playback playback-hover${isSelected ? ' collection-detail__track-playback--playing' : ''}`}
       type="button"
       aria-label={label}
       aria-pressed={isPlaying}
@@ -31,7 +31,7 @@ function TrackPlaybackButton({ displayTrackNumber, index, isPlaying, onToggle, s
     >
       {content}
       <span className="collection-detail__track-playback-status" aria-hidden="true">
-        <PreviewIndicator status={isPlaying ? 'playing' : null} />
+        <PreviewIndicator status={isPlaying ? 'playing' : isSelected ? 'paused' : null} />
       </span>
     </button>
   )
@@ -165,7 +165,7 @@ export default function FilaCancionOrdenable({
           <GripVertical size={19} strokeWidth={2.2} aria-hidden="true" />
         </button>
       )}
-      <TrackPlaybackButton displayTrackNumber={displayTrackNumber} index={index} isPlaying={isPlaying} onToggle={toggleTrackPlayback} song={song} withArtwork={showsTrackArtwork} />
+      <TrackPlaybackButton displayTrackNumber={displayTrackNumber} index={index} isPlaying={isPlaying} isSelected={isSelected} onToggle={toggleTrackPlayback} song={song} withArtwork={showsTrackArtwork} />
       <TrackMetadata albumId={albumId} albumTitle={albumTitle} artistId={artistId} onAlbumSelect={onAlbumSelect} onArtistSelect={onArtistSelect} onSongSelect={onSongSelect} song={song} variant={variant} />
       <TrackActions isLiked={isLiked} onAddToPlaylist={onAddToPlaylist} onToggleFavorite={onToggleFavorite} renderTrackActions={renderTrackActions} song={song} />
       <time>{formatDuration(song.durationSeconds)}</time>
