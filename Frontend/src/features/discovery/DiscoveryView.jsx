@@ -719,7 +719,6 @@ function useDiscoveryPage({
     <div className={`music-app${sidebarCollapsed ? ' music-app--sidebar-collapsed' : ''}${playerVisible ? ' music-app--player-open' : ''}${playerVisible && playerCollapsed ? ' music-app--player-collapsed' : ''}`} id="music-home">
       <AppHeader
         collapsed={sidebarCollapsed}
-        glowArtwork={activeAlbum?.artwork ?? activePlaylist?.artwork ?? selectedSong?.artwork ?? null}
         mobileBrandHidden={mobileBrandHidden}
         mobileContextTitle={mobileContextTitle}
         mobileMenuOpen={mobileMenuOpen}

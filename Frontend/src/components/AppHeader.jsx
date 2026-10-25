@@ -5,7 +5,6 @@ import { DesktopAppHeaderLink } from './DesktopAppDownload.jsx'
 
 function AppHeader({
   collapsed,
-  glowArtwork,
   mobileBrandHidden,
   mobileContextTitle,
   mobileMenuOpen,
@@ -23,7 +22,6 @@ function AppHeader({
   const [searchOpen, setSearchOpen] = useState(false)
   const menuRef = useRef(null)
   const searchInputRef = useRef(null)
-  const searchStyle = glowArtwork ? { '--search-glow-image': `url("${glowArtwork}")` } : undefined
 
   useEffect(() => {
     function closeFromOutside(event) {
@@ -105,18 +103,17 @@ function AppHeader({
         </div>
 
         <label
-          className={`music-search${glowArtwork ? ' music-search--themed' : ''}${searchOpen ? ' music-search--open' : ''}`}
+          className={`music-search${searchOpen ? ' music-search--open' : ''}`}
           id="mobile-catalog-search"
-          style={searchStyle}
         >
-          <span className="sr-only">Buscar albumes o artistas</span>
+          <span className="sr-only">Buscar canciones</span>
           <Search className="music-search__icon" size={16} strokeWidth={1.8} aria-hidden="true" />
           <input
             className="music-search__input"
             ref={searchInputRef}
             value={searchQuery}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Buscar albumes o artistas"
+            placeholder="Buscar canciones"
             type="search"
             autoComplete="off"
           />
