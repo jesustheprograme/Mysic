@@ -1,4 +1,5 @@
 import CollectionDetailView from '../collections/CollectionDetailView.jsx'
+import { normalizeYoutubePlaylistSong } from '../youtube/lib/playlistSong.js'
 import PlaylistDeleteModal from './PlaylistDeleteModal.jsx'
 import { useState } from 'react'
 
@@ -26,9 +27,9 @@ function PlaylistView({
   const playlistSongs = playlist.songIds.flatMap((songId) => {
     const song = songs.find((item) => item.id === songId)
     return song ? [song] : []
-  }).concat((playlist.externalSongs ?? []).map((song) => ({
-    ...song,
-    artwork: song.thumbnail,
+  }).concat((playlist.externalSongs ?? []).map((storedSong) => ({
+    ...normalizeYoutubePlaylistSong(storedSong),
+    artwork: storedSong.thumbnail || storedSong.artwork,
   })))
   const playlistArtists = new Map()
   playlistSongs.forEach((song) => {

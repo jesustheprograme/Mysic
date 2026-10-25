@@ -23,3 +23,14 @@ test('normaliza una pista de YouTube para guardarla en una playlist', () => {
     source: 'youtube',
   })
 })
+
+test('recupera la duración textual de una canción externa existente', () => {
+  const song = normalizeYoutubePlaylistSong({
+    id: 'video-2',
+    title: 'Canción externa',
+    duration: '3:21',
+    durationSeconds: 0,
+  })
+
+  assert.equal(song.durationSeconds, 201)
+})

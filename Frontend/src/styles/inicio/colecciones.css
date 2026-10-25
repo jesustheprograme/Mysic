@@ -1254,6 +1254,11 @@
 }
 
 .collection-detail--playlist .collection-detail__track {
+  grid-template-columns: 48px minmax(0, 1fr) 70px 46px;
+  gap: 10px;
+}
+
+.collection-detail--playlist .collection-detail__track--reorderable {
   grid-template-columns: 26px 48px minmax(0, 1fr) 70px 46px;
   gap: 10px;
 }
@@ -1552,6 +1557,11 @@
   }
 
   .collection-detail--playlist .collection-detail__track {
+    grid-template-columns: 44px minmax(0, 1fr) 58px 42px;
+    gap: 8px;
+  }
+
+  .collection-detail--playlist .collection-detail__track--reorderable {
     grid-template-columns: 24px 44px minmax(0, 1fr) 58px 42px;
     gap: 8px;
   }
@@ -1661,6 +1671,10 @@
   }
 
   .collection-detail--playlist .collection-detail__track {
+    grid-template-columns: 42px minmax(0, 1fr) 42px;
+  }
+
+  .collection-detail--playlist .collection-detail__track--reorderable {
     grid-template-columns: 24px 42px minmax(0, 1fr) 42px;
   }
 
@@ -2612,6 +2626,10 @@
   }
 
   .collection-detail--playlist .collection-detail__track {
+    grid-template-columns: 46px minmax(0, 1fr) 38px;
+  }
+
+  .collection-detail--playlist .collection-detail__track--reorderable {
     grid-template-columns: 24px 46px minmax(0, 1fr) 38px;
   }
 
