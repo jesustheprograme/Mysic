@@ -1,7 +1,7 @@
-import { ArrowLeft, Disc3, ListMusic, ListPlus, Pause, Play, Shuffle } from 'lucide-react'
+import { ArrowLeft, Disc3, ListMusic, Pause, Play, Shuffle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import HeartToggle from '../../components/HeartToggle.jsx'
-import PreviewIndicator from '../../components/PreviewIndicator.jsx'
+import { SongRow } from '../discovery/SongList.jsx'
 
 const portraitDirections = ['left', 'down', 'right', 'up']
 const PORTRAIT_DURATION = 5600
@@ -15,11 +15,6 @@ function getArtistTitleScale(title) {
   if (length > 22) return 'long'
   if (length > 13) return 'medium'
   return 'short'
-}
-
-function formatDuration(seconds) {
-  const minutes = Math.floor(seconds / 60)
-  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`
 }
 
 function collectAlbums(songs) {
@@ -326,72 +321,25 @@ function ArtistView({
               </button>
             )}
           </div>
-          <ol className="artist-profile__songs">
-            {featuredSongs.map((song) => {
-              const selected = song.id === selectedSongId
-              const albumId = song.albumId ?? song.album?.id ?? song.albumMemberships?.[0]?.id
-              const albumTitle = song.albumTitle ?? song.album?.title ?? song.albumMemberships?.[0]?.title
-              return (
-                <li className={`song-row artist-profile__song${selected ? ' song-row--active' : ''}${selected && selectedSongPlaying ? ' song-row--playing' : ''}`} key={song.id}>
-                  <div className="song-row__main">
-                    <button
-                      className="song-row__artwork playback-hover"
-                      type="button"
-                      aria-label={`${selected && selectedSongPlaying ? 'Pausar' : 'Reproducir'} ${song.title}`}
-                      aria-pressed={selected && selectedSongPlaying}
-                      onClick={() => {
-                        if (selected) onPlaybackToggle?.()
-                        else onSongSelect(song.id, { contextSong: song, contextSongs: artistSongs })
-                      }}
-                    >
-                      <img src={song.artwork} alt="" loading="lazy" />
-                        <PreviewIndicator status={selected && selectedSongPlaying ? 'playing' : null} />
-                    </button>
-                    <span className="song-row__copy">
-                      <strong>{song.title}</strong>
-                      {albumTitle && (
-                        <button
-                          className="song-row__catalog-link song-row__catalog-link--album"
-                          type="button"
-                          disabled={!albumId || !onAlbumSelect}
-                          onClick={() => onAlbumSelect?.(albumId)}
-                        >
-                          {albumTitle}
-                        </button>
-                      )}
-                    </span>
-                  </div>
-                  <span className="song-row__meta">
-                    <span className="song-row__actions">
-                      {onToggleFavorite && (
-                        <HeartToggle
-                          className="heart-container--song-row"
-                          label={`Me gusta ${song.title}`}
-                          liked={likedSongIds?.has(song.id)}
-                          onToggle={(liked) => onToggleFavorite(song.id, liked)}
-                          removeLabel={`Quitar ${song.title} de favoritas`}
-                          size={16}
-                        />
-                      )}
-                      {onAddToPlaylist && (
-                        <button
-                          className="song-row__action"
-                          type="button"
-                          aria-label={`Añadir ${song.title} a una playlist`}
-                          title="Añadir a playlist"
-                          onClick={() => onAddToPlaylist(song)}
-                        >
-                          <ListPlus size={16} strokeWidth={1.8} aria-hidden="true" />
-                        </button>
-                      )}
-                      {renderSongActions?.(song)}
-                    </span>
-                    <span className="song-row__duration">{formatDuration(song.durationSeconds)}</span>
-                  </span>
-                </li>
-              )
-            })}
-          </ol>
+          <div className="artist-profile__songs">
+            {featuredSongs.map((song, index) => (
+              <SongRow
+                byline="album"
+                index={index}
+                isSelected={song.id === selectedSongId}
+                key={song.id}
+                likedSongIds={likedSongIds}
+                onAddToPlaylist={onAddToPlaylist}
+                onAlbumSelect={onAlbumSelect}
+                onPlaybackToggle={onPlaybackToggle}
+                onSongSelect={(songId) => onSongSelect(songId, { contextSong: song, contextSongs: artistSongs })}
+                onToggleFavorite={onToggleFavorite}
+                renderSongActions={renderSongActions}
+                selectedSongPlaying={selectedSongPlaying}
+                song={song}
+              />
+            ))}
+          </div>
         </section>
 
         <section className="artist-profile__section" aria-labelledby="artist-albums-title">

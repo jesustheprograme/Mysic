@@ -1,8 +1,20 @@
-export function adaptSong(song, index = 0) {
+function parseDurationSeconds(duration) {
+  if (typeof duration === 'number') return duration
+  if (typeof duration !== 'string') return 0
+
+  const parts = duration.split(':').map(Number)
+  if (!parts.length || parts.some((part) => !Number.isFinite(part))) return 0
+  return parts.reduce((total, part) => (total * 60) + part, 0)
+}
+
+export function adaptSong(song, index = 0, defaults = {}) {
   return {
     ...song,
+    artist: song.artist || defaults.artist || 'Artista desconocido',
+    artistId: song.artistId || defaults.artistId || null,
     albumTitle: song.album,
     artwork: song.thumbnail ?? song.artwork,
+    durationSeconds: Number(song.durationSeconds) || parseDurationSeconds(song.duration),
     source: 'youtube',
     trackNo: song.index ?? index + 1,
   }

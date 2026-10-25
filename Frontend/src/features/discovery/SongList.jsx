@@ -11,6 +11,69 @@ function formatDuration(seconds) {
   return `${minutes}:${String(seconds % 60).padStart(2, '0')}`
 }
 
+export function SongRow({
+  byline = 'artist-and-album',
+  index,
+  isLiked,
+  isSelected,
+  likedSongIds,
+  onAddToPlaylist,
+  onAlbumSelect,
+  onArtistSelect,
+  onPlaybackToggle,
+  onPreviewStart,
+  onPreviewStop,
+  onSongSelect,
+  onToggleFavorite,
+  preview,
+  renderSongActions,
+  selectedSongPlaying,
+  showNumber = false,
+  song,
+}) {
+  const artistId = song.artistId ?? song.artists?.[0]?.id
+  const albumId = song.albumId ?? song.album?.id ?? song.albumMemberships?.[0]?.id
+  const albumTitle = song.albumTitle ?? song.album?.title ?? song.albumMemberships?.[0]?.title
+  const selected = isSelected ?? false
+  const liked = isLiked ?? likedSongIds?.has(song.id)
+  const previewStatus = preview?.itemId === song.id ? preview.status : null
+  const indicatorStatus = previewStatus ?? (selected && selectedSongPlaying ? 'playing' : null)
+  const showArtist = byline === 'artist-and-album'
+
+  function selectSong() {
+    if (previewStatus) onPreviewStop?.()
+    if (selected) onPlaybackToggle?.()
+    else onSongSelect(song.id)
+  }
+
+  return (
+    <div className={`song-row${showNumber ? ' song-row--numbered' : ''}${selected ? ' song-row--active' : ''}${selected && selectedSongPlaying ? ' song-row--playing' : ''}${previewStatus ? ` song-row--preview-${previewStatus}` : ''}`}>
+      {showNumber && <span className="song-row__number" aria-hidden="true">{index + 1}</span>}
+      <div className="song-row__main">
+        <button className="song-row__artwork playback-hover" type="button" aria-label={selected && selectedSongPlaying ? `Pausar ${song.title}` : `Reproducir ${song.title}`} aria-pressed={selected && selectedSongPlaying} onClick={selectSong} onPointerEnter={() => { if (!selected) onPreviewStart?.(song) }} onPointerLeave={onPreviewStop}>
+          {song.artwork && <img src={song.artwork} alt="" loading="eager" decoding="async" />}
+          <span aria-hidden="true"><PreviewIndicator status={indicatorStatus} /></span>
+        </button>
+        <span className="song-row__copy">
+          <button className="song-row__title-link" type="button" title={song.title} onClick={selectSong}>{song.title}</button>
+          <span className="song-row__byline">
+            {showArtist && <button className="song-row__catalog-link" type="button" disabled={!artistId || !onArtistSelect} onClick={() => onArtistSelect?.(artistId)}>{song.artist}</button>}
+            {albumTitle && <>{showArtist && <span className="song-row__separator" aria-hidden="true">·</span>}<button className="song-row__catalog-link song-row__catalog-link--album" type="button" disabled={!albumId || !onAlbumSelect} title={albumTitle} onClick={() => onAlbumSelect?.(albumId)}>{albumTitle}</button></>}
+          </span>
+        </span>
+      </div>
+      <span className="song-row__meta">
+        <span className="song-row__actions">
+          <HeartToggle className="heart-container--song-row" label={`Me gusta ${song.title}`} liked={liked} onToggle={(nextLiked) => onToggleFavorite?.(song.id, nextLiked)} removeLabel={`Quitar ${song.title} de favoritas`} size={16} />
+          <button className="song-row__action" type="button" aria-label={`Añadir ${song.title} a una playlist`} title="Añadir a playlist" onClick={(event) => { event.stopPropagation(); onAddToPlaylist?.(song) }}><ListPlus size={16} strokeWidth={1.8} aria-hidden="true" /></button>
+          {renderSongActions?.(song)}
+        </span>
+        <span className="song-row__duration">{formatDuration(song.durationSeconds)}</span>
+      </span>
+    </div>
+  )
+}
+
 function SongList({
   emptyMessage = 'No tienes canciones favoritas todavía.',
   hasMore = false,
@@ -96,105 +159,27 @@ function SongList({
         <>
           <div className="song-list-frame">
             <div className={`song-list song-list--slide-${direction}`} key={currentPage}>
-              {visibleSongs.map((song, index) => {
-                const artistId = song.artistId ?? song.artists?.[0]?.id
-                const albumId = song.albumId ?? song.album?.id ?? song.albumMemberships?.[0]?.id
-                const albumTitle = song.albumTitle ?? song.album?.title ?? song.albumMemberships?.[0]?.title
-                const isSelected = selectedSongId === song.id
-                const isLiked = likedSongIds?.has(song.id)
-                const previewStatus = preview?.itemId === song.id ? preview.status : null
-                const indicatorStatus = previewStatus ?? (isSelected && selectedSongPlaying ? 'playing' : null)
-
-                return (
-                  <div
-                    className={`song-row${showNumbers ? ' song-row--numbered' : ''}${isSelected ? ' song-row--active' : ''}${isSelected && selectedSongPlaying ? ' song-row--playing' : ''}${previewStatus ? ` song-row--preview-${previewStatus}` : ''}`}
-                    key={song.id}
-                  >
-                    {showNumbers && (
-                      <span className="song-row__number" aria-hidden="true">
-                        {(currentPage * SONGS_PER_PAGE) + index + 1}
-                      </span>
-                    )}
-                    <div className="song-row__main">
-                      <button
-                        className="song-row__artwork playback-hover"
-                        type="button"
-                        aria-label={isSelected && selectedSongPlaying ? `Pausar ${song.title}` : `Reproducir ${song.title}`}
-                        aria-pressed={isSelected && selectedSongPlaying}
-                        onClick={() => {
-                          if (previewStatus) onPreviewStop()
-                          if (isSelected) onPlaybackToggle?.()
-                          else onSongSelect(song.id)
-                        }}
-                        onPointerEnter={() => {
-                          if (!isSelected) onPreviewStart(song)
-                        }}
-                        onPointerLeave={onPreviewStop}
-                      >
-                        {song.artwork && <img src={song.artwork} alt="" loading="eager" decoding="async" />}
-                        <span aria-hidden="true">
-                          <PreviewIndicator status={indicatorStatus} />
-                        </span>
-                      </button>
-                      <span className="song-row__copy">
-                        <button className="song-row__title-link" type="button" title={song.title} onClick={() => {
-                          if (previewStatus) {
-                            onPreviewStop()
-                          }
-                          if (isSelected) onPlaybackToggle?.()
-                          else onSongSelect(song.id)
-                        }}>
-                          {song.title}
-                        </button>
-                        <span className="song-row__byline">
-                          <button className="song-row__catalog-link" type="button" disabled={!artistId} onClick={() => onArtistSelect?.(artistId)}>
-                            {song.artist}
-                          </button>
-                          {albumId && albumTitle && (
-                            <>
-                              <span className="song-row__separator" aria-hidden="true">·</span>
-                              <button
-                                className="song-row__catalog-link song-row__catalog-link--album"
-                                type="button"
-                                title={albumTitle}
-                                onClick={() => onAlbumSelect?.(albumId)}
-                              >
-                                {albumTitle}
-                              </button>
-                            </>
-                          )}
-                        </span>
-                      </span>
-                    </div>
-                    <span className="song-row__meta">
-                      <span className="song-row__actions">
-                        <HeartToggle
-                          className="heart-container--song-row"
-                          label={`Me gusta ${song.title}`}
-                          liked={isLiked}
-                          onToggle={(liked) => onToggleFavorite?.(song.id, liked)}
-                          removeLabel={`Quitar ${song.title} de favoritas`}
-                          size={16}
-                        />
-                        <button
-                          className="song-row__action"
-                          type="button"
-                          aria-label={`A\u00f1adir ${song.title} a una playlist`}
-                          title="A\u00f1adir a playlist"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            onAddToPlaylist?.(song)
-                          }}
-                        >
-                          <ListPlus size={16} strokeWidth={1.8} aria-hidden="true" />
-                        </button>
-                        {renderSongActions?.(song)}
-                      </span>
-                      <span className="song-row__duration">{formatDuration(song.durationSeconds)}</span>
-                    </span>
-                  </div>
-                )
-              })}
+              {visibleSongs.map((song, index) => (
+                <SongRow
+                  index={(currentPage * SONGS_PER_PAGE) + index}
+                  isSelected={selectedSongId === song.id}
+                  key={song.id}
+                  likedSongIds={likedSongIds}
+                  onAddToPlaylist={onAddToPlaylist}
+                  onAlbumSelect={onAlbumSelect}
+                  onArtistSelect={onArtistSelect}
+                  onPlaybackToggle={onPlaybackToggle}
+                  onPreviewStart={onPreviewStart}
+                  onPreviewStop={onPreviewStop}
+                  onSongSelect={onSongSelect}
+                  onToggleFavorite={onToggleFavorite}
+                  preview={preview}
+                  renderSongActions={renderSongActions}
+                  selectedSongPlaying={selectedSongPlaying}
+                  showNumber={showNumbers}
+                  song={song}
+                />
+              ))}
               {trailingContent}
             </div>
           </div>
