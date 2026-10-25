@@ -10,6 +10,7 @@ const MAX_VIDEO_THUMBNAILS = 8;
 const artistSourceCache = createAsyncTtlCache({ ttlMs: config.browseCacheTtlMs, maxSize: config.requestCacheMax });
 const artistCache = createAsyncTtlCache({ ttlMs: config.browseCacheTtlMs, maxSize: config.requestCacheMax });
 const artistReleasesCache = createAsyncTtlCache({ ttlMs: config.browseCacheTtlMs, maxSize: config.requestCacheMax });
+const artistTopSongDetailsCache = createAsyncTtlCache({ ttlMs: config.browseCacheTtlMs, maxSize: config.requestCacheMax });
 const artistSongsCache = createAsyncTtlCache({ ttlMs: config.browseCacheTtlMs, maxSize: config.requestCacheMax });
 
 function mapReleaseItems(items, artist) {
@@ -77,6 +78,13 @@ export async function collectArtistSongs(playlist, defaults) {
     page = page.has_continuation ? await page.getContinuation() : null;
   }
   return [...songs.values()];
+}
+
+export function selectArtistSongDetails(items, topSongIds, defaults) {
+  const wanted = new Set(topSongIds);
+  return (items || [])
+    .filter((item) => wanted.has(item.id) && (item.item_type === 'song' || item.item_type === 'video'))
+    .map((item) => mapSong(item, defaults));
 }
 
 /**
@@ -167,6 +175,25 @@ export async function getArtistReleases(id) {
   });
 }
 
+export async function getArtistTopSongDetails(id) {
+  return artistTopSongDetailsCache.get(id, async () => {
+    const youtube = getYoutube();
+    const artist = await getArtistSource(id);
+    const section = (artist.sections || []).find((item) => item.type === 'MusicShelf');
+    const playlistId = section?.endpoint?.payload?.browseId;
+    const topSongIds = (section?.contents || []).map((item) => item.id).filter(Boolean);
+    if (!playlistId || !topSongIds.length) return { id, songs: [] };
+
+    const playlist = await youtube.music.getPlaylist(playlistId);
+    const songs = selectArtistSongDetails(playlist.items, topSongIds, {
+      artist: artist.header?.title?.text || 'Artista',
+      artistId: id,
+      thumbnail: pickThumbnail(artist.header?.thumbnail ?? artist.header?.foreground_thumbnail),
+    });
+    return { id, songs };
+  });
+}
+
 export async function getArtistSongs(id) {
   return artistSongsCache.get(id, async () => {
     const youtube = getYoutube();
@@ -214,6 +241,7 @@ async function loadArtistPage(id) {
       images: [media.header].filter(Boolean),
       imagesComplete: false,
       releasesComplete: false,
+      songDetailsComplete: false,
       topSongs,
       shelves,
     },

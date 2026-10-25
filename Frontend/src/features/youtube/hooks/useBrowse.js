@@ -102,7 +102,7 @@ export function useBrowse({ progressive = false } = {}) {
 
   useEffect(() => {
     const artistId = view.kind === 'artist' ? view.data?.id : null;
-    if (!artistId || view.data?.releasesComplete) return undefined;
+    if (!artistId || (view.data?.releasesComplete && view.data?.songDetailsComplete)) return undefined;
 
     const controller = new AbortController();
     artistEnrichmentControllerRef.current?.abort();
@@ -111,9 +111,26 @@ export function useBrowse({ progressive = false } = {}) {
     artistEnrichmentCancelRef.current = scheduleBackground(async () => {
       artistEnrichmentCancelRef.current = null;
       try {
-        const data = await api.artistReleases(artistId, controller.signal);
+        const [releases, songDetails] = await Promise.allSettled([
+          api.artistReleases(artistId, controller.signal),
+          api.artistTopSongs(artistId, controller.signal),
+        ]);
         setView((current) => current.kind === 'artist' && current.data?.id === artistId
-          ? { ...current, data: { ...current.data, shelves: data.shelves, releasesComplete: true } }
+          ? {
+              ...current,
+              data: {
+                ...current.data,
+                shelves: releases.status === 'fulfilled' ? releases.value.shelves : current.data.shelves,
+                releasesComplete: true,
+                topSongs: songDetails.status === 'fulfilled'
+                  ? current.data.topSongs.map((song) => {
+                      const details = songDetails.value.songs.find((item) => item.id === song.id);
+                      return details ? { ...song, duration: details.duration, durationSeconds: details.durationSeconds } : song;
+                    })
+                  : current.data.topSongs,
+                songDetailsComplete: true,
+              },
+            }
           : current);
       } catch (error) {
         if (error.name !== 'AbortError') console.warn(`No se pudo completar la discografía: ${error.message}`);
@@ -129,7 +146,7 @@ export function useBrowse({ progressive = false } = {}) {
       artistEnrichmentCancelRef.current?.();
       artistEnrichmentCancelRef.current = null;
     };
-  }, [view.data?.id, view.data?.releasesComplete, view.kind]);
+  }, [view.data?.id, view.data?.releasesComplete, view.data?.songDetailsComplete, view.kind]);
 
   const runSearch = useCallback(async (text, type) => {
     const trimmed = text.trim();

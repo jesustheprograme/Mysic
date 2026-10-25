@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { collectArtistSongs, createReleasePreview, expandReleaseShelf, findSongAlbum, mergeReleaseItems } from './artist.mjs';
+import { collectArtistSongs, createReleasePreview, expandReleaseShelf, findSongAlbum, mergeReleaseItems, selectArtistSongDetails } from './artist.mjs';
 
 test('combina la vista previa y la discografía completa sin duplicar lanzamientos', () => {
   const preview = [{ id: 'album-1', title: 'Uno' }, { id: 'album-2', title: 'Dos' }];
@@ -100,5 +100,18 @@ test('carga todas las páginas de canciones y elimina duplicados', async () => {
   assert.deepEqual(songs.map((item) => item.id), ['song-1', 'song-2']);
   assert.deepEqual(songs.map((item) => item.album), ['Álbum 1', 'Álbum 2']);
   assert.deepEqual(songs.map((item) => item.albumId), ['MPREalbum-1', 'MPREalbum-2']);
+});
+
+test('completa solo las canciones destacadas con su duración real', () => {
+  const items = [
+    { id: 'top-1', item_type: 'song', title: 'Uno', duration: { text: '3:21', seconds: 201 } },
+    { id: 'other', item_type: 'song', title: 'Otra', duration: { text: '4:00', seconds: 240 } },
+  ];
+
+  const songs = selectArtistSongDetails(items, ['top-1'], { artist: 'Artista' });
+
+  assert.equal(songs.length, 1);
+  assert.equal(songs[0].duration, '3:21');
+  assert.equal(songs[0].durationSeconds, 201);
 });
 
