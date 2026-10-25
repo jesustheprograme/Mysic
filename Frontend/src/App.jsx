@@ -37,10 +37,10 @@ function MainApp() {
   } = useCatalogo()
   const library = useUserLibrary({ libraryLoading, librarySongs, user: auth.user })
   const {
-    addSongToPlaylist, createPlaylist, deletePlaylist, favoritesError, favoritesLoading,
+    createPlaylist, deletePlaylist, favoritesError, favoritesLoading,
     likedAlbumIds, likedArtistIds, likedSongIds, playlists, playlistsError, playlistsLoading,
-    reorderPlaylist, selectedSongId, setExternalSongInPlaylist, setFavorite, setSelectedSongId,
-    setSongInPlaylist, updatePlaylist,
+    reorderPlaylist, selectedSongId, setFavorite, setSelectedSongId, setTrackInPlaylist,
+    updatePlaylist,
   } = library
 
   if (auth.isLoading || libraryLoading || (auth.user && (favoritesLoading || playlistsLoading))) {
@@ -82,7 +82,6 @@ function MainApp() {
         </div>
       )}
       <DiscoveryView
-        addSongToPlaylist={addSongToPlaylist}
         catalogHasMore={Boolean((searchQuery.trim() ? searchPagination : libraryPagination)?.hasNext)}
         catalogLoadingMore={catalogLoadingMore || searchLoading}
         createPlaylist={createPlaylist}
@@ -98,8 +97,7 @@ function MainApp() {
         onLogout={auth.logout}
         onReorderPlaylist={reorderPlaylist}
         onSearchChange={setSearchQuery}
-        onSetSongInPlaylist={setSongInPlaylist}
-        onSetExternalSongInPlaylist={setExternalSongInPlaylist}
+        onSetTrackInPlaylist={setTrackInPlaylist}
         onSongSelect={setSelectedSongId}
         onToggleAlbumFavorite={(albumId, liked) => setFavorite('album', albumId, liked)}
         onToggleArtistFavorite={(artistId, liked) => setFavorite('artist', artistId, liked)}

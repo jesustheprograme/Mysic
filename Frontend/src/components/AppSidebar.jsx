@@ -22,6 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { getPlaylistTrackCount } from '../features/playlists/playlistTracks.js'
 
 const primaryNavigationItems = [
   { id: 'home', label: 'Inicio', icon: House },
@@ -130,7 +131,7 @@ function AppSidebar({
                   )}
                   <span className="app-sidebar__playlist-copy">
                     <strong>{playlist.title}</strong>
-                    <small>{playlist.songIds.length} canciones</small>
+                    <small>{getPlaylistTrackCount(playlist)} canciones</small>
                   </span>
                 </button>
                 <DropdownMenu>

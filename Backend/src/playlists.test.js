@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { isAcceptedArtworkFile, resolveStoredSongIds } = require('./playlists')
+const { isAcceptedArtworkFile, resolvePublicTracks, resolveStoredSongIds } = require('./playlists')
 
 test('resuelve slugs persistentes al ID del catálogo activo sin perder el orden', () => {
   const playlist = { songSlugs: ['magic-stable', 'hello-stable'] }
@@ -31,6 +31,32 @@ test('usa título y artista cuando el slug cambia entre catálogos', () => {
   }]
 
   assert.deepEqual(resolveStoredSongIds(playlist, localSongs), ['local-magic'])
+})
+
+test('migra playlists antiguas al contrato unificado', () => {
+  const playlist = {
+    externalSongs: [{ id: 'yt-1', source: 'youtube', title: 'Global' }],
+  }
+
+  assert.deepEqual(resolvePublicTracks(playlist, ['local-1']), [
+    { id: 'local-1', source: 'local' },
+    { id: 'yt-1', source: 'youtube', title: 'Global' },
+  ])
+})
+
+test('conserva el orden mixto y actualiza IDs locales resueltos', () => {
+  const playlist = {
+    externalSongs: [{ id: 'yt-1', source: 'youtube', title: 'Global' }],
+    tracks: [
+      { id: 'yt-1', source: 'youtube', title: 'Global' },
+      { id: 'local-antiguo', source: 'local' },
+    ],
+  }
+
+  assert.deepEqual(resolvePublicTracks(playlist, ['local-actual']), [
+    { id: 'yt-1', source: 'youtube', title: 'Global' },
+    { id: 'local-actual', source: 'local' },
+  ])
 })
 
 test('acepta portadas cuando MIME y extensión son imágenes permitidas', () => {

@@ -17,12 +17,13 @@ export default function CollectionTrackList({
   )
 
   function renderTrack(song, index) {
+    const trackKey = song.trackKey ?? song.id
     const selected = selectedSongId === song.id && (!selectedSongAlbumId || selectedSongAlbumId === song.albumId)
     return (
       <FilaCancionOrdenable
         displayTrackNumber={showsDiscHeadings ? albumTrackNumbers.get(song.id) : null}
         index={index}
-        key={song.id}
+        key={trackKey}
         onAddToPlaylist={onAddToPlaylist}
         onAlbumSelect={onAlbumSelect}
         onArtistSelect={onArtistSelect}
@@ -41,7 +42,7 @@ export default function CollectionTrackList({
 
   const content = trackGroups.flatMap((group) => group.tracks).length > 0 ? (
     <DndContext collisionDetection={closestCenter} modifiers={dragModifiers} sensors={sensors} onDragEnd={({ active, over }) => { if (over && active.id !== over.id) onMoveSong?.(active.id, over.id) }}>
-      <SortableContext items={songs.map((song) => song.id)} strategy={verticalListSortingStrategy}>
+      <SortableContext items={songs.map((song) => song.trackKey ?? song.id)} strategy={verticalListSortingStrategy}>
         <ol className="collection-detail__track-list">
           {showsDiscHeadings
             ? trackGroups.map((group) => <li className="collection-detail__disc" key={group.discNumber}><h2>Disco {group.discNumber}</h2><ol className="collection-detail__disc-tracks">{group.tracks.map(renderTrack)}</ol></li>)

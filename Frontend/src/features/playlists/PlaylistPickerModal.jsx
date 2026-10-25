@@ -1,15 +1,12 @@
 import { ListPlus, Search, X } from 'lucide-react'
 import { useState } from 'react'
 import VerticalSpectrum from '../../components/VerticalSpectrum.jsx'
+import { getPlaylistTrackCount, playlistHasTrack } from './playlistTracks.js'
 
 function PlaylistPickerModal({ analyser, onAdd, onClose, onCreate, playing, playlists, song }) {
   const [query, setQuery] = useState('')
   const [selectedPlaylistIds, setSelectedPlaylistIds] = useState(() => new Set(
-    playlists.filter((playlist) => (
-      song.source === 'youtube'
-        ? playlist.externalSongs?.some((item) => item.id === song.id)
-        : playlist.songIds.includes(song.id)
-    )).map((playlist) => playlist.id),
+    playlists.filter((playlist) => playlistHasTrack(playlist, song)).map((playlist) => playlist.id),
   ))
   const normalizedQuery = query.trim().toLocaleLowerCase('es')
   const visiblePlaylists = normalizedQuery
@@ -78,7 +75,7 @@ function PlaylistPickerModal({ analyser, onAdd, onClose, onCreate, playing, play
                   {playlist.artwork ? <img src={playlist.artwork} alt="" /> : <span className="playlist-picker__empty-art" />}
                   <span className="playlist-picker__item-copy">
                     <strong>{playlist.title}</strong>
-                    <small>{playlist.songIds.length + (playlist.externalSongs?.length ?? 0)} canciones</small>
+                    <small>{getPlaylistTrackCount(playlist)} canciones</small>
                   </span>
                   <input
                     className="playlist-picker__checkbox"

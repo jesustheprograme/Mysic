@@ -106,7 +106,7 @@ export default function FilaCancionOrdenable({
     transform,
     transition,
   } = useSortable({
-    id: song.id,
+    id: song.trackKey ?? song.id,
     disabled: !reorderable,
     transition: {
       duration: 260,

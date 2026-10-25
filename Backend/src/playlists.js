@@ -25,6 +25,13 @@ const externalSongSchema = z.object({
   source: z.literal('youtube'),
 }).strict()
 
+const localTrackSchema = z.object({
+  id: z.string().trim().min(1).max(128),
+  source: z.literal('local'),
+}).strict()
+
+const playlistTrackSchema = z.union([localTrackSchema, externalSongSchema])
+
 function isAcceptedArtworkFile(file) {
   const extension = file.originalname.split('.').pop()?.toLocaleLowerCase()
   return acceptedArtworkTypes.has(file.mimetype.toLocaleLowerCase())
@@ -51,6 +58,7 @@ const playlistFields = {
   pinned: z.boolean().default(false),
   songIds: z.array(z.string().trim().min(1).max(128)).max(5000).default([]),
   externalSongs: z.array(externalSongSchema).max(5000).default([]),
+  tracks: z.array(playlistTrackSchema).max(5000).optional(),
 }
 
 const createPlaylistSchema = z.object(playlistFields).strict()
@@ -63,7 +71,34 @@ const updatePlaylistSchema = z.object({
   pinned: z.boolean().optional(),
   songIds: z.array(z.string().trim().min(1).max(128)).max(5000).optional(),
   externalSongs: z.array(externalSongSchema).max(5000).optional(),
+  tracks: z.array(playlistTrackSchema).max(5000).optional(),
 }).strict().refine((changes) => Object.keys(changes).length > 0)
+
+function resolvePublicTracks(playlist, songIds) {
+  const externalSongs = playlist.externalSongs || []
+  if (!Array.isArray(playlist.tracks)) {
+    return [
+      ...songIds.map((id) => ({ id, source: 'local' })),
+      ...externalSongs,
+    ]
+  }
+
+  let localIndex = 0
+  const seenYoutubeIds = new Set()
+  const tracks = playlist.tracks.flatMap((track) => {
+    if (track.source === 'local') {
+      const id = songIds[localIndex]
+      localIndex += 1
+      return id ? [{ id, source: 'local' }] : []
+    }
+    seenYoutubeIds.add(track.id)
+    return [track]
+  })
+
+  tracks.push(...songIds.slice(localIndex).map((id) => ({ id, source: 'local' })))
+  tracks.push(...externalSongs.filter((song) => !seenYoutubeIds.has(song.id)))
+  return tracks
+}
 
 function publicPlaylist(playlist, songIds = playlist.songIds || []) {
   return {
@@ -75,6 +110,7 @@ function publicPlaylist(playlist, songIds = playlist.songIds || []) {
     pinned: Boolean(playlist.pinned),
     songIds,
     externalSongs: playlist.externalSongs || [],
+    tracks: resolvePublicTracks(playlist, songIds),
   }
 }
 
@@ -277,12 +313,26 @@ function createPlaylistsRouter(config) {
         return res.status(400).json({ message: 'La portada indicada no pertenece a este usuario.' })
       }
 
-      const { songIds, ...playlistData } = parsed.data
-      const songReferences = await resolveSongReferences(songIds)
+      const {
+        externalSongs: legacyExternalSongs,
+        songIds,
+        tracks: requestedTracks,
+        ...playlistData
+      } = parsed.data
+      const requestedSongIds = requestedTracks
+        ? requestedTracks.filter((track) => track.source === 'local').map((track) => track.id)
+        : songIds
+      const externalSongs = requestedTracks
+        ? requestedTracks.filter((track) => track.source === 'youtube')
+        : legacyExternalSongs
+      const songReferences = await resolveSongReferences(requestedSongIds)
+      const tracks = resolvePublicTracks({ tracks: requestedTracks, externalSongs }, songReferences.songIds)
       const now = new Date()
       const playlist = {
         ...playlistData,
+        externalSongs,
         songRefs: songReferences.songRefs,
+        tracks,
         userId: req.user._id,
         createdAt: now,
         updatedAt: now,
@@ -307,8 +357,21 @@ function createPlaylistsRouter(config) {
       }
 
       const changes = { ...parsed.data, updatedAt: new Date() }
+      const updatesTracks = Object.prototype.hasOwnProperty.call(changes, 'tracks')
       const updatesSongIds = Object.prototype.hasOwnProperty.call(changes, 'songIds')
-      if (updatesSongIds) {
+      const updatesExternalSongs = Object.prototype.hasOwnProperty.call(changes, 'externalSongs')
+      if (updatesTracks) {
+        const requestedTracks = changes.tracks
+        const requestedSongIds = requestedTracks
+          .filter((track) => track.source === 'local')
+          .map((track) => track.id)
+        const externalSongs = requestedTracks.filter((track) => track.source === 'youtube')
+        const songReferences = await resolveSongReferences(requestedSongIds)
+        changes.songRefs = songReferences.songRefs
+        changes.externalSongs = externalSongs
+        changes.tracks = resolvePublicTracks({ tracks: requestedTracks, externalSongs }, songReferences.songIds)
+        delete changes.songIds
+      } else if (updatesSongIds) {
         const songReferences = await resolveSongReferences(changes.songIds)
         delete changes.songIds
         changes.songRefs = songReferences.songRefs
@@ -321,8 +384,12 @@ function createPlaylistsRouter(config) {
         { _id: new ObjectId(req.params.playlistId), userId: req.user._id },
         {
           $set: changes,
-          // Keep legacy songIds during the rolling deployment; the new code prefers songRefs.
-          ...(updatesSongIds ? { $unset: { songSlugs: '' } } : {}),
+          ...((updatesSongIds || updatesTracks || updatesExternalSongs) ? {
+            $unset: {
+              ...(updatesSongIds || updatesTracks ? { songSlugs: '' } : {}),
+              ...(!updatesTracks && (updatesSongIds || updatesExternalSongs) ? { tracks: '' } : {}),
+            },
+          } : {}),
         },
         { returnDocument: 'after' },
       )
@@ -365,4 +432,4 @@ function createPlaylistsRouter(config) {
   return router
 }
 
-module.exports = { createPlaylistsRouter, isAcceptedArtworkFile, resolveStoredSongIds }
+module.exports = { createPlaylistsRouter, isAcceptedArtworkFile, resolvePublicTracks, resolveStoredSongIds }

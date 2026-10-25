@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { clearPlaylists, loadPlaylists } from '../data/playlists.js'
 import { favoritesApi, playlistsApi } from '../lib/api.js'
-import { normalizeYoutubePlaylistSong } from '../features/youtube/lib/playlistSong.js'
+import { playlistHasTrack, setPlaylistTrack } from '../features/playlists/playlistTracks.js'
 
 export default function useUserLibrary({ libraryLoading, librarySongs, user }) {
   const [selectedSongId, setSelectedSongId] = useState(null)
@@ -97,6 +97,7 @@ export default function useUserLibrary({ libraryLoading, librarySongs, user }) {
         pinned: Boolean(details.pinned),
         songIds: [],
         externalSongs: [],
+        tracks: [],
       })
       setPlaylists((current) => [playlist, ...current])
       setPlaylistsError('')
@@ -131,44 +132,26 @@ export default function useUserLibrary({ libraryLoading, librarySongs, user }) {
     }
   }
 
-  function setSongInPlaylist(playlistId, songId, included) {
+  function setTrackInPlaylist(playlistId, song, included) {
     const playlist = playlists.find((item) => item.id === playlistId)
     if (!playlist) return false
-    const alreadyIncluded = playlist.songIds.includes(songId)
-    if (included === alreadyIncluded) return true
-    const songIds = included ? [...playlist.songIds, songId] : playlist.songIds.filter((id) => id !== songId)
-    return updatePlaylist(playlistId, { songIds })
+    if (playlistHasTrack(playlist, song) === included) return true
+    const tracks = setPlaylistTrack(playlist, song, included)
+    return updatePlaylist(playlistId, { tracks })
   }
 
-  function setExternalSongInPlaylist(playlistId, song, included) {
-    const playlist = playlists.find((item) => item.id === playlistId)
-    const externalSongs = playlist?.externalSongs ?? []
-    const alreadyIncluded = externalSongs.some((item) => item.id === song.id)
-    if (included === alreadyIncluded) return true
-    const nextSongs = included
-      ? [...externalSongs, normalizeYoutubePlaylistSong(song)]
-      : externalSongs.filter((item) => item.id !== song.id)
-    return updatePlaylist(playlistId, { externalSongs: nextSongs })
-  }
-
-  function addSongToPlaylist(playlistId, songId) {
-    const playlist = playlists.find((item) => item.id === playlistId)
-    if (playlist?.songIds.includes(songId)) return true
-    return updatePlaylist(playlistId, { songIds: playlist ? [...playlist.songIds, songId] : [songId] })
-  }
-
-  async function reorderPlaylist(playlistId, songIds) {
+  async function reorderPlaylist(playlistId, tracks) {
     const previous = playlists.find((playlist) => playlist.id === playlistId)
     if (!previous) return false
-    setPlaylists((current) => current.map((playlist) => playlist.id === playlistId ? { ...playlist, songIds } : playlist))
+    setPlaylists((current) => current.map((playlist) => playlist.id === playlistId ? { ...playlist, tracks } : playlist))
 
     try {
-      replacePlaylist(await playlistsApi.update(playlistId, { songIds }))
+      replacePlaylist(await playlistsApi.update(playlistId, { tracks }))
       setPlaylistsError('')
       return true
     } catch (error) {
       setPlaylists((current) => current.map((playlist) => (
-        playlist.id === playlistId && playlist.songIds === songIds ? previous : playlist
+        playlist.id === playlistId && playlist.tracks === tracks ? previous : playlist
       )))
       setPlaylistsError(error.message || 'No se pudo actualizar la playlist.')
       return false
@@ -197,7 +180,6 @@ export default function useUserLibrary({ libraryLoading, librarySongs, user }) {
   }
 
   return {
-    addSongToPlaylist,
     createPlaylist,
     deletePlaylist,
     favoritesError,
@@ -210,10 +192,9 @@ export default function useUserLibrary({ libraryLoading, librarySongs, user }) {
     playlistsLoading,
     reorderPlaylist,
     selectedSongId,
-    setExternalSongInPlaylist,
+    setTrackInPlaylist,
     setFavorite,
     setSelectedSongId,
-    setSongInPlaylist,
     updatePlaylist,
   }
 }

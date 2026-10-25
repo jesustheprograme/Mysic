@@ -1,6 +1,6 @@
 import CollectionDetailView from '../collections/CollectionDetailView.jsx'
-import { normalizeYoutubePlaylistSong } from '../youtube/lib/playlistSong.js'
 import PlaylistDeleteModal from './PlaylistDeleteModal.jsx'
+import { reorderPlaylistTracks, resolvePlaylistSongs } from './playlistTracks.js'
 import { useState } from 'react'
 
 function PlaylistView({
@@ -24,13 +24,7 @@ function PlaylistView({
 }) {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const playlistSongs = playlist.songIds.flatMap((songId) => {
-    const song = songs.find((item) => item.id === songId)
-    return song ? [song] : []
-  }).concat((playlist.externalSongs ?? []).map((storedSong) => ({
-    ...normalizeYoutubePlaylistSong(storedSong),
-    artwork: storedSong.thumbnail || storedSong.artwork,
-  })))
+  const playlistSongs = resolvePlaylistSongs(playlist, songs)
   const playlistArtists = new Map()
   playlistSongs.forEach((song) => {
     const artist = song.artists?.[0]
@@ -45,15 +39,8 @@ function PlaylistView({
   })
   const playlistArtist = playlistArtists.size === 1 ? [...playlistArtists.values()][0] : null
 
-  function moveSong(draggedSongId, targetSongId) {
-    const nextSongIds = [...playlist.songIds]
-    const sourceIndex = nextSongIds.indexOf(draggedSongId)
-    const targetIndex = nextSongIds.indexOf(targetSongId)
-    if (sourceIndex < 0 || targetIndex < 0) return
-
-    nextSongIds.splice(sourceIndex, 1)
-    nextSongIds.splice(targetIndex, 0, draggedSongId)
-    onReorderPlaylist(playlist.id, nextSongIds)
+  function moveSong(draggedTrackKey, targetTrackKey) {
+    onReorderPlaylist(playlist.id, reorderPlaylistTracks(playlist, draggedTrackKey, targetTrackKey))
   }
 
   async function deletePlaylist() {
@@ -82,7 +69,7 @@ function PlaylistView({
         onBack={onBack}
         onDelete={() => setDeleteModalOpen(true)}
         onEdit={() => onEdit?.(playlist)}
-        onMoveSong={playlist.externalSongs?.length ? undefined : moveSong}
+        onMoveSong={moveSong}
         onPlaybackToggle={onPlaybackToggle}
         onSongSelect={(songId, options) => {
           const song = playlistSongs.find((item) => item.id === songId)

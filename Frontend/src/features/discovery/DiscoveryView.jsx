@@ -6,6 +6,7 @@ import ArtistView from '../collections/ArtistView.jsx'
 import PlaylistEditorModal from '../playlists/PlaylistEditorModal.jsx'
 import PlaylistPickerModal from '../playlists/PlaylistPickerModal.jsx'
 import PlaylistView from '../playlists/PlaylistView.jsx'
+import { getPlaylistTrackCount, getPlaylistTracks, resolvePlaylistSongs } from '../playlists/playlistTracks.js'
 import HomeDiscoveryPrompt from './HomeDiscoveryPrompt.jsx'
 import HomeRail from './HomeRail.jsx'
 import SectionRoute from './SectionRoute.jsx'
@@ -125,8 +126,8 @@ function useSongPreview(disabled) {
 }
 
 function usePlaylistActions({
-  activePlaylist, addSongToPlaylist, createPlaylist, navigateTo, navigateToPlaylist,
-  onDeletePlaylist, onSetExternalSongInPlaylist, onUpdatePlaylist, setActivePlaylistId,
+  activePlaylist, createPlaylist, navigateTo, navigateToPlaylist,
+  onDeletePlaylist, onSetTrackInPlaylist, onUpdatePlaylist, setActivePlaylistId,
   setPlaylistPickerSong,
 }) {
   const [playlistEditor, setPlaylistEditor] = useState(null)
@@ -147,8 +148,7 @@ function usePlaylistActions({
       const playlistId = await createPlaylist(details)
       if (!playlistId) return
       const pendingSong = playlistEditor.pendingSong
-      if (pendingSong?.source === 'youtube') await onSetExternalSongInPlaylist(playlistId, pendingSong, true)
-      else if (pendingSong?.id) await addSongToPlaylist(playlistId, pendingSong.id)
+      if (pendingSong?.id) await onSetTrackInPlaylist(playlistId, pendingSong, true)
       setPlaylistEditor(null)
       navigateToPlaylist(playlistId)
       return
@@ -342,7 +342,6 @@ function getMobileContextTitle(activeSection, activeArtist, activeAlbum, activeP
 }
 
 function useDiscoveryPage({
-  addSongToPlaylist,
   catalogHasMore,
   catalogLoadingMore,
   createPlaylist,
@@ -356,8 +355,7 @@ function useDiscoveryPage({
   onDeletePlaylist,
   onReorderPlaylist,
   onSearchChange,
-  onSetExternalSongInPlaylist,
-  onSetSongInPlaylist,
+  onSetTrackInPlaylist,
   onSongSelect,
   onToggleAlbumFavorite,
   onToggleArtistFavorite,
@@ -378,6 +376,8 @@ function useDiscoveryPage({
   // YouTube Music se monta la primera vez que se visita y ya no se desmonta (la música sigue al cambiar de sección)
   const [youtubeVisited, setYoutubeVisited] = useState(activeSection === 'youtube')
   const [youtubePlayerVisible, setYoutubePlayerVisible] = useState(false)
+  const [youtubePlaybackRequest, setYoutubePlaybackRequest] = useState(null)
+  const [youtubeStopNonce, setYoutubeStopNonce] = useState(0)
   const [activeAlbumId, setActiveAlbumId] = useState(getAlbumIdFromHash)
   const [activeArtistId, setActiveArtistId] = useState(getArtistIdFromHash)
   const [activeArtistProfile, setActiveArtistProfile] = useState(null)
@@ -463,17 +463,16 @@ function useDiscoveryPage({
     ...playlist,
     externalSongs: playlist.externalSongs ?? [],
     songIds: playlist.songIds.filter((songId) => availableSongIds.has(songId)),
+    tracks: getPlaylistTracks(playlist),
   }))
   const playlistsWithArtwork = resolvedPlaylists.map((playlist) => {
     if (playlist.artwork) return playlist
-    const firstSong = playlist.songIds
-      .map((songId) => songs.find((song) => song.id === songId))
-      .find(Boolean) ?? playlist.externalSongs[0]
+    const firstSong = resolvePlaylistSongs(playlist, songs)[0]
     return firstSong?.artwork ? { ...playlist, artwork: firstSong.artwork } : playlist
   })
   const orderedPlaylists = playlistsWithArtwork
     .toSorted((first, second) => Number(second.pinned) - Number(first.pinned))
-    .map((playlist) => ({ ...playlist, meta: `${playlist.songIds.length + playlist.externalSongs.length} canciones` }))
+    .map((playlist) => ({ ...playlist, meta: `${getPlaylistTrackCount(playlist)} canciones` }))
   const activePlaylist = playlistsWithArtwork.find((playlist) => playlist.id === activePlaylistId) ?? null
   const activeAlbum = allAlbumItems.find((album) => album.id === activeAlbumId) ?? null
   const allArtistItems = createArtistItems(songs)
@@ -687,10 +686,8 @@ function useDiscoveryPage({
   }
 
   function playExternalSong(song) {
-    navigateTo('youtube')
-    requestAnimationFrame(() => {
-      window.dispatchEvent(new CustomEvent('mysic:play-youtube-song', { detail: song }))
-    })
+    setYoutubeVisited(true)
+    setYoutubePlaybackRequest((current) => ({ nonce: (current?.nonce ?? 0) + 1, song }))
   }
 
   const {
@@ -698,20 +695,19 @@ function useDiscoveryPage({
     setPlaylistEditor, togglePlaylistPinned,
   } = usePlaylistActions({
     activePlaylist,
-    addSongToPlaylist,
     createPlaylist,
     navigateTo,
     navigateToPlaylist,
     onDeletePlaylist,
-    onSetExternalSongInPlaylist,
+    onSetTrackInPlaylist,
     onUpdatePlaylist,
     setActivePlaylistId,
     setPlaylistPickerSong,
   })
 
   const playerVisible = Boolean(
-    (selectedSong && !spotlightArtist && activeSection !== 'youtube')
-    || (activeSection === 'youtube' && youtubePlayerVisible),
+    (selectedSong && !spotlightArtist && !youtubePlayerVisible)
+    || youtubePlayerVisible,
   )
 
   function renderPage() {
@@ -966,6 +962,8 @@ function useDiscoveryPage({
                 onPlayerCollapseToggle={() => setPlayerCollapsed((collapsed) => !collapsed)}
                 onPlayerVisibilityChange={setYoutubePlayerVisible}
                 playerCollapsed={playerCollapsed}
+                playbackRequest={youtubePlaybackRequest}
+                stopNonce={youtubeStopNonce}
               />
             </Suspense>
           </div>
@@ -1016,6 +1014,7 @@ function useDiscoveryPage({
             // Si empieza a sonar Mysic, se pausa YouTube Music
             if (playing) {
               claimMiniPlayer('mysic')
+              setYoutubeStopNonce((nonce) => nonce + 1)
               window.dispatchEvent(new CustomEvent('yotubei:pause'))
             }
           }}
@@ -1031,7 +1030,7 @@ function useDiscoveryPage({
           onToggleCollapsed={() => setPlayerCollapsed((collapsed) => !collapsed)}
           playbackToggleNonce={playbackToggleNonce}
           queue={nextSongs}
-          suppressed={Boolean(spotlightArtist) || activeSection === 'youtube'}
+          suppressed={Boolean(spotlightArtist) || youtubePlayerVisible}
           track={selectedSong}
           />
         </Suspense>
@@ -1054,9 +1053,7 @@ function useDiscoveryPage({
           onAdd={async (selectedPlaylistIds) => {
             const selectedIds = new Set(selectedPlaylistIds)
             const results = await Promise.all(playlists.map((playlist) => (
-              playlistPickerSong.source === 'youtube'
-                ? onSetExternalSongInPlaylist(playlist.id, playlistPickerSong, selectedIds.has(playlist.id))
-                : onSetSongInPlaylist(playlist.id, playlistPickerSong.id, selectedIds.has(playlist.id))
+              onSetTrackInPlaylist(playlist.id, playlistPickerSong, selectedIds.has(playlist.id))
             )))
             if (results.every(Boolean)) setPlaylistPickerSong(null)
           }}

@@ -32,7 +32,7 @@ function getScrollTargets(workspace) {
   return [content, workspace.querySelector('.artist-profile__content'), workspace.querySelector('.collection-detail__tracks')].filter(Boolean)
 }
 
-function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, onPlayerVisibilityChange, playerCollapsed = false }) {
+function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, onPlayerVisibilityChange, playerCollapsed = false, playbackRequest, stopNonce = 0 }) {
   const scrollPositionsRef = useRef(new Map())
   const workspaceRef = useRef(null)
   const queueRequestRef = useRef(null)
@@ -48,6 +48,8 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
   const [actionError, setActionError] = useState('')
   const [queueLoadingKey, setQueueLoadingKey] = useState(null)
   const player = usePlayer({ enabled: active, isDownloaded: downloads.isDownloaded, onPlayerVisibilityChange })
+  const playRequestedSong = useEffectEvent((song) => player.playFrom([song], 0))
+  const closeRequestedPlayer = useEffectEvent(() => player.closePlayer())
   const playerAudioRef = player.audioProps.ref
   const playerSongId = player.currentSong?.id
   const playerUsesLocalAudio = player.isLocal
@@ -122,14 +124,16 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
     if (results.pending?.includes('album')) void loadSection('album')
   }, [loadSection, results?.pending, results?.query, results?.type])
 
-  const playExternalSong = useEffectEvent((event) => {
-    if (event.detail?.id) player.playFrom([event.detail], 0)
-  })
   useEffect(() => {
-    const listener = (event) => playExternalSong(event)
-    window.addEventListener('mysic:play-youtube-song', listener)
-    return () => window.removeEventListener('mysic:play-youtube-song', listener)
-  }, [])
+    if (playbackRequest?.song?.id) playRequestedSong(playbackRequest.song)
+  }, [playbackRequest?.nonce, playbackRequest?.song, playbackRequest?.song?.id])
+
+  const previousStopNonceRef = useRef(stopNonce)
+  useEffect(() => {
+    if (stopNonce === previousStopNonceRef.current) return
+    previousStopNonceRef.current = stopNonce
+    closeRequestedPlayer()
+  }, [stopNonce])
 
   function playSongs(sourceSongs, songId) {
     const index = sourceSongs.findIndex((song) => song.id === songId)
@@ -295,7 +299,7 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
       </main>
       <audio {...player.audioProps}><track default kind="captions" label="Sin contenido hablado" src="/music-captions.vtt" srcLang="es" /></audio>
       <div ref={player.iframeHostRef} className="youtube-player-engine" aria-hidden="true" />
-      {active && currentTrack && root && createPortal(
+      {currentTrack && root && createPortal(
         <PlayerDock
           collapsed={playerCollapsed}
           externalPlayback={{ analyser: playerAnalyser, commitSeek: player.commitSeek, currentIndex: player.currentIndex, currentTime: player.currentTime, duration: player.progressMax, error: player.playerError, handleSeek: player.handleSeek, isBuffering: player.isBuffering, isPlaying: player.isPlaying, setVolume: player.setVolume, togglePlayback: player.togglePlay, volume: player.volume }}
