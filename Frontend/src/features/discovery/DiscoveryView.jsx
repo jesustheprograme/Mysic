@@ -354,7 +354,6 @@ function useDiscoveryPage({
   onLogout,
   onDeletePlaylist,
   onReorderPlaylist,
-  onSearchChange,
   onSetTrackInPlaylist,
   onSongSelect,
   onToggleAlbumFavorite,
@@ -377,6 +376,7 @@ function useDiscoveryPage({
   const [youtubeVisited, setYoutubeVisited] = useState(activeSection === 'youtube')
   const [youtubePlayerVisible, setYoutubePlayerVisible] = useState(false)
   const [youtubePlaybackRequest, setYoutubePlaybackRequest] = useState(null)
+  const [youtubeSearchRequest, setYoutubeSearchRequest] = useState({ nonce: 0, query: '' })
   const [youtubeStopNonce, setYoutubeStopNonce] = useState(0)
   const [activeAlbumId, setActiveAlbumId] = useState(getAlbumIdFromHash)
   const [activeArtistId, setActiveArtistId] = useState(getArtistIdFromHash)
@@ -672,6 +672,18 @@ function useDiscoveryPage({
     setYoutubeVisited,
   })
 
+  function changeGlobalSearch(query) {
+    if (query.trim()) setYoutubeVisited(true)
+    setYoutubeSearchRequest((current) => ({ ...current, query }))
+  }
+
+  function submitGlobalSearch(query) {
+    const trimmed = query.trim()
+    if (!trimmed) return
+    navigateTo('youtube')
+    setYoutubeSearchRequest((current) => ({ nonce: current.nonce + 1, query: trimmed }))
+  }
+
   function dismissArtistSpotlight() {
     const artistId = spotlightArtist?.artistId
     setSpotlightArtist(null)
@@ -723,9 +735,10 @@ function useDiscoveryPage({
         onLogout={onLogout}
         onMobileMenuClose={() => setMobileMenuOpen(false)}
         onMobileMenuToggle={() => setMobileMenuOpen((open) => !open)}
-        onSearchChange={onSearchChange}
+        onSearchChange={changeGlobalSearch}
+        onSearchSubmit={submitGlobalSearch}
         onSidebarToggle={() => setSidebarCollapsed((collapsed) => !collapsed)}
-        searchQuery={searchQuery}
+        searchQuery={youtubeSearchRequest.query}
         user={user}
       />
       <AppSidebar
@@ -963,6 +976,7 @@ function useDiscoveryPage({
                 onPlayerVisibilityChange={setYoutubePlayerVisible}
                 playerCollapsed={playerCollapsed}
                 playbackRequest={youtubePlaybackRequest}
+                searchRequest={youtubeSearchRequest}
                 stopNonce={youtubeStopNonce}
               />
             </Suspense>

@@ -32,7 +32,7 @@ function getScrollTargets(workspace) {
   return [content, workspace.querySelector('.artist-profile__content'), workspace.querySelector('.collection-detail__tracks')].filter(Boolean)
 }
 
-function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, onPlayerVisibilityChange, playerCollapsed = false, playbackRequest, stopNonce = 0 }) {
+function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, onPlayerVisibilityChange, playerCollapsed = false, playbackRequest, searchRequest, stopNonce = 0 }) {
   const scrollPositionsRef = useRef(new Map())
   const workspaceRef = useRef(null)
   const queueRequestRef = useRef(null)
@@ -56,6 +56,18 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
   const [playerAnalyser, setPlayerAnalyser] = useState(null)
   const openMiniPlayer = useGlobalMiniPlayer(player, browse)
   const refreshPersonalizedHome = useEffectEvent(() => browse.showHome())
+  const applyHeaderSearch = useEffectEvent((request) => {
+    browse.setQuery(request.query)
+    if (request.nonce > 0) browse.runSearch(request.query, 'all')
+  })
+  const warmHeaderSearch = useEffectEvent((query) => browse.prefetchSearch(query))
+
+  useEffect(() => {
+    if (!searchRequest?.query.trim()) return undefined
+    applyHeaderSearch(searchRequest)
+    const timer = setTimeout(() => warmHeaderSearch(searchRequest.query), 180)
+    return () => clearTimeout(timer)
+  }, [searchRequest])
 
   useEffect(() => {
     const controller = new AbortController()

@@ -14,6 +14,7 @@ function AppHeader({
   onMobileMenuClose,
   onMobileMenuToggle,
   onSearchChange,
+  onSearchSubmit,
   onSidebarToggle,
   searchQuery,
   user,
@@ -102,23 +103,30 @@ function AppHeader({
           </div>
         </div>
 
-        <label
+        <form
           className={`music-search${searchOpen ? ' music-search--open' : ''}`}
           id="mobile-catalog-search"
+          role="search"
+          onSubmit={(event) => {
+            event.preventDefault()
+            onSearchSubmit?.(searchQuery)
+            setSearchOpen(false)
+          }}
         >
-          <span className="sr-only">Buscar canciones</span>
+          <label className="sr-only" htmlFor="global-header-search">Buscar en Mysic</label>
           <Search className="music-search__icon" size={16} strokeWidth={1.8} aria-hidden="true" />
           <input
+            id="global-header-search"
             className="music-search__input"
             ref={searchInputRef}
             value={searchQuery}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Buscar canciones"
+            placeholder="Canciones, artistas, álbumes…"
             type="search"
             autoComplete="off"
           />
           <span className="music-search__border" aria-hidden="true" />
-        </label>
+        </form>
 
         <button
           className="app-header__search-toggle"
