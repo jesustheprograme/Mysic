@@ -179,7 +179,7 @@ function CatalogNavigation({ controller }) {
         </button>
       </div>
       <AccountHelp account={account} busy={accountBusy} error={accountError} onConnect={connectMusicSession} onDisconnect={disconnectAccount} open={accountHelpOpen} />
-      <MusicSearchPanel history={browse.history} onEntitySelect={selectSearchEntity} onHistoryRemove={browse.removeFromHistory} onQueryChange={browse.setQuery} onSubmit={(text) => browse.runSearch(text, searchType)} query={browse.query} />
+      <MusicSearchPanel history={browse.history} onEntitySelect={selectSearchEntity} onHistoryRemove={browse.removeFromHistory} onPrefetch={searchType === 'all' || searchType === 'song' ? browse.prefetchSearch : undefined} onQueryChange={browse.setQuery} onSubmit={(text) => browse.runSearch(text, searchType)} query={browse.query} />
       <CatalogTabs browse={browse} downloads={downloads} player={player} showDownloads={showDownloads} showingDownloads={showingDownloads} />
       {actionError && <div className="collection-empty" role="alert">{actionError}</div>}
       {(browse.view.kind === 'search' || showingDownloads) && (

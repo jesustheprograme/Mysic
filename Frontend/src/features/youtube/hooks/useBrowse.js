@@ -301,6 +301,10 @@ export function useBrowse({ progressive = false } = {}) {
     return request;
   }, []);
 
+  const prefetchSearch = useCallback((text) => {
+    api.warmSearch(text, 'song');
+  }, []);
+
   const changeTab = (type) => {
     setSearchType(type);
     if (results?.query) runSearch(results.query, type);
@@ -391,6 +395,7 @@ export function useBrowse({ progressive = false } = {}) {
     history,
     removeFromHistory,
     runSearch,
+    prefetchSearch,
     loadSection,
     changeTab,
     openArtist,

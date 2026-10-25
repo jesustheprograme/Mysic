@@ -6,6 +6,23 @@ import { API_URL } from '../../../lib/api.js';
 
 export const API_BASE = `${API_URL}/youtube`;
 
+const SEARCH_WARM_TTL_MS = 30_000;
+const SEARCH_WARM_LIMIT = 12;
+const warmedSearches = new Map();
+
+function searchKey(q, type) {
+  return `${type}:${q.trim().toLocaleLowerCase()}`;
+}
+
+function pruneWarmedSearches(now = Date.now()) {
+  for (const [key, entry] of warmedSearches) {
+    if (now - entry.createdAt > SEARCH_WARM_TTL_MS) warmedSearches.delete(key);
+  }
+  while (warmedSearches.size > SEARCH_WARM_LIMIT) {
+    warmedSearches.delete(warmedSearches.keys().next().value);
+  }
+}
+
 function apiError(data, status) {
   const error = new Error(data.error || data.message || data.detail || `Error del servidor (${status})`);
   error.status = status;
@@ -59,6 +76,34 @@ async function send(path, method, body) {
   return readJson(response);
 }
 
+function warmSearch(q, type = 'song') {
+  const trimmed = q.trim();
+  if (trimmed.length < 2) return;
+  const key = searchKey(trimmed, type);
+  const now = Date.now();
+  pruneWarmedSearches(now);
+  if (warmedSearches.has(key)) return;
+  const request = fetchJson(`/search?q=${encodeURIComponent(trimmed)}&type=${type}`)
+    .catch((error) => {
+      warmedSearches.delete(key);
+      throw error;
+    });
+  // Attach a handler now so an abandoned warm-up can never become unhandled.
+  request.catch(() => {});
+  warmedSearches.set(key, { createdAt: now, request });
+}
+
+function search(q, type, signal) {
+  const key = searchKey(q, type);
+  pruneWarmedSearches();
+  const warmed = warmedSearches.get(key);
+  if (warmed && !signal?.aborted) {
+    warmedSearches.delete(key);
+    return warmed.request;
+  }
+  return fetchJson(`/search?q=${encodeURIComponent(q)}&type=${type}`, signal);
+}
+
 /* ---------- URLs de medios ---------- */
 export const streamUrl = (id) => `${API_BASE}/stream/${id}`;
 export const localAudioUrl = (id) => `${API_BASE}/downloads/${id}/audio`;
@@ -84,7 +129,8 @@ export const api = {
   radio: (id, signal) => fetchJson(`/radio/${encodeURIComponent(id)}`, signal),
   playlist: (id, signal) => fetchJson(`/playlist/${encodeURIComponent(id)}`, signal),
   recommendations: (id, signal) => fetchJson(`/recommendations/${encodeURIComponent(id)}`, signal),
-  search: (q, type, signal) => fetchJson(`/search?q=${encodeURIComponent(q)}&type=${type}`, signal),
+  search,
+  warmSearch,
   suggest: (q, signal) => fetchJson(`/suggest?q=${encodeURIComponent(q)}`, signal),
   artist: (id, signal) => fetchJson(`/artist/${encodeURIComponent(id)}`, signal),
   artistReleases: (id, signal) => fetchJson(`/artist/${encodeURIComponent(id)}/releases`, signal),

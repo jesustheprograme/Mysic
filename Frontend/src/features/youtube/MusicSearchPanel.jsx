@@ -12,6 +12,7 @@ export default function MusicSearchPanel({
   history,
   onEntitySelect,
   onHistoryRemove,
+  onPrefetch,
   onQueryChange,
   onSubmit,
   query,
@@ -30,6 +31,7 @@ export default function MusicSearchPanel({
     }
     const controller = new AbortController()
     const timer = setTimeout(() => {
+      onPrefetch?.(query.trim())
       api.suggest(query.trim(), controller.signal)
         .then((data) => {
           setSuggestions(data)
@@ -43,7 +45,7 @@ export default function MusicSearchPanel({
       clearTimeout(timer)
       controller.abort()
     }
-  }, [open, query])
+  }, [onPrefetch, open, query])
 
   useEffect(() => {
     function closeFromOutside(event) {
