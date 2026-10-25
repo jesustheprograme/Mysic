@@ -22,6 +22,18 @@ function scheduleWhenIdle(callback) {
   return () => globalThis.clearTimeout(id);
 }
 
+function scheduleBackground(callback) {
+  let cancelIdle = null;
+  const timer = globalThis.setTimeout(() => {
+    cancelIdle = scheduleWhenIdle(callback);
+  }, 1_000);
+
+  return () => {
+    globalThis.clearTimeout(timer);
+    cancelIdle?.();
+  };
+}
+
 async function loadArtist(id, signal) {
   return api.artist(id, signal);
 }
@@ -51,6 +63,7 @@ export function useBrowse({ progressive = false } = {}) {
   const searchControllerRef = useRef(null);
   const detailControllerRef = useRef(null);
   const artistEnrichmentControllerRef = useRef(null);
+  const artistEnrichmentCancelRef = useRef(null);
   const enrichmentCancelRef = useRef(null);
   const searchSequenceRef = useRef(0);
   const sectionRequestsRef = useRef(new Map());
@@ -70,6 +83,8 @@ export function useBrowse({ progressive = false } = {}) {
     detailControllerRef.current = null;
     artistEnrichmentControllerRef.current?.abort();
     artistEnrichmentControllerRef.current = null;
+    artistEnrichmentCancelRef.current?.();
+    artistEnrichmentCancelRef.current = null;
     enrichmentCancelRef.current?.();
     enrichmentCancelRef.current = null;
     setLoading(false);
@@ -81,6 +96,7 @@ export function useBrowse({ progressive = false } = {}) {
     searchControllerRef.current?.abort();
     detailControllerRef.current?.abort();
     artistEnrichmentControllerRef.current?.abort();
+    artistEnrichmentCancelRef.current?.();
     enrichmentCancelRef.current?.();
   }, []);
 
@@ -91,22 +107,28 @@ export function useBrowse({ progressive = false } = {}) {
     const controller = new AbortController();
     artistEnrichmentControllerRef.current?.abort();
     artistEnrichmentControllerRef.current = controller;
-    setEnriching(true);
-
-    api.artistReleases(artistId, controller.signal).then((data) => {
-      setView((current) => current.kind === 'artist' && current.data?.id === artistId
-        ? { ...current, data: { ...current.data, shelves: data.shelves, releasesComplete: true } }
-        : current);
-    }).catch((error) => {
-      if (error.name !== 'AbortError') console.warn(`No se pudo completar la discografía: ${error.message}`);
-    }).finally(() => {
-      if (artistEnrichmentControllerRef.current === controller) {
-        artistEnrichmentControllerRef.current = null;
-        setEnriching(false);
+    artistEnrichmentCancelRef.current?.();
+    artistEnrichmentCancelRef.current = scheduleBackground(async () => {
+      artistEnrichmentCancelRef.current = null;
+      try {
+        const data = await api.artistReleases(artistId, controller.signal);
+        setView((current) => current.kind === 'artist' && current.data?.id === artistId
+          ? { ...current, data: { ...current.data, shelves: data.shelves, releasesComplete: true } }
+          : current);
+      } catch (error) {
+        if (error.name !== 'AbortError') console.warn(`No se pudo completar la discografía: ${error.message}`);
+      } finally {
+        if (artistEnrichmentControllerRef.current === controller) {
+          artistEnrichmentControllerRef.current = null;
+        }
       }
     });
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      artistEnrichmentCancelRef.current?.();
+      artistEnrichmentCancelRef.current = null;
+    };
   }, [view.data?.id, view.data?.releasesComplete, view.kind]);
 
   const runSearch = useCallback(async (text, type) => {
