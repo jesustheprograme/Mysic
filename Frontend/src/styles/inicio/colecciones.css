@@ -1193,9 +1193,6 @@
 
 .collection-detail__track--active {
   z-index: 6;
-  background: rgba(24, 26, 25, 0.98);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(12px);
 }
 
 .collection-detail__active-track-arrow {

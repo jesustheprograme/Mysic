@@ -128,7 +128,7 @@ export default function FilaCancionOrdenable({
   const className = [
     'collection-detail__track',
     reorderable && 'collection-detail__track--reorderable',
-    isSelected && isPlaying && 'collection-detail__track--active',
+    isSelected && 'collection-detail__track--active',
     isDragging && 'collection-detail__track--dragging',
     isOver && !isDragging && 'collection-detail__track--drop-target',
   ].filter(Boolean).join(' ')
