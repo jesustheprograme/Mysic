@@ -151,7 +151,9 @@ export function useBrowse({ progressive = false } = {}) {
     setQuery(trimmed);
     sectionRequestsRef.current.clear();
     searchContextRef.current = { query: trimmed, type, sequence, controller, pending: true };
-    setResults(null);
+    setResults(progressive && type === 'all'
+      ? { type: 'all', query: trimmed, songs: null, artists: [], albums: [], pending: ['artist', 'album'] }
+      : null);
     setLoading(true);
     setEnriching(type === 'all');
     setError('');

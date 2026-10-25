@@ -18,22 +18,16 @@ import { createStreamRouter } from './stream.mjs';
 export function createApiRouter() {
   const api = express.Router();
 
-  // Agregador de fotos de artista, compartido por la página del artista y la búsqueda (precalentado)
+  // Agregador de fotos de artista, disponible bajo demanda y para cachés existentes.
   const getArtistImages = createArtistImagesResolver({
     cacheDir: config.artistImagesCacheDir,
     imageCacheDir: config.imageCacheDir,
     getYoutubeArtist: getArtistNameAndMedia,
     getChannelMedia: collectChannelMedia,
   });
-  const warmArtistImages = (id) => {
-    getArtistImages(id, { priority: 'warm' }).catch((error) =>
-      console.warn(`[artist-images] precalentado de ${id} falló: ${error.message}`)
-    );
-  };
-
   api.use('/health', createHealthRouter());
   api.use('/', createBrowseRouter());
-  api.use('/', createSearchRouter({ warmArtistImages })); // /search y /suggest
+  api.use('/', createSearchRouter()); // /search y /suggest
   api.use('/artist', createArtistRouter({ getArtistImages }));
   api.use('/album', createAlbumRouter());
   api.use('/stream', createStreamRouter());

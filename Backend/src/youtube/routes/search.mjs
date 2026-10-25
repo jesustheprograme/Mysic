@@ -5,7 +5,7 @@ import express from 'express';
 import { asyncRoute, requireYoutube } from '../utils/http.mjs';
 import { getSuggestions, SEARCH_TYPES, searchMusic } from '../youtube/search.mjs';
 
-export function createSearchRouter({ warmArtistImages } = {}) {
+export function createSearchRouter() {
   const router = express.Router();
 
   router.get(
@@ -18,12 +18,6 @@ export function createSearchRouter({ warmArtistImages } = {}) {
       const results = await searchMusic(text, type);
       res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=240');
       res.json(results);
-
-      // Precalienta en segundo plano (baja prioridad) las fotos del artista principal,
-      // que es el que más probablemente se abra a continuación.
-      if (warmArtistImages && results.type === 'all' && results.top?.kind === 'artist') {
-        warmArtistImages(results.top.id);
-      }
     }, 'Error al buscar música')
   );
 
