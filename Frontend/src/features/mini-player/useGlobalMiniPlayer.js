@@ -2,7 +2,11 @@ import { useCallback, useEffect, useEffectEvent } from 'react'
 import { claimMiniPlayer, ownsMiniPlayer, listenToMiniPlayerCommands, publishPlaybackState } from './playerBridge.ts'
 import { openMiniPlayerWindow } from './openMiniPlayerWindow.tsx'
 
-const adaptTrack = (song) => song ? ({ ...song, artwork: song.thumbnail ?? song.artwork, albumTitle: song.album }) : null
+const adaptTrack = (song) => song ? ({
+  ...song,
+  artwork: song.thumbnail ?? song.artwork,
+  albumTitle: song.albumTitle ?? song.album?.title ?? song.albumMemberships?.[0]?.title,
+}) : null
 
 export default function useGlobalMiniPlayer(player, browse) {
   const publish = useCallback(() => {

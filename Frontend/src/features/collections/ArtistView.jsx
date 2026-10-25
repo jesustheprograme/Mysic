@@ -329,6 +329,8 @@ function ArtistView({
           <ol className="artist-profile__songs">
             {featuredSongs.map((song) => {
               const selected = song.id === selectedSongId
+              const albumId = song.albumId ?? song.album?.id ?? song.albumMemberships?.[0]?.id
+              const albumTitle = song.albumTitle ?? song.album?.title ?? song.albumMemberships?.[0]?.title
               return (
                 <li className={`song-row artist-profile__song${selected ? ' song-row--active' : ''}${selected && selectedSongPlaying ? ' song-row--playing' : ''}`} key={song.id}>
                   <div className="song-row__main">
@@ -347,14 +349,14 @@ function ArtistView({
                     </button>
                     <span className="song-row__copy">
                       <strong>{song.title}</strong>
-                      {song.album && (
+                      {albumTitle && (
                         <button
                           className="song-row__catalog-link song-row__catalog-link--album"
                           type="button"
-                          disabled={!song.albumId || !onAlbumSelect}
-                          onClick={() => onAlbumSelect?.(song.albumId)}
+                          disabled={!albumId || !onAlbumSelect}
+                          onClick={() => onAlbumSelect?.(albumId)}
                         >
-                          {song.album}
+                          {albumTitle}
                         </button>
                       )}
                     </span>
