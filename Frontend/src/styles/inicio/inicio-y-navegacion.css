@@ -296,7 +296,28 @@
   width: min(560px, calc(100vw - 32px));
   border-color: #dce3df;
   border-radius: 0;
+  overflow-y: overlay;
+  scrollbar-color: #59615f transparent !important;
+  scrollbar-width: thin !important;
   transform: translate(-50%, -10px) scaleY(0.96);
+}
+
+.music-search > .yt-music-search .yt-music-search__popover::-webkit-scrollbar {
+  display: block !important;
+  width: 5px !important;
+}
+
+.music-search > .yt-music-search .yt-music-search__popover::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.music-search > .yt-music-search .yt-music-search__popover::-webkit-scrollbar-thumb {
+  border-radius: 0;
+  background: #59615f;
+}
+
+.music-search > .yt-music-search .yt-music-search__popover::-webkit-scrollbar-thumb:hover {
+  background: #89928f;
 }
 
 .music-search > .yt-music-search--open .yt-music-search__popover {
