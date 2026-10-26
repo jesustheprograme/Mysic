@@ -974,6 +974,7 @@ function useDiscoveryPage({
                 onAddToPlaylist={setPlaylistPickerSong}
                 onPlayerCollapseToggle={() => setPlayerCollapsed((collapsed) => !collapsed)}
                 onPlayerVisibilityChange={setYoutubePlayerVisible}
+                onSearchNavigate={() => navigateTo('youtube')}
                 playerCollapsed={playerCollapsed}
                 playbackRequest={youtubePlaybackRequest}
                 searchRequest={youtubeSearchRequest}

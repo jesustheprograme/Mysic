@@ -33,7 +33,7 @@ function getScrollTargets(workspace) {
   return [content, workspace.querySelector('.artist-profile__content'), workspace.querySelector('.collection-detail__tracks')].filter(Boolean)
 }
 
-function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, onPlayerVisibilityChange, playerCollapsed = false, playbackRequest, searchRequest, stopNonce = 0 }) {
+function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, onPlayerVisibilityChange, onSearchNavigate, playerCollapsed = false, playbackRequest, searchRequest, stopNonce = 0 }) {
   const scrollPositionsRef = useRef(new Map())
   const workspaceRef = useRef(null)
   const queueRequestRef = useRef(null)
@@ -251,8 +251,14 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
 
   function selectSearchEntity(entity) {
     if (entity.kind === 'song' && entity.song) player.playFrom([entity.song], 0)
-    if (entity.kind === 'artist') openArtist(entity.id)
-    if (entity.kind === 'album') openAlbum(entity.id)
+    if (entity.kind === 'artist') {
+      onSearchNavigate?.()
+      openArtist(entity.id)
+    }
+    if (entity.kind === 'album') {
+      onSearchNavigate?.()
+      openAlbum(entity.id)
+    }
   }
 
   async function startAccountLink() {
