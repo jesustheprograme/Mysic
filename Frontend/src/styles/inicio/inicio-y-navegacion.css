@@ -250,7 +250,7 @@
 }
 
 .music-search {
-  width: min(580px, calc(100% - 440px));
+  width: min(370px, calc(100% - 560px));
   color: #8f9996;
 }
 
@@ -268,7 +268,31 @@
 }
 
 .music-search > .yt-music-search .yt-music-search__bar {
-  min-height: 42px;
+  min-height: 34px;
+  padding: 0 4px;
+  border: 0;
+  border-bottom: 1px solid #69726f;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.music-search > .yt-music-search--open .yt-music-search__bar,
+.music-search > .yt-music-search .yt-music-search__bar:hover,
+.music-search > .yt-music-search .yt-music-search__bar:focus-within {
+  border-color: #dce3df;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.music-search > .yt-music-search .yt-music-search__bar input {
+  font-size: 13px;
+}
+
+.music-search > .yt-music-search .yt-music-search__popover {
+  top: calc(100% + 8px);
+  border-top-color: rgba(255, 255, 255, 0.17);
+  border-radius: 12px;
 }
 
 .music-search__input {
