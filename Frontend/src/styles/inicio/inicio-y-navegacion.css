@@ -291,8 +291,16 @@
 
 .music-search > .yt-music-search .yt-music-search__popover {
   top: calc(100% + 8px);
+  right: auto;
+  left: 50%;
+  width: min(560px, calc(100vw - 32px));
   border-top-color: rgba(255, 255, 255, 0.17);
   border-radius: 12px;
+  transform: translate(-50%, -10px) scaleY(0.96);
+}
+
+.music-search > .yt-music-search--open .yt-music-search__popover {
+  transform: translate(-50%, 0) scaleY(1);
 }
 
 .music-search__input {
@@ -1379,11 +1387,11 @@
   left: 0;
   max-height: min(58vh, 420px);
   overflow: auto;
-  padding: 8px;
+  padding: 10px;
   border: 1px solid rgba(255, 255, 255, 0.17);
   border-top-color: rgba(255, 255, 255, 0.08);
   border-radius: 0 0 12px 12px;
-  background: rgba(8, 10, 9, 0.985);
+  background: rgba(10, 12, 12, 0.985);
   box-shadow: 0 30px 70px rgba(0, 0, 0, 0.58);
   opacity: 0;
   pointer-events: none;
@@ -1401,7 +1409,7 @@
 .yt-music-search__eyebrow,
 .yt-music-search__empty {
   margin: 0;
-  padding: 11px 13px;
+  padding: 10px 11px 7px;
   color: #77817d;
   font-size: 11px;
   font-weight: 700;
@@ -1423,6 +1431,22 @@
   transition: background-color 140ms ease;
 }
 
+.yt-music-search__section + .yt-music-search__section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.yt-music-search__query-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.yt-music-search__query-grid .yt-music-search__choice {
+  min-height: 40px;
+}
+
 .yt-music-search__option:hover,
 .yt-music-search__option--active {
   background: rgba(255, 255, 255, 0.065);
@@ -1440,6 +1464,41 @@
   color: #9da6a2;
   background: transparent;
   text-align: left;
+}
+
+.yt-music-search__option--featured {
+  margin: 2px;
+  border: 1px solid rgba(150, 113, 255, 0.3);
+  background: linear-gradient(110deg, rgba(83, 58, 140, 0.28), rgba(28, 31, 31, 0.82));
+}
+
+.yt-music-search__option--featured:hover,
+.yt-music-search__option--featured.yt-music-search__option--active {
+  border-color: rgba(172, 139, 255, 0.56);
+  background: linear-gradient(110deg, rgba(95, 65, 161, 0.38), rgba(33, 36, 35, 0.94));
+}
+
+.yt-music-search__option--featured .yt-music-search__choice {
+  min-height: 86px;
+  grid-template-columns: 66px minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 10px;
+}
+
+.yt-music-search__option--featured .yt-music-search__choice img {
+  width: 66px;
+  height: 66px;
+  border-radius: 10px;
+}
+
+.yt-music-search__option--featured .yt-music-search__choice strong {
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.yt-music-search__option--featured .yt-music-search__choice > svg {
+  margin: 0 5px 0 0;
+  color: #c9b5ff;
 }
 
 .yt-music-search__choice img {
@@ -1542,6 +1601,10 @@
 
   .yt-music-search__popover {
     max-height: 58vh;
+  }
+
+  .yt-music-search__query-grid {
+    grid-template-columns: 1fr;
   }
 
   .yt-feed-skeleton {
