@@ -295,7 +295,7 @@
   left: 50%;
   width: min(560px, calc(100vw - 32px));
   border-color: #dce3df;
-  border-radius: 12px;
+  border-radius: 0;
   transform: translate(-50%, -10px) scaleY(0.96);
 }
 
