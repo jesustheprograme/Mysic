@@ -250,8 +250,25 @@
 }
 
 .music-search {
-  width: min(370px, calc(100% - 560px));
+  width: min(580px, calc(100% - 440px));
   color: #8f9996;
+}
+
+.app-header__search-fallback {
+  position: relative;
+  display: block;
+}
+
+.music-search:has(.yt-music-search) .app-header__search-fallback {
+  display: none;
+}
+
+.music-search > .yt-music-search {
+  width: 100%;
+}
+
+.music-search > .yt-music-search .yt-music-search__bar {
+  min-height: 42px;
 }
 
 .music-search__input {

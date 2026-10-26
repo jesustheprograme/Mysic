@@ -6,7 +6,6 @@ import CollectionDetailView from '../collections/CollectionDetailView.jsx'
 import CatalogSearchControls from '../discovery/CatalogSearchControls.jsx'
 import HomeRail from '../discovery/HomeRail.jsx'
 import SongList from '../discovery/SongList.jsx'
-import MusicSearchPanel from './MusicSearchPanel.jsx'
 import { adaptAlbum, adaptArtist, adaptBrowseItem, adaptReleases, adaptSong } from './lib/adapters.js'
 
 const ignorePreview = () => {}
@@ -166,7 +165,7 @@ function CatalogTabs({ browse, downloads, player, showDownloads, showingDownload
 }
 
 function CatalogNavigation({ controller }) {
-  const { account, accountBusy, accountError, accountHelpOpen, actionError, browse, changeTab, connectMusicSession, disconnectAccount, downloads, player, searchType, selectSearchEntity, setAccountHelpOpen, showDownloads } = controller
+  const { account, accountBusy, accountError, accountHelpOpen, actionError, browse, changeTab, connectMusicSession, disconnectAccount, downloads, player, searchType, setAccountHelpOpen, showDownloads } = controller
   const showingDownloads = browse.view.kind === 'downloads'
   const heading = getCatalogHeading(browse.view.kind, account?.personalized)
 
@@ -179,7 +178,6 @@ function CatalogNavigation({ controller }) {
         </button>
       </div>
       <AccountHelp account={account} busy={accountBusy} error={accountError} onConnect={connectMusicSession} onDisconnect={disconnectAccount} open={accountHelpOpen} />
-      <MusicSearchPanel history={browse.history} onEntitySelect={selectSearchEntity} onHistoryRemove={browse.removeFromHistory} onPrefetch={searchType === 'all' || searchType === 'song' ? browse.prefetchSearch : undefined} onQueryChange={browse.setQuery} onSubmit={(text) => browse.runSearch(text, searchType)} query={browse.query} />
       <CatalogTabs browse={browse} downloads={downloads} player={player} showDownloads={showDownloads} showingDownloads={showingDownloads} />
       {actionError && <div className="collection-empty" role="alert">{actionError}</div>}
       {(browse.view.kind === 'search' || showingDownloads) && (

@@ -10,6 +10,7 @@ import { usePlayer } from './hooks/usePlayer.js'
 import { adaptSong } from './lib/adapters.js'
 import { api } from './lib/api.js'
 import { readStorage, writeStorage } from './lib/storage.js'
+import MusicSearchPanel from './MusicSearchPanel.jsx'
 import YoutubeCatalogContent from './YoutubeCatalogContent.jsx'
 
 function useFavoriteIds(storageKey) {
@@ -42,6 +43,7 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
   const [likedArtistIds, toggleArtistFavorite] = useFavoriteIds('mysic:youtube:favorite-artists')
   const [likedAlbumIds, toggleAlbumFavorite] = useFavoriteIds('mysic:youtube:favorite-albums')
   const [account, setAccount] = useState(null)
+  const [searchRoot, setSearchRoot] = useState(null)
   const [accountHelpOpen, setAccountHelpOpen] = useState(false)
   const [accountBusy, setAccountBusy] = useState(false)
   const [accountError, setAccountError] = useState('')
@@ -56,9 +58,13 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
   const [playerAnalyser, setPlayerAnalyser] = useState(null)
   const openMiniPlayer = useGlobalMiniPlayer(player, browse)
   const refreshPersonalizedHome = useEffectEvent(() => browse.showHome())
+
+  useLayoutEffect(() => {
+    setSearchRoot(document.getElementById('global-header-search-root'))
+  }, [])
   const applyHeaderSearch = useEffectEvent((request) => {
     browse.setQuery(request.query)
-    if (request.nonce > 0) browse.runSearch(request.query, 'all')
+    if (request.nonce > 0) browse.runGlobalSearch(request.query)
   })
   const warmHeaderSearch = useEffectEvent((query) => browse.prefetchSearch(query))
 
@@ -300,6 +306,7 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
     showDownloads, startPlaylist, toggleAlbumFavorite, toggleArtistFavorite, toggleSongFavorite,
   }
   const root = document.getElementById('music-home')
+  const focusHeaderSearch = searchRoot?.contains(document.activeElement)
   const currentTrack = player.currentSong ? adaptSong(player.currentSong) : null
 
   return (
@@ -311,6 +318,19 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
       </main>
       <audio {...player.audioProps}><track default kind="captions" label="Sin contenido hablado" src="/music-captions.vtt" srcLang="es" /></audio>
       <div ref={player.iframeHostRef} className="youtube-player-engine" aria-hidden="true" />
+      {searchRoot && createPortal(
+        <MusicSearchPanel
+          focusOnMount={focusHeaderSearch}
+          history={browse.history}
+          onEntitySelect={selectSearchEntity}
+          onHistoryRemove={browse.removeFromHistory}
+          onPrefetch={browse.prefetchSearch}
+          onQueryChange={browse.setQuery}
+          onSubmit={browse.runGlobalSearch}
+          query={browse.query}
+        />,
+        searchRoot,
+      )}
       {currentTrack && root && createPortal(
         <PlayerDock
           collapsed={playerCollapsed}

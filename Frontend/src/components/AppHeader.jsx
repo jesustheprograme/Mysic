@@ -46,7 +46,11 @@ function AppHeader({
   }, [])
 
   useEffect(() => {
-    if (searchOpen) searchInputRef.current?.focus()
+    if (searchOpen) {
+      const globalSearchInput = document.querySelector('#global-header-search-root .yt-music-search input')
+      if (globalSearchInput) globalSearchInput.focus()
+      else searchInputRef.current?.focus()
+    }
   }, [searchOpen])
 
   function toggleMobileSearch() {
@@ -103,35 +107,39 @@ function AppHeader({
           </div>
         </div>
 
-        <form
+        <div
           className={`music-search${searchOpen ? ' music-search--open' : ''}`}
-          id="mobile-catalog-search"
-          role="search"
-          onSubmit={(event) => {
-            event.preventDefault()
-            onSearchSubmit?.(searchQuery)
-            setSearchOpen(false)
-          }}
+          id="global-header-search-root"
         >
-          <label className="sr-only" htmlFor="global-header-search">Buscar en Mysic</label>
-          <Search className="music-search__icon" size={16} strokeWidth={1.8} aria-hidden="true" />
-          <input
-            id="global-header-search"
-            className="music-search__input"
-            ref={searchInputRef}
-            value={searchQuery}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Canciones, artistas, álbumes…"
-            type="search"
-            autoComplete="off"
-          />
-          <span className="music-search__border" aria-hidden="true" />
-        </form>
+          <form
+            className="app-header__search-fallback"
+            role="search"
+            onSubmit={(event) => {
+              event.preventDefault()
+              onSearchSubmit?.(searchQuery)
+              setSearchOpen(false)
+            }}
+          >
+            <label className="sr-only" htmlFor="global-header-search">Buscar en Mysic</label>
+            <Search className="music-search__icon" size={16} strokeWidth={1.8} aria-hidden="true" />
+            <input
+              id="global-header-search"
+              className="music-search__input"
+              ref={searchInputRef}
+              value={searchQuery}
+              onChange={(event) => onSearchChange(event.target.value)}
+              placeholder="Canciones, artistas, álbumes…"
+              type="search"
+              autoComplete="off"
+            />
+            <span className="music-search__border" aria-hidden="true" />
+          </form>
+        </div>
 
         <button
           className="app-header__search-toggle"
           type="button"
-          aria-controls="mobile-catalog-search"
+          aria-controls="global-header-search-root"
           aria-expanded={searchOpen}
           aria-label={searchOpen ? 'Ocultar buscador' : 'Abrir buscador'}
           title={searchOpen ? 'Ocultar buscador' : 'Buscar'}

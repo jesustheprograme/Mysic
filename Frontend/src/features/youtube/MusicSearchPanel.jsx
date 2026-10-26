@@ -9,6 +9,7 @@ const TYPE_LABELS = {
 }
 
 export default function MusicSearchPanel({
+  focusOnMount = false,
   history,
   onEntitySelect,
   onHistoryRemove,
@@ -23,6 +24,10 @@ export default function MusicSearchPanel({
   const rootRef = useRef(null)
   const inputRef = useRef(null)
   const listboxId = useId()
+
+  useEffect(() => {
+    if (focusOnMount) inputRef.current?.focus()
+  }, [focusOnMount])
 
   useEffect(() => {
     if (!open || query.trim().length < 2) {

@@ -305,6 +305,11 @@ export function useBrowse({ progressive = false } = {}) {
     api.warmSearch(text, 'song');
   }, []);
 
+  const runGlobalSearch = useCallback((text) => {
+    setSearchType('all');
+    return runSearch(text, 'all');
+  }, [runSearch]);
+
   const changeTab = (type) => {
     setSearchType(type);
     if (results?.query) runSearch(results.query, type);
@@ -395,6 +400,7 @@ export function useBrowse({ progressive = false } = {}) {
     history,
     removeFromHistory,
     runSearch,
+    runGlobalSearch,
     prefetchSearch,
     loadSection,
     changeTab,
