@@ -6,9 +6,12 @@ import { API_URL } from '../../../lib/api.js';
 
 export const API_BASE = `${API_URL}/youtube`;
 
-const SEARCH_WARM_TTL_MS = 30_000;
+const SEARCH_WARM_TTL_MS = 2 * 60_000;
 const SEARCH_WARM_LIMIT = 12;
 const warmedSearches = new Map();
+const DETAIL_CACHE_TTL_MS = 5 * 60_000;
+const DETAIL_CACHE_LIMIT = 30;
+const detailRequests = new Map();
 
 function searchKey(q, type) {
   return `${type}:${q.trim().toLocaleLowerCase()}`;
@@ -21,6 +24,36 @@ function pruneWarmedSearches(now = Date.now()) {
   while (warmedSearches.size > SEARCH_WARM_LIMIT) {
     warmedSearches.delete(warmedSearches.keys().next().value);
   }
+}
+
+function waitForSharedRequest(request, signal) {
+  if (!signal) return request;
+  if (signal.aborted) return Promise.reject(signal.reason ?? new DOMException('Solicitud cancelada', 'AbortError'));
+
+  return new Promise((resolve, reject) => {
+    const abort = () => reject(signal.reason ?? new DOMException('Solicitud cancelada', 'AbortError'));
+    signal.addEventListener('abort', abort, { once: true });
+    request.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
+  });
+}
+
+function cachedJson(cache, key, path, signal, ttlMs, limit) {
+  const now = Date.now();
+  for (const [cachedKey, entry] of cache) {
+    if (now - entry.createdAt > ttlMs) cache.delete(cachedKey);
+  }
+  let entry = cache.get(key);
+  if (!entry) {
+    const request = fetchJson(path).catch((error) => {
+      cache.delete(key);
+      throw error;
+    });
+    request.catch(() => {});
+    entry = { createdAt: now, request };
+    cache.set(key, entry);
+    while (cache.size > limit) cache.delete(cache.keys().next().value);
+  }
+  return waitForSharedRequest(entry.request, signal);
 }
 
 function apiError(data, status) {
@@ -96,12 +129,22 @@ function warmSearch(q, type = 'song') {
 function search(q, type, signal) {
   const key = searchKey(q, type);
   pruneWarmedSearches();
-  const warmed = warmedSearches.get(key);
-  if (warmed && !signal?.aborted) {
-    warmedSearches.delete(key);
-    return warmed.request;
+  let warmed = warmedSearches.get(key);
+  if (!warmed) {
+    const request = fetchJson(`/search?q=${encodeURIComponent(q)}&type=${type}`)
+      .catch((error) => {
+        warmedSearches.delete(key);
+        throw error;
+      });
+    request.catch(() => {});
+    warmed = { createdAt: Date.now(), request };
+    warmedSearches.set(key, warmed);
   }
-  return fetchJson(`/search?q=${encodeURIComponent(q)}&type=${type}`, signal);
+  return waitForSharedRequest(warmed.request, signal);
+}
+
+function detail(key, path, signal) {
+  return cachedJson(detailRequests, key, path, signal, DETAIL_CACHE_TTL_MS, DETAIL_CACHE_LIMIT);
 }
 
 /* ---------- URLs de medios ---------- */
@@ -131,10 +174,11 @@ export const api = {
   recommendations: (id, signal) => fetchJson(`/recommendations/${encodeURIComponent(id)}`, signal),
   search,
   warmSearch,
-  suggest: (q, signal) => fetchJson(`/suggest?q=${encodeURIComponent(q)}`, signal),
-  artist: (id, signal) => fetchJson(`/artist/${encodeURIComponent(id)}`, signal),
-  artistReleases: (id, signal) => fetchJson(`/artist/${encodeURIComponent(id)}/releases`, signal),
-  artistTopSongs: (id, signal) => fetchJson(`/artist/${encodeURIComponent(id)}/top-songs`, signal),
+  suggest: (q, signal) => detail(`suggest:${q.trim().toLocaleLowerCase()}`, `/suggest?q=${encodeURIComponent(q)}`, signal),
+  artist: (id, signal) => detail(`artist:${id}`, `/artist/${encodeURIComponent(id)}`, signal),
+  prefetchArtist: (id) => detail(`artist:${id}`, `/artist/${encodeURIComponent(id)}`).catch(() => {}),
+  artistReleases: (id, signal) => detail(`artist-releases:${id}`, `/artist/${encodeURIComponent(id)}/releases`, signal),
+  artistTopSongs: (id, signal) => detail(`artist-top-songs:${id}`, `/artist/${encodeURIComponent(id)}/top-songs`, signal),
   artistSongs: (id, signal) => fetchJson(`/artist/${encodeURIComponent(id)}/songs`, signal),
   artistImages: (id, signal) => fetchJson(`/artist/${id}/images`, signal),
   album: (id, signal) => fetchJson(`/album/${encodeURIComponent(id)}`, signal),

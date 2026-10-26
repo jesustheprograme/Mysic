@@ -66,13 +66,10 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
     browse.setQuery(request.query)
     if (request.nonce > 0) browse.runGlobalSearch(request.query)
   })
-  const warmHeaderSearch = useEffectEvent((query) => browse.prefetchSearch(query))
-
   useEffect(() => {
     if (!searchRequest?.query.trim()) return undefined
     applyHeaderSearch(searchRequest)
-    const timer = setTimeout(() => warmHeaderSearch(searchRequest.query), 180)
-    return () => clearTimeout(timer)
+    return undefined
   }, [searchRequest])
 
   useEffect(() => {

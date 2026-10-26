@@ -1,5 +1,5 @@
 import { ChevronRight, Clock3, Search, Trash2, X } from 'lucide-react'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useId, useRef, useState } from 'react'
 import { api, imageUrl } from './lib/api.js'
 
 const TYPE_LABELS = {
@@ -109,6 +109,19 @@ export default function MusicSearchPanel({
   const rootRef = useRef(null)
   const inputRef = useRef(null)
   const listboxId = useId()
+  const loadSuggestions = useEffectEvent((searchQuery, signal) => {
+    onPrefetch?.(searchQuery)
+    api.suggest(searchQuery, signal)
+      .then((data) => {
+        setSuggestions(data)
+        setActiveIndex(-1)
+        const primaryArtist = data.entities?.find((entity) => entity.kind === 'artist' && entity.id)
+        if (primaryArtist) api.prefetchArtist(primaryArtist.id)
+      })
+      .catch((error) => {
+        if (error.name !== 'AbortError') setSuggestions({ texts: [], entities: [] })
+      })
+  })
 
   useEffect(() => {
     if (focusOnMount) inputRef.current?.focus()
@@ -121,21 +134,13 @@ export default function MusicSearchPanel({
     }
     const controller = new AbortController()
     const timer = setTimeout(() => {
-      onPrefetch?.(query.trim())
-      api.suggest(query.trim(), controller.signal)
-        .then((data) => {
-          setSuggestions(data)
-          setActiveIndex(-1)
-        })
-        .catch((error) => {
-          if (error.name !== 'AbortError') setSuggestions({ texts: [], entities: [] })
-        })
+      loadSuggestions(query.trim(), controller.signal)
     }, 180)
     return () => {
       clearTimeout(timer)
       controller.abort()
     }
-  }, [onPrefetch, open, query])
+  }, [open, query])
 
   useEffect(() => {
     function closeFromOutside(event) {

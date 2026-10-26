@@ -23,15 +23,7 @@ function scheduleWhenIdle(callback) {
 }
 
 function scheduleBackground(callback) {
-  let cancelIdle = null;
-  const timer = globalThis.setTimeout(() => {
-    cancelIdle = scheduleWhenIdle(callback);
-  }, 1_000);
-
-  return () => {
-    globalThis.clearTimeout(timer);
-    cancelIdle?.();
-  };
+  return scheduleWhenIdle(callback);
 }
 
 async function loadArtist(id, signal) {
