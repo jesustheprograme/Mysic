@@ -294,7 +294,7 @@
   right: auto;
   left: 50%;
   width: min(560px, calc(100vw - 32px));
-  border-top-color: rgba(255, 255, 255, 0.17);
+  border-color: #dce3df;
   border-radius: 12px;
   transform: translate(-50%, -10px) scaleY(0.96);
 }
@@ -1388,11 +1388,10 @@
   max-height: min(58vh, 420px);
   overflow: auto;
   padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.17);
-  border-top-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid #dce3df;
   border-radius: 0 0 12px 12px;
-  background: rgba(10, 12, 12, 0.985);
-  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.58);
+  background: #030404;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.82);
   opacity: 0;
   pointer-events: none;
   transform: translateY(-10px) scaleY(0.96);
