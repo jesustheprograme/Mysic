@@ -1437,16 +1437,6 @@
   border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 
-.yt-music-search__query-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 3px;
-}
-
-.yt-music-search__query-grid .yt-music-search__choice {
-  min-height: 40px;
-}
-
 .yt-music-search__option:hover,
 .yt-music-search__option--active {
   background: rgba(255, 255, 255, 0.065);
@@ -1601,10 +1591,6 @@
 
   .yt-music-search__popover {
     max-height: 58vh;
-  }
-
-  .yt-music-search__query-grid {
-    grid-template-columns: 1fr;
   }
 
   .yt-feed-skeleton {

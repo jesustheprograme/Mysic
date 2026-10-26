@@ -18,17 +18,16 @@ const SECTION_LABELS = {
 function buildSearchModel(suggestions, history, hasQuery) {
   if (!hasQuery) {
     const rows = history.map((title) => ({ kind: 'history', title }))
-    return { entityGroups: [], featured: null, queryRows: [], rows }
+    return { entityGroups: [], featured: null, rows }
   }
 
-  const queryRows = suggestions.texts.map((title) => ({ kind: 'query', title }))
   const featured = suggestions.entities[0] ?? null
   const entityGroups = ENTITY_ORDER.map((kind) => ({
     kind,
     rows: suggestions.entities.slice(1).filter((entity) => entity.kind === kind),
   })).filter((group) => group.rows.length)
-  const rows = [...queryRows, ...(featured ? [featured] : []), ...entityGroups.flatMap((group) => group.rows)]
-  return { entityGroups, featured, queryRows, rows }
+  const rows = [...(featured ? [featured] : []), ...entityGroups.flatMap((group) => group.rows)]
+  return { entityGroups, featured, rows }
 }
 
 function SearchOption({ active, featured, index, listboxId, onChoose, onHistoryRemove, row }) {
@@ -66,27 +65,19 @@ function SearchOption({ active, featured, index, listboxId, onChoose, onHistoryR
   )
 }
 
-function SearchPopover({ activeIndex, entityGroups, featured, hasQuery, listboxId, onChoose, onHistoryRemove, open, queryLength, queryRows, rows }) {
+function SearchPopover({ activeIndex, entityGroups, featured, hasQuery, listboxId, onChoose, onHistoryRemove, open, queryLength, rows }) {
   return (
     <div className="yt-music-search__popover" id={listboxId} role="listbox" aria-label="Sugerencias de búsqueda" inert={!open}>
       {!hasQuery && rows.length > 0 && <p className="yt-music-search__eyebrow">Búsquedas recientes</p>}
       {!hasQuery && rows.map((row, index) => <SearchOption active={activeIndex === index} featured={false} index={index} key={`${row.kind}-${row.title}`} listboxId={listboxId} onChoose={onChoose} onHistoryRemove={onHistoryRemove} row={row} />)}
-      {hasQuery && queryRows.length > 0 && (
-        <section className="yt-music-search__section" aria-label="Sugerencias">
-          <p className="yt-music-search__eyebrow">Sugerencias</p>
-          <div className="yt-music-search__query-grid">
-            {queryRows.map((row, index) => <SearchOption active={activeIndex === index} featured={false} index={index} key={`${row.kind}-${row.title}`} listboxId={listboxId} onChoose={onChoose} onHistoryRemove={onHistoryRemove} row={row} />)}
-          </div>
-        </section>
-      )}
       {hasQuery && featured && (
         <section className="yt-music-search__section" aria-label="Resultado principal">
           <p className="yt-music-search__eyebrow">Resultado principal</p>
-          <SearchOption active={activeIndex === queryRows.length} featured index={queryRows.length} key={`${featured.kind}-${featured.id ?? featured.title}`} listboxId={listboxId} onChoose={onChoose} onHistoryRemove={onHistoryRemove} row={featured} />
+          <SearchOption active={activeIndex === 0} featured index={0} key={`${featured.kind}-${featured.id ?? featured.title}`} listboxId={listboxId} onChoose={onChoose} onHistoryRemove={onHistoryRemove} row={featured} />
         </section>
       )}
       {hasQuery && entityGroups.map((group, groupIndex) => {
-        const firstIndex = queryRows.length + (featured ? 1 : 0)
+        const firstIndex = (featured ? 1 : 0)
           + entityGroups.slice(0, groupIndex).reduce((total, item) => total + item.rows.length, 0)
         return (
           <section className="yt-music-search__section" aria-label={SECTION_LABELS[group.kind]} key={group.kind}>
@@ -158,7 +149,7 @@ export default function MusicSearchPanel({
   }, [])
 
   const hasQuery = Boolean(query.trim())
-  const { entityGroups, featured, queryRows, rows } = buildSearchModel(suggestions, history, hasQuery)
+  const { entityGroups, featured, rows } = buildSearchModel(suggestions, history, hasQuery)
 
   function choose(row) {
     if (row.kind === 'song' && row.song) onEntitySelect(row)
@@ -239,7 +230,7 @@ export default function MusicSearchPanel({
         )}
       </form>
 
-      <SearchPopover activeIndex={activeIndex} entityGroups={entityGroups} featured={featured} hasQuery={hasQuery} listboxId={listboxId} onChoose={choose} onHistoryRemove={removeHistory} open={open} queryLength={query.trim().length} queryRows={queryRows} rows={rows} />
+      <SearchPopover activeIndex={activeIndex} entityGroups={entityGroups} featured={featured} hasQuery={hasQuery} listboxId={listboxId} onChoose={choose} onHistoryRemove={removeHistory} open={open} queryLength={query.trim().length} rows={rows} />
     </div>
   )
 }
