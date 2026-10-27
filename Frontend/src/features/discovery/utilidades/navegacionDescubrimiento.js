@@ -1,3 +1,7 @@
+import { readStorage, writeStorage } from '../../../lib/storage.js'
+
+const ROUTE_STORAGE_KEY = 'mysic:last-route'
+
 export const sectionHashes = {
   home: '#/inicio',
   explore: '#/explorar',
@@ -14,6 +18,29 @@ export const sectionHashes = {
 const hashSections = Object.fromEntries(
   Object.entries(sectionHashes).map(([section, hash]) => [hash, section]),
 )
+
+function isKnownRoute(hash) {
+  if (typeof hash !== 'string') return false
+  return Boolean(
+    hashSections[hash]
+    || /^#(?:playlist|album|artist)-.+/.test(hash),
+  )
+}
+
+export function rememberRouteHash(hash = window.location.hash) {
+  if (isKnownRoute(hash)) writeStorage(ROUTE_STORAGE_KEY, hash)
+}
+
+export function restoreLastRoute() {
+  if (isKnownRoute(window.location.hash)) {
+    rememberRouteHash()
+    return
+  }
+
+  const savedHash = readStorage(ROUTE_STORAGE_KEY, sectionHashes.home)
+  const nextHash = isKnownRoute(savedHash) ? savedHash : sectionHashes.home
+  window.history.replaceState(window.history.state, '', nextHash)
+}
 
 const albumTitles = {
   afterglow: 'Afterglow',

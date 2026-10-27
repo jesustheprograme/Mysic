@@ -7,12 +7,20 @@ import { readStorage, writeStorage } from '../lib/storage.js';
 const HISTORY_KEY = 'searchHistory';
 const HISTORY_MAX = 10;
 
+function readHistory() {
+  const saved = readStorage(HISTORY_KEY, []);
+  if (!Array.isArray(saved)) return [];
+  return saved.filter((item) => typeof item === 'string' && item.trim()).slice(0, HISTORY_MAX);
+}
+
 export function useSearchHistory() {
-  const [history, setHistory] = useState(() => readStorage(HISTORY_KEY, []));
+  const [history, setHistory] = useState(readHistory);
 
   const add = useCallback((text) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
     setHistory((prev) => {
-      const next = [text, ...prev.filter((h) => h.toLowerCase() !== text.toLowerCase())].slice(0, HISTORY_MAX);
+      const next = [trimmed, ...prev.filter((item) => item.toLocaleLowerCase() !== trimmed.toLocaleLowerCase())].slice(0, HISTORY_MAX);
       writeStorage(HISTORY_KEY, next);
       return next;
     });

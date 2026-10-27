@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { clearPlaylists, loadPlaylists } from '../data/playlists.js'
 import { favoritesApi, playlistsApi } from '../lib/api.js'
+import { readStorage, writeStorage } from '../lib/storage.js'
 import { playlistHasTrack, setPlaylistTrack } from '../features/playlists/playlistTracks.js'
 
 export default function useUserLibrary({ libraryLoading, librarySongs, user }) {
-  const [selectedSongId, setSelectedSongId] = useState(null)
+  const [selectedSongId, setSelectedSongIdState] = useState(null)
+  const [selectedSongRestored, setSelectedSongRestored] = useState(false)
   const [likedSongIds, setLikedSongIds] = useState(() => new Set())
   const [likedAlbumIds, setLikedAlbumIds] = useState(() => new Set())
   const [likedArtistIds, setLikedArtistIds] = useState(() => new Set())
@@ -13,6 +15,20 @@ export default function useUserLibrary({ libraryLoading, librarySongs, user }) {
   const [playlists, setPlaylists] = useState([])
   const [playlistsLoading, setPlaylistsLoading] = useState(true)
   const [playlistsError, setPlaylistsError] = useState('')
+  const userStorageId = user?.id ?? user?.email ?? user?.username ?? null
+  const selectedSongStorageKey = userStorageId ? `mysic:user:${userStorageId}:selected-song` : null
+
+  useEffect(() => {
+    const savedSongId = selectedSongStorageKey ? readStorage(selectedSongStorageKey, null) : null
+    setSelectedSongIdState(savedSongId)
+    setSelectedSongRestored(Boolean(savedSongId))
+  }, [selectedSongStorageKey])
+
+  const setSelectedSongId = useCallback((songId) => {
+    setSelectedSongRestored(false)
+    setSelectedSongIdState(songId)
+    if (selectedSongStorageKey) writeStorage(selectedSongStorageKey, songId)
+  }, [selectedSongStorageKey])
 
   useEffect(() => {
     let cancelled = false
@@ -192,6 +208,7 @@ export default function useUserLibrary({ libraryLoading, librarySongs, user }) {
     playlistsLoading,
     reorderPlaylist,
     selectedSongId,
+    selectedSongRestored,
     setTrackInPlaylist,
     setFavorite,
     setSelectedSongId,

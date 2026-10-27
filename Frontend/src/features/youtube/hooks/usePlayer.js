@@ -5,6 +5,7 @@ import { readStorage, writeStorage } from '../lib/storage.js';
 
 export const PLAY_EVENT = 'yotubei:play';
 export const PAUSE_EVENT = 'yotubei:pause';
+const PLAYER_STORAGE_KEY = 'mysic:youtube:player-song';
 
 let iframeApiPromise;
 
@@ -29,6 +30,8 @@ function loadIframeApi() {
 }
 
 export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChange }) {
+  const restoredSongRef = useRef(readStorage(PLAYER_STORAGE_KEY, null));
+  const restoringPausedSongRef = useRef(Boolean(restoredSongRef.current?.id));
   const audioRef = useRef(null);
   const iframeHostRef = useRef(null);
   const youtubeRef = useRef(null);
@@ -37,8 +40,8 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
   const youtubeReadyRef = useRef(false);
   const pendingVideoIdRef = useRef(null);
   const nextRef = useRef(() => {});
-  const [queue, setQueue] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(-1);
+  const [queue, setQueue] = useState(() => restoredSongRef.current?.id ? [restoredSongRef.current] : []);
+  const [currentIndex, setCurrentIndex] = useState(() => restoredSongRef.current?.id ? 0 : -1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
   const [playerError, setPlayerError] = useState('');
@@ -53,6 +56,7 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
 
   const playFrom = useCallback((list, index) => {
     if (!list || index < 0 || index >= list.length) return;
+    restoringPausedSongRef.current = false;
     setPlayerError('');
     setQueue(list);
     setCurrentIndex(index);
@@ -82,6 +86,7 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
 
   const togglePlay = useCallback(() => {
     if (!currentSong) return;
+    restoringPausedSongRef.current = false;
     if (isLocal) {
       const audio = audioRef.current;
       if (!audio) return;
@@ -124,13 +129,23 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
   }, [onPlayerVisibilityChange]);
 
   useEffect(() => {
+    writeStorage(PLAYER_STORAGE_KEY, currentSong?.id ? currentSong : null);
+    onPlayerVisibilityChange?.(Boolean(currentSong));
+  }, [currentSong, onPlayerVisibilityChange]);
+
+  useEffect(() => {
     if (!videoId || isLocal) return undefined;
     let cancelled = false;
     loadIframeApi().then((YT) => {
       if (cancelled || !iframeHostRef.current) return;
+      const restorePaused = restoringPausedSongRef.current;
       pendingVideoIdRef.current = videoId;
       if (youtubeRef.current?.loadVideoById && youtubeReadyRef.current) {
-        youtubeRef.current.loadVideoById(videoId);
+        if (restorePaused) {
+          youtubeRef.current.cueVideoById?.(videoId);
+          restoringPausedSongRef.current = false;
+          setIsBuffering(false);
+        } else youtubeRef.current.loadVideoById(videoId);
       } else if (!youtubeCreatingRef.current) {
         youtubeCreatingRef.current = true;
         const iframeMount = document.createElement('div');
@@ -140,7 +155,7 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
           height: 200,
           videoId,
           playerVars: {
-            autoplay: 1,
+            autoplay: restorePaused ? 0 : 1,
             controls: 0,
             enablejsapi: 1,
             playsinline: 1,
@@ -155,7 +170,11 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
               event.target.setVolume(Math.round(volumeRef.current * 100));
               const requestedVideoId = pendingVideoIdRef.current;
               pendingVideoIdRef.current = null;
-              if (requestedVideoId && requestedVideoId !== videoId) event.target.loadVideoById?.(requestedVideoId);
+              if (restorePaused && restoringPausedSongRef.current) {
+                event.target.cueVideoById?.(requestedVideoId || videoId);
+                restoringPausedSongRef.current = false;
+                setIsBuffering(false);
+              } else if (requestedVideoId && requestedVideoId !== videoId) event.target.loadVideoById?.(requestedVideoId);
               else event.target.playVideo?.();
             },
             onStateChange: (event) => {
@@ -201,7 +220,10 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
     youtubeRef.current?.pauseVideo?.();
     audio.src = localAudioUrl(videoId);
     audio.load();
-    audio.play().catch(() => setPlayerError('No se pudo reproducir el archivo descargado.'));
+    if (restoringPausedSongRef.current) {
+      restoringPausedSongRef.current = false;
+      setIsBuffering(false);
+    } else audio.play().catch(() => setPlayerError('No se pudo reproducir el archivo descargado.'));
   }, [videoId, isLocal]);
 
   useEffect(() => {

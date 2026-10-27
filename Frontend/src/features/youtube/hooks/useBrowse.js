@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { readIndexedSearch, writeIndexedSearch } from '../lib/searchIndex.js';
 import { rankSearchResult } from '../lib/searchRanking.js';
+import { readStorage, writeStorage } from '../lib/storage.js';
 import { useSearchHistory } from './useSearchHistory.js';
+
+const BROWSE_STORAGE_KEY = 'mysic:youtube:browse-view';
 
 const SEARCH_SECTIONS = [
   ['song', 'songs'],
@@ -63,6 +66,8 @@ export function useBrowse({ progressive = false } = {}) {
   const resultsRef = useRef(results);
   const viewRef = useRef(view);
   const viewHistoryRef = useRef([]);
+  const savedViewRef = useRef(readStorage(BROWSE_STORAGE_KEY, { kind: 'home' }));
+  const restoringViewRef = useRef(true);
 
   useEffect(() => {
     resultsRef.current = results;
@@ -356,12 +361,6 @@ export function useBrowse({ progressive = false } = {}) {
     id && openLanding('recommendations', (signal) => api.recommendations(id, signal))
   ), [openLanding]);
 
-  useEffect(() => {
-    showHome();
-    globalThis.addEventListener?.('mysic:global-home', showHome);
-    return () => globalThis.removeEventListener?.('mysic:global-home', showHome);
-  }, [showHome]);
-
   const openArtist = useCallback((id) => {
     if (!id || (viewRef.current.kind === 'artist' && viewRef.current.data?.id === id)) return;
     return openDetail('artist', (signal) => loadArtist(id, signal));
@@ -375,6 +374,47 @@ export function useBrowse({ progressive = false } = {}) {
     setError('');
     setView({ kind: 'downloads' });
   };
+
+  useEffect(() => {
+    if (restoringViewRef.current) return;
+
+    let savedView = null;
+    if (['home', 'explore', 'downloads'].includes(view.kind)) {
+      savedView = { kind: view.kind };
+    } else if (['artist', 'artist-songs', 'album'].includes(view.kind) && view.data?.id) {
+      savedView = { kind: view.kind, id: view.data.id };
+    } else if (view.kind === 'search' && (results?.query || query.trim())) {
+      savedView = { kind: 'search', query: results?.query || query.trim(), type: searchType };
+    }
+
+    if (savedView) writeStorage(BROWSE_STORAGE_KEY, savedView);
+  }, [query, results?.query, searchType, view.data?.id, view.kind]);
+
+  useEffect(() => {
+    const savedView = savedViewRef.current;
+    let restoreRequest;
+
+    if (savedView?.kind === 'artist' && savedView.id) restoreRequest = openArtist(savedView.id);
+    else if (savedView?.kind === 'artist-songs' && savedView.id) restoreRequest = openArtistSongs(savedView.id);
+    else if (savedView?.kind === 'album' && savedView.id) restoreRequest = openAlbum(savedView.id);
+    else if (savedView?.kind === 'explore') restoreRequest = showExplore();
+    else if (savedView?.kind === 'search' && savedView.query) {
+      const type = SEARCH_TABS.some((tab) => tab.type === savedView.type) ? savedView.type : 'all';
+      setSearchType(type);
+      restoreRequest = runSearch(savedView.query, type);
+    } else if (savedView?.kind === 'downloads') {
+      setView({ kind: 'downloads' });
+    } else restoreRequest = showHome();
+
+    Promise.resolve(restoreRequest).finally(() => {
+      restoringViewRef.current = false;
+    });
+  }, [openAlbum, openArtist, openArtistSongs, runSearch, showExplore, showHome]);
+
+  useEffect(() => {
+    globalThis.addEventListener?.('mysic:global-home', showHome);
+    return () => globalThis.removeEventListener?.('mysic:global-home', showHome);
+  }, [showHome]);
 
   const goBack = useCallback(() => {
     const previous = viewHistoryRef.current.pop();
@@ -407,6 +447,7 @@ export function useBrowse({ progressive = false } = {}) {
     error,
     view,
     history,
+    addToHistory: addHistory,
     removeFromHistory,
     runSearch,
     runGlobalSearch,

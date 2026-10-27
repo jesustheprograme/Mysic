@@ -97,6 +97,7 @@ export default function MusicSearchPanel({
   focusOnMount = false,
   history,
   onEntitySelect,
+  onHistoryAdd,
   onHistoryRemove,
   onPrefetch,
   onQueryChange,
@@ -171,9 +172,13 @@ export default function MusicSearchPanel({
     setOpen(false)
     inputRef.current?.blur()
 
-    if (row.kind === 'song' && row.song) onEntitySelect(row)
-    else if (row.kind === 'artist' || row.kind === 'album') onEntitySelect(row)
-    else {
+    if (row.kind === 'song' && row.song) {
+      onHistoryAdd?.(query.trim() || row.title)
+      onEntitySelect(row)
+    } else if (row.kind === 'artist' || row.kind === 'album') {
+      onHistoryAdd?.(query.trim() || row.title)
+      onEntitySelect(row)
+    } else {
       onQueryChange(row.title)
       onSubmit(row.title)
     }

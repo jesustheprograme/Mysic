@@ -326,6 +326,7 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
           focusOnMount={focusHeaderSearch}
           history={browse.history}
           onEntitySelect={selectSearchEntity}
+          onHistoryAdd={browse.addToHistory}
           onHistoryRemove={browse.removeFromHistory}
           onPrefetch={browse.prefetchSearch}
           onQueryChange={browse.setQuery}

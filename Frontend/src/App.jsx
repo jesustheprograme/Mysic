@@ -39,7 +39,7 @@ function MainApp() {
   const {
     createPlaylist, deletePlaylist, favoritesError, favoritesLoading,
     likedAlbumIds, likedArtistIds, likedSongIds, playlists, playlistsError, playlistsLoading,
-    reorderPlaylist, selectedSongId, setFavorite, setSelectedSongId, setTrackInPlaylist,
+    reorderPlaylist, selectedSongId, selectedSongRestored, setFavorite, setSelectedSongId, setTrackInPlaylist,
     updatePlaylist,
   } = library
 
@@ -107,6 +107,7 @@ function MainApp() {
         searchQuery={searchQuery}
         searchSongs={searchSongs}
         selectedSongId={selectedSongId}
+        selectedSongRestored={selectedSongRestored}
         songs={librarySongs}
         user={auth.user}
       />

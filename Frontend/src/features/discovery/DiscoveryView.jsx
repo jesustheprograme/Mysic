@@ -34,6 +34,8 @@ import {
   getFollowingSongs,
   getPlaylistIdFromHash,
   getSectionFromHash,
+  rememberRouteHash,
+  restoreLastRoute,
   sectionHashes,
   shuffleSongs,
 } from './utilidades/navegacionDescubrimiento.js'
@@ -259,6 +261,7 @@ function useDiscoveryNavigation({
     if (window.location.hash !== nextHash) {
       window.history.pushState({ previousAppHash: window.location.hash || fallbackHash }, '', nextHash)
     }
+    rememberRouteHash(nextHash)
   }
 
   function resetDetailIds() {
@@ -364,11 +367,13 @@ function useDiscoveryPage({
   searchQuery,
   searchSongs,
   selectedSongId,
+  selectedSongRestored,
   songs,
   user,
 }) {
   const mayImportMusic = canImportMusic(user)
   const [activeSection, setActiveSection] = useState(() => {
+    restoreLastRoute()
     const requestedSection = getSectionFromHash()
     return requestedSection === 'import' && !mayImportMusic ? 'home' : requestedSection
   })
@@ -493,6 +498,7 @@ function useDiscoveryPage({
       setActiveAlbumId(getAlbumIdFromHash)
       setActiveArtistId(getArtistIdFromHash)
       setActivePlaylistId(getPlaylistIdFromHash)
+      rememberRouteHash()
     }
 
     window.addEventListener('hashchange', syncSectionFromHash)
@@ -1013,6 +1019,7 @@ function useDiscoveryPage({
         <Suspense fallback={null}>
           <PlayerDock
           animationNonce={playerAnimationNonce}
+          autoPlay={!selectedSongRestored}
           collapsed={playerCollapsed}
           fadeInNonce={playerFadeInNonce}
           isLoading={discoveryLoading}

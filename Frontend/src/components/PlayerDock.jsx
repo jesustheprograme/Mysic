@@ -157,7 +157,7 @@ function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = fal
   )
 }
 
-function useAudioPlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0, isLoading = false, onAnalyserChange, onNext, onPlaybackChange, onPlaybackStateChange, onPrevious, playbackToggleNonce, queue, track }) {
+function useAudioPlayerDock({ animationNonce, autoPlay = true, collapsed = false, fadeInNonce = 0, isLoading = false, onAnalyserChange, onNext, onPlaybackChange, onPlaybackStateChange, onPrevious, playbackToggleNonce, queue, track }) {
   const PAUSE_FADE_DURATION_MS = 400
   const START_FADE_DURATION_MS = 1200
   const waveformRef = useRef(null)
@@ -394,6 +394,12 @@ function useAudioPlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0
         setDuration(nextDuration)
         setCurrentTime(0)
         notifyPlaybackState({ currentTime: 0, duration: nextDuration })
+        if (!autoPlay) {
+          fadeInPendingRef.current = false
+          setOutputVolume(volumeRef.current)
+          updatePlaybackState(false)
+          return
+        }
         waveSurfer.play().then(() => {
           fadeInPendingRef.current = false
           if (shouldFadeIn) startFadeIn(waveSurfer)
@@ -445,7 +451,7 @@ function useAudioPlayerDock({ animationNonce, collapsed = false, fadeInNonce = 0
       media.remove()
       if (waveSurferRef.current === waveSurfer) waveSurferRef.current = null
     }
-  }, [fadeInNonce, hasAudio, isLoading, notifyPlaybackState, setOutputVolume, startFadeIn, stopPauseFade, track.audioUrl, track.durationSeconds, track.id, updatePlaybackState])
+  }, [autoPlay, fadeInNonce, hasAudio, isLoading, notifyPlaybackState, setOutputVolume, startFadeIn, stopPauseFade, track.audioUrl, track.durationSeconds, track.id, updatePlaybackState])
 
   useEffect(() => {
     const previousTrack = previousTrackRef.current
