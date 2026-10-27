@@ -252,11 +252,11 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
   function selectSearchEntity(entity) {
     if (entity.kind === 'song' && entity.song) player.playFrom([entity.song], 0)
     if (entity.kind === 'artist') {
-      onSearchNavigate?.()
+      if (!active) onSearchNavigate?.()
       openArtist(entity.id)
     }
     if (entity.kind === 'album') {
-      onSearchNavigate?.()
+      if (!active) onSearchNavigate?.()
       openAlbum(entity.id)
     }
   }

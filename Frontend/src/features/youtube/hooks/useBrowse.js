@@ -60,8 +60,13 @@ export function useBrowse({ progressive = false } = {}) {
   const searchSequenceRef = useRef(0);
   const sectionRequestsRef = useRef(new Map());
   const searchContextRef = useRef(null);
+  const resultsRef = useRef(results);
   const viewRef = useRef(view);
   const viewHistoryRef = useRef([]);
+
+  useEffect(() => {
+    resultsRef.current = results;
+  }, [results]);
 
   useEffect(() => {
     viewRef.current = view;
@@ -147,9 +152,18 @@ export function useBrowse({ progressive = false } = {}) {
     detailControllerRef.current = null;
     viewHistoryRef.current = [];
     const current = searchContextRef.current;
-    if (current?.pending && current.type === type
+    const repeatsCurrentSearch = current?.type === type
       && current.query.toLocaleLowerCase() === trimmed.toLocaleLowerCase()
-      && current.sequence === searchSequenceRef.current && !current.controller.signal.aborted) return;
+      && current.sequence === searchSequenceRef.current
+      && !current.controller.signal.aborted;
+    if (repeatsCurrentSearch && current.pending) return;
+    if (repeatsCurrentSearch && hasResults(resultsRef.current)) {
+      setQuery(trimmed);
+      setError('');
+      setView({ kind: 'search' });
+      addHistory(trimmed);
+      return;
+    }
 
     searchControllerRef.current?.abort();
     enrichmentCancelRef.current?.();
@@ -348,7 +362,10 @@ export function useBrowse({ progressive = false } = {}) {
     return () => globalThis.removeEventListener?.('mysic:global-home', showHome);
   }, [showHome]);
 
-  const openArtist = useCallback((id) => id && openDetail('artist', (signal) => loadArtist(id, signal)), [openDetail]);
+  const openArtist = useCallback((id) => {
+    if (!id || (viewRef.current.kind === 'artist' && viewRef.current.data?.id === id)) return;
+    return openDetail('artist', (signal) => loadArtist(id, signal));
+  }, [openDetail]);
   const openArtistSongs = useCallback((id) => id && openDetail('artist-songs', (signal) => api.artistSongs(id, signal)), [openDetail]);
   const openAlbum = useCallback((id) => id && openDetail('album', (signal) => api.album(id, signal)), [openDetail]);
 

@@ -108,11 +108,21 @@ export default function MusicSearchPanel({
   const [activeIndex, setActiveIndex] = useState(-1)
   const rootRef = useRef(null)
   const inputRef = useRef(null)
+  const suggestionsCacheRef = useRef(new Map())
   const listboxId = useId()
   const loadSuggestions = useEffectEvent((searchQuery, signal) => {
+    const cacheKey = searchQuery.toLocaleLowerCase()
+    const cached = suggestionsCacheRef.current.get(cacheKey)
+    if (cached) {
+      setSuggestions(cached)
+      setActiveIndex(-1)
+      return
+    }
+
     onPrefetch?.(searchQuery)
     api.suggest(searchQuery, signal)
       .then((data) => {
+        suggestionsCacheRef.current.set(cacheKey, data)
         setSuggestions(data)
         setActiveIndex(-1)
         const primaryArtist = data.entities?.find((entity) => entity.kind === 'artist' && entity.id)
@@ -157,14 +167,16 @@ export default function MusicSearchPanel({
   const { entityGroups, featured, rows } = buildSearchModel(suggestions, history, hasQuery)
 
   function choose(row) {
+    setActiveIndex(-1)
+    setOpen(false)
+    inputRef.current?.blur()
+
     if (row.kind === 'song' && row.song) onEntitySelect(row)
     else if (row.kind === 'artist' || row.kind === 'album') onEntitySelect(row)
     else {
       onQueryChange(row.title)
       onSubmit(row.title)
     }
-    setActiveIndex(-1)
-    setOpen(false)
   }
 
   function handleKeyDown(event) {
@@ -202,6 +214,7 @@ export default function MusicSearchPanel({
           if (!query.trim()) return
           onSubmit(query)
           setOpen(false)
+          inputRef.current?.blur()
         }}
       >
         <Search size={21} strokeWidth={1.8} aria-hidden="true" />
