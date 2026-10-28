@@ -138,6 +138,11 @@ export function getFollowingSongs(songs, selectedSongId, count = 10) {
   ))
 }
 
+export function getPlaybackQueue(songs, selectedSongId) {
+  if (!selectedSongId || !songs.some((song) => song.id === selectedSongId)) return []
+  return songs
+}
+
 export function shuffleSongs(songs) {
   const shuffledSongs = [...songs]
 

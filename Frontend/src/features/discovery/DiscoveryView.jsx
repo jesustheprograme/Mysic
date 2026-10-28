@@ -32,6 +32,7 @@ import {
   getAlbumIdFromHash,
   getArtistIdFromHash,
   getFollowingSongs,
+  getPlaybackQueue,
   getPlaylistIdFromHash,
   getSectionFromHash,
   rememberRouteHash,
@@ -410,7 +411,7 @@ function useDiscoveryPage({
   const activeRouteKey = `${activeSection}-${activePlaylistId ?? activeAlbumId ?? activeArtistId ?? ''}`
   const selectedSong = resolveSelectedSong(selectedSongContext, selectedSongId, songs)
   const playbackSongs = discoveryMix.length ? discoveryMix : songs
-  const nextSongs = getFollowingSongs(playbackSongs, selectedSongId)
+  const playbackQueue = getPlaybackQueue(playbackSongs, selectedSongId)
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase()
   const filteredSongs = normalizedQuery ? searchSongs : songs
 
@@ -1051,7 +1052,7 @@ function useDiscoveryPage({
           onToggleFavorite={(liked) => onToggleFavorite?.(selectedSong.id, liked)}
           onToggleCollapsed={() => setPlayerCollapsed((collapsed) => !collapsed)}
           playbackToggleNonce={playbackToggleNonce}
-          queue={nextSongs}
+          queue={playbackQueue}
           suppressed={Boolean(spotlightArtist) || youtubePlayerVisible}
           track={selectedSong}
           />
