@@ -36,6 +36,7 @@ import {
   getPlaylistIdFromHash,
   getSectionFromHash,
   rememberRouteHash,
+  resolvePlaybackSongs,
   restoreLastRoute,
   sectionHashes,
   shuffleSongs,
@@ -205,7 +206,11 @@ function useSongSelection({
     const currentIndex = playbackSongs.findIndex((song) => song.id === selectedSongId)
     const startIndex = currentIndex >= 0 ? currentIndex : 0
     const nextIndex = (startIndex + offset + playbackSongs.length) % playbackSongs.length
-    selectSong(playbackSongs[nextIndex].id, { animatePlayer: false, contextSong: playbackSongs[nextIndex], preserveDiscoveryMix: true })
+    selectSong(playbackSongs[nextIndex].id, {
+      animatePlayer: false,
+      contextSong: playbackSongs[nextIndex],
+      contextSongs: playbackSongs,
+    })
   }
 
   function startWeeklyDiscovery() {
@@ -235,7 +240,7 @@ function useMiniPlayerCommandListener({ playbackSongs, selectRelativeSong, selec
       selectSong(command.songId, {
         animatePlayer: false,
         contextSong: playbackSongs.find((song) => song.id === command.songId) ?? null,
-        preserveDiscoveryMix: true,
+        contextSongs: playbackSongs,
       })
     }
   })
@@ -409,9 +414,6 @@ function useDiscoveryPage({
   const scrollPositionsRef = useRef(new Map())
   const mobileBrandHiddenRef = useRef(false)
   const activeRouteKey = `${activeSection}-${activePlaylistId ?? activeAlbumId ?? activeArtistId ?? ''}`
-  const selectedSong = resolveSelectedSong(selectedSongContext, selectedSongId, songs)
-  const playbackSongs = discoveryMix.length ? discoveryMix : songs
-  const playbackQueue = getPlaybackQueue(playbackSongs, selectedSongId)
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase()
   const filteredSongs = normalizedQuery ? searchSongs : songs
 
@@ -480,6 +482,13 @@ function useDiscoveryPage({
     .toSorted((first, second) => Number(second.pinned) - Number(first.pinned))
     .map((playlist) => ({ ...playlist, meta: `${getPlaylistTrackCount(playlist)} canciones` }))
   const activePlaylist = playlistsWithArtwork.find((playlist) => playlist.id === activePlaylistId) ?? null
+  const activePlaylistSongs = activePlaylist ? resolvePlaylistSongs(activePlaylist, songs) : []
+  const restoredPlaylistSongs = selectedSongRestored && activeSection === 'playlist'
+    ? activePlaylistSongs
+    : []
+  const selectedSong = resolveSelectedSong(selectedSongContext, selectedSongId, songs)
+  const playbackSongs = resolvePlaybackSongs(songs, discoveryMix, restoredPlaylistSongs, selectedSongId)
+  const playbackQueue = getPlaybackQueue(playbackSongs, selectedSongId)
   const activeAlbum = allAlbumItems.find((album) => album.id === activeAlbumId) ?? null
   const allArtistItems = createArtistItems(songs)
   const activeArtistItem = allArtistItems.find((artist) => artist.artistId === activeArtistId) ?? null
@@ -1046,7 +1055,7 @@ function useDiscoveryPage({
           onQueueSelect={(songId) => selectSong(songId, {
             animatePlayer: false,
             contextSong: playbackSongs.find((song) => song.id === songId) ?? null,
-            preserveDiscoveryMix: true,
+            contextSongs: playbackSongs,
           })}
           liked={likedSongIds?.has(selectedSong.id)}
           onToggleFavorite={(liked) => onToggleFavorite?.(selectedSong.id, liked)}

@@ -143,6 +143,12 @@ export function getPlaybackQueue(songs, selectedSongId) {
   return songs
 }
 
+export function resolvePlaybackSongs(catalogSongs, contextSongs, restoredSongs, selectedSongId) {
+  if (contextSongs.length) return contextSongs
+  if (restoredSongs.some((song) => song.id === selectedSongId)) return restoredSongs
+  return catalogSongs
+}
+
 export function shuffleSongs(songs) {
   const shuffledSongs = [...songs]
 
