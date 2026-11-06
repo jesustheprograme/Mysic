@@ -113,17 +113,12 @@ export default function FilaCancionOrdenable({
       easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
     },
   })
+  // Solo la transición que dnd-kit pide mientras se reordena. Antes se añadían aquí seis transiciones
+  // más en línea (color, fondo, sombra, opacidad, contorno, escala): al ser estilos en línea ganaban
+  // a cualquier CSS y cada fila de la lista las animaba. Las filas de una lista no deben animarse.
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition: [
-      transition,
-      'color 180ms ease',
-      'background-color 220ms ease',
-      'box-shadow 260ms ease',
-      'opacity 220ms ease',
-      'outline-color 220ms ease',
-      'scale 260ms cubic-bezier(0.22, 1, 0.36, 1)',
-    ].filter(Boolean).join(', '),
+    transition: transition || undefined,
   }
   const className = [
     'collection-detail__track',

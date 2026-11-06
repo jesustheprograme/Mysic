@@ -117,6 +117,7 @@ function CollectionDetailView({
         activeTrackRef={activeTrack.activeTrackRef}
         albumTrackNumbers={albumTrackNumbers}
         likedSongIds={likedSongIds}
+        metricsRef={activeTrack.metricsRef}
         onAddToPlaylist={onAddToPlaylist}
         onAlbumSelect={onAlbumSelect}
         onArtistSelect={onArtistSelect}
