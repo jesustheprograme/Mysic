@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { applyHomeLayout, DEFAULT_LAYOUT, moveKey, sanitizeLayout, setAllHidden, shelfKey, toggleHidden, withOrder } from './homeLayout.js'
+import { applyHomeLayout, chooseShelfLayout, DEFAULT_LAYOUT, moveKey, sanitizeLayout, setAllHidden, shelfKey, toggleHidden, withOrder } from './homeLayout.js'
 
 const shelves = [
   { title: 'Trending' },
@@ -46,6 +46,24 @@ test('ocultar y mostrar todo', () => {
 test('una sección repetida solo cuenta una vez', () => {
   const { sections } = applyHomeLayout([{ title: 'Trending' }, { title: 'trending' }], DEFAULT_LAYOUT)
   assert.equal(sections.length, 1)
+})
+
+test('cada sección elige su formato según el contenido', () => {
+  const songs = [{ kind: 'song' }, { kind: 'song' }]
+  assert.equal(chooseShelfLayout({ title: 'Listen again', items: [{ kind: 'album' }, { kind: 'song' }] }), 'tiles')
+  assert.equal(chooseShelfLayout({ title: 'Quick picks', items: songs }), 'songs')
+  assert.equal(chooseShelfLayout({ title: 'Forgotten favorites', items: songs }), 'songs')
+  assert.equal(chooseShelfLayout({ title: 'Familiar artists', items: [{ kind: 'artist' }] }), 'artists')
+  assert.equal(chooseShelfLayout({ title: 'From the community', items: [{ kind: 'playlist' }] }), 'community')
+  assert.equal(chooseShelfLayout({ title: 'From the community', items: [{ kind: 'playlist' }, { kind: 'song' }] }), 'rail')
+  assert.equal(chooseShelfLayout({ title: 'Albums for you', items: [{ kind: 'album' }, { kind: 'playlist' }] }), 'rail')
+  assert.equal(chooseShelfLayout({ title: 'Listen again', items: [] }), 'rail')
+  assert.equal(chooseShelfLayout({ title: 'x', items: [] }), 'rail')
+})
+
+test('el panel recibe el formato de cada sección', () => {
+  const { sections } = applyHomeLayout([{ title: 'Quick picks', items: [{ kind: 'song' }] }], DEFAULT_LAYOUT)
+  assert.equal(sections[0].kind, 'songs')
 })
 
 test('moveKey respeta los extremos', () => {

@@ -40,6 +40,24 @@ const DEFAULT_ORDER = [
 
 const rankOf = new Map(DEFAULT_ORDER.map((key, index) => [key, index]))
 
+/**
+ * Cómo se pinta una sección según lo que contiene (igual que limusic, que no usa un único formato):
+ *  - tiles: atajos compactos (miniatura + texto) para "Volver a escuchar"
+ *  - songs: filas de canciones en columnas, con "Reproducir todo"
+ *  - community: tarjetas de playlist con sus canciones
+ *  - artists / rail: carrusel de portadas (artistas redondos, o álbumes/playlists/mezclas)
+ */
+export function chooseShelfLayout(shelf) {
+  const items = shelf?.items ?? []
+  const key = shelfKey(shelf?.title)
+  const all = (kind) => items.length > 0 && items.every((item) => item.kind === kind)
+  if (key === 'volver a escuchar' && items.length > 0) return 'tiles'
+  if (key === 'de la comunidad' && all('playlist')) return 'community'
+  if (all('song')) return 'songs'
+  if (all('artist')) return 'artists'
+  return 'rail'
+}
+
 /** Clave estable de una sección: el título ya traducido y en minúsculas (igual en inglés o español). */
 export function shelfKey(title) {
   return String(translateShelfTitle(title) ?? '').trim().toLocaleLowerCase()
@@ -84,6 +102,7 @@ export function applyHomeLayout(shelves, layout) {
   const sections = resolveOrder([...byKey.keys()], layout).map((key) => ({
     hidden: hidden.has(key),
     key,
+    kind: chooseShelfLayout(byKey.get(key)),
     shelf: byKey.get(key),
     title: translateShelfTitle(byKey.get(key).title),
   }))

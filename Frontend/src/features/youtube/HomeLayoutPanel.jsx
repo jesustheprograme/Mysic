@@ -4,6 +4,7 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, LayoutGrid, RotateCcw, Check, X } from 'lucide-react'
 import { useEffect } from 'react'
+import { SectionIcon } from './ShelfLayouts.jsx'
 import { CARD_SIZES, setAllHidden, toggleHidden, withOrder } from './homeLayout.js'
 import './home-layout.css'
 
@@ -23,6 +24,7 @@ function SectionRow({ section, onToggle }) {
       <button className="hl-row__handle" type="button" ref={setActivatorNodeRef} aria-label={`Mover ${section.title}. Usa espacio y las flechas del teclado.`} {...attributes} {...listeners}>
         <GripVertical size={16} aria-hidden="true" />
       </button>
+      <SectionIcon kind={section.kind} size={16} />
       <span className="hl-row__title">{section.title}</span>
       <button className="hl-switch" type="button" role="switch" aria-checked={!section.hidden} aria-label={`Mostrar ${section.title}`} onClick={() => onToggle(section.key)} />
     </li>

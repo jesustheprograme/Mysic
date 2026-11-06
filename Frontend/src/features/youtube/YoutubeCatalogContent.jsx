@@ -6,7 +6,8 @@ import CollectionDetailView from '../collections/CollectionDetailView.jsx'
 import CatalogSearchControls from '../discovery/CatalogSearchControls.jsx'
 import HomeRail from '../discovery/HomeRail.jsx'
 import CommunityShelf from './CommunityShelf.jsx'
-import { applyHomeLayout, CARD_SIZES, DEFAULT_LAYOUT, shelfKey } from './homeLayout.js'
+import { applyHomeLayout, CARD_SIZES, chooseShelfLayout, DEFAULT_LAYOUT } from './homeLayout.js'
+import { SectionIcon, SongShelf, TileShelf } from './ShelfLayouts.jsx'
 import { prefetchHandlers } from './prefetchDetail.js'
 import { translateShelfTitle } from './shelfTitles.js'
 import useHomeLayout from './useHomeLayout.js'
@@ -218,45 +219,48 @@ function CatalogNavigation({ controller, editingHome = false, onEditHome }) {
   )
 }
 
-const COMMUNITY_KEY = 'de la comunidad'
-
 function BrowseShelves({ controller, shelves }) {
   const { openAlbum, openArtist, openPlaylist, player, playSongs, startPlaylist } = controller
   if (!shelves.length) return <div className="collection-empty">No hay recomendaciones disponibles por ahora.</div>
-  return shelves.map((shelf) => (shelfKey(shelf.title) === COMMUNITY_KEY && shelf.items.every((item) => item.kind === 'playlist')
-    ? (
-      <CommunityShelf
-        currentSongId={player.currentSong?.id}
+
+  // Misma lógica de selección para cualquier formato: una canción suena, lo demás se abre.
+  const selectItem = (shelf, id) => {
+    const item = shelf.items.find((entry) => entry.id === id)
+    if (item?.kind === 'song') playSongs(shelf.items.filter((entry) => entry.kind === 'song'), id)
+    if (item?.kind === 'artist') openArtist(id)
+    if (item?.kind === 'album') openAlbum(id)
+    if (item?.kind === 'playlist') openPlaylist(id)
+  }
+
+  return shelves.map((shelf) => {
+    const key = `${shelf.title}-${shelf.items[0]?.id}`
+    const title = translateShelfTitle(shelf.title)
+    const kind = chooseShelfLayout(shelf)
+    if (kind === 'community') {
+      return <CommunityShelf currentSongId={player.currentSong?.id} items={shelf.items.map(adaptBrowseItem)} key={key} onOpen={openPlaylist} onPlayPlaylist={startPlaylist} onPlaySong={playSongs} title={title} />
+    }
+    if (kind === 'songs') return <SongShelf controller={controller} items={shelf.items} key={key} title={title} />
+    if (kind === 'tiles') {
+      return <TileShelf items={shelf.items.map(adaptBrowseItem)} key={key} onSelect={(item) => selectItem(shelf, item.id)} selectedId={player.currentSong?.id} title={title} />
+    }
+    return (
+      <HomeRail
+        icon={<SectionIcon kind={kind} />}
         items={shelf.items.map(adaptBrowseItem)}
-        key={`${shelf.title}-${shelf.items[0]?.id}`}
-        onOpen={openPlaylist}
-        onPlayPlaylist={startPlaylist}
-        onPlaySong={playSongs}
-        title={translateShelfTitle(shelf.title)}
+        key={key}
+        {...intentProps((item) => shelf.items.find((entry) => entry.id === item.id)?.kind)}
+        onArtistSelect={openArtist}
+        onDetailSelect={openAlbum}
+        onPlaybackToggle={player.togglePlay}
+        onSelect={(id) => selectItem(shelf, id)}
+        selectedId={player.currentSong?.id}
+        selectedItemPlaying={player.isPlaying}
+        title={title}
+        variant={kind === 'artists' ? 'artist' : 'default'}
       />
     )
-    : <HomeRail
-      items={shelf.items.map(adaptBrowseItem)}
-      key={`${shelf.title}-${shelf.items[0]?.id}`}
-      {...intentProps((item) => shelf.items.find((entry) => entry.id === item.id)?.kind)}
-      onArtistSelect={openArtist}
-      onDetailSelect={openAlbum}
-      onPlaybackToggle={player.togglePlay}
-      onSelect={(id) => {
-        const item = shelf.items.find((entry) => entry.id === id)
-        if (item?.kind === 'song') playSongs(shelf.items.filter((entry) => entry.kind === 'song'), id)
-        if (item?.kind === 'artist') openArtist(id)
-        if (item?.kind === 'album') openAlbum(id)
-        if (item?.kind === 'playlist') openPlaylist(id)
-      }}
-      selectedId={player.currentSong?.id}
-      selectedItemPlaying={player.isPlaying}
-      title={translateShelfTitle(shelf.title)}
-      variant={shelf.items.every((item) => item.kind === 'artist') ? 'artist' : 'default'}
-    />
-  ))
+  })
 }
-
 function LandingView({ controller }) {
   const { browse } = controller
   const isHome = browse.view.kind === 'home'

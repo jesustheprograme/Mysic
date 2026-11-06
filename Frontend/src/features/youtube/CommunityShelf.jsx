@@ -1,6 +1,7 @@
 import { Play } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { usePlaylistPreview } from './playlistPreview.js'
+import { ShelfHeading } from './ShelfLayouts.jsx'
 import './community-shelf.css'
 
 const SONGS_PER_CARD = 3
@@ -81,7 +82,7 @@ export default function CommunityShelf({ currentSongId, items, onOpen, onPlayPla
   const id = 'community-shelf-title'
   return (
     <section className="home-shelf cs-shelf" aria-labelledby={id}>
-      <div className="home-shelf__heading"><h2 id={id}>{title}</h2></div>
+      <ShelfHeading id={id} kind="community" title={title} />
       <div className="cs-grid">
         {items.map((item) => (
           <CommunityCard currentSongId={currentSongId} item={item} key={item.id} onOpen={onOpen} onPlayPlaylist={onPlayPlaylist} onPlaySong={onPlaySong} />

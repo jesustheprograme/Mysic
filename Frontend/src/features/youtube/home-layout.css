@@ -108,13 +108,16 @@
 
 .hl-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  padding: 0 14px 0 6px;
-  min-height: 46px;
+  padding: 0 14px 0 4px;
+  min-height: 40px;
   background: #0d1110;
 }
+
+.hl-row .sl-icon { opacity: 0.9; }
+.hl-row--hidden .sl-icon { opacity: 0.35; }
 
 .hl-row + .hl-row { border-top: 1px solid oklch(1 0 0 / 0.07); }
 .hl-row--dragging { position: relative; z-index: 2; background: #151a19; box-shadow: 0 6px 18px rgb(0 0 0 / 0.5); }
@@ -122,7 +125,7 @@
 
 .hl-row__handle { width: 28px; height: 32px; display: grid; place-items: center; color: #6c7571; cursor: grab; touch-action: none; }
 .hl-row__handle:hover { color: #d4d9d6; }
-.hl-row__title { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.hl-row__title { overflow: hidden; font-size: 13.5px; text-overflow: ellipsis; white-space: nowrap; }
 
 .hl-switch {
   position: relative;

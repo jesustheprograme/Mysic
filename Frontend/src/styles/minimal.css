@@ -385,9 +385,17 @@
 }
 
 .music-app .home-page .home-shelf__heading h2 {
-  font-size: 18px;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 17px;
+  font-weight: 650;
 }
+
+.music-app .home-page .home-shelf__heading { min-height: 30px; margin-bottom: 10px; }
+
+/* Secciones más juntas: el ritmo lo marcan los títulos, no el espacio en blanco. */
+.music-app .home-page.yt-landing { gap: 28px; }
 
 .music-app .home-page .home-shelf-card__meta {
   gap: 2px;

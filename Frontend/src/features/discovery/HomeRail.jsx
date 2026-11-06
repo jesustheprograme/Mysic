@@ -5,6 +5,7 @@ import PreviewIndicator from '../../components/PreviewIndicator.jsx'
 function HomeRail({
   emptyMessage = 'Todavía no hay elementos.',
   headingAction,
+  icon,
   items,
   onIntent,
   onIntentEnd,
@@ -30,7 +31,7 @@ function HomeRail({
   return (
     <section className={`home-shelf${variant === 'artist' ? ' home-shelf--artists' : ''}`} aria-labelledby={`${title.toLocaleLowerCase().replaceAll(' ', '-')}-title`}>
       <div className="home-shelf__heading">
-        <h2 id={`${title.toLocaleLowerCase().replaceAll(' ', '-')}-title`}>{title}</h2>
+        <h2 id={`${title.toLocaleLowerCase().replaceAll(' ', '-')}-title`}>{icon}{title}</h2>
         {headingAction ?? (items.length > 0 && (
           <div className="home-shelf__actions">
             <span>Ver todo</span>
