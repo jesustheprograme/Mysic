@@ -5,6 +5,7 @@ import ArtistView from '../collections/ArtistView.jsx'
 import CollectionDetailView from '../collections/CollectionDetailView.jsx'
 import CatalogSearchControls from '../discovery/CatalogSearchControls.jsx'
 import HomeRail from '../discovery/HomeRail.jsx'
+import { prefetchHandlers } from './prefetchDetail.js'
 import SongList from '../discovery/SongList.jsx'
 import { adaptAlbum, adaptArtist, adaptBrowseItem, adaptReleases, adaptSong } from './lib/adapters.js'
 
@@ -34,9 +35,18 @@ function SongResults({ controller, sourceSongs, title = 'Canciones' }) {
   )
 }
 
+function intentProps(kindOf) {
+  return {
+    onIntent: (item) => prefetchHandlers(kindOf(item), item.id).start?.(),
+    onIntentEnd: (item) => prefetchHandlers(kindOf(item), item.id).stop?.(),
+  }
+}
+
+const searchRailKind = (variant) => () => (variant === 'artist' ? 'artist' : 'album')
+
 function SearchRail({ emptyMessage, items, onSelect, title, variant }) {
   if (!items) return null
-  return <HomeRail emptyMessage={emptyMessage} items={items} onSelect={onSelect} title={title} variant={variant} />
+  return <HomeRail emptyMessage={emptyMessage} items={items} onSelect={onSelect} title={title} variant={variant} {...intentProps(searchRailKind(variant))} />
 }
 
 function getGroupedResults(results) {
@@ -212,6 +222,7 @@ function BrowseShelves({ controller, data }) {
     <HomeRail
       items={shelf.items.map(adaptBrowseItem)}
       key={`${shelf.title}-${shelf.items[0]?.id}`}
+      {...intentProps((item) => shelf.items.find((entry) => entry.id === item.id)?.kind)}
       onArtistSelect={openArtist}
       onDetailSelect={openAlbum}
       onPlaybackToggle={player.togglePlay}

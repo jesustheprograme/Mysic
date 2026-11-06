@@ -34,6 +34,7 @@ const { getConfig } = require('./src/config')
 const { checkDatabaseHealth, closeDatabase, connectDatabase } = require('./src/database')
 const { checkPrismaHealth, closePrisma, connectPrisma } = require('./src/prisma')
 const { YOUTUBE_USER_PATHS } = require('./src/youtube/authPaths')
+const { artistCacheHeaders } = require('./src/cache-headers')
 
 const app = express()
 let server
@@ -169,7 +170,7 @@ async function start() {
   app.use(['/api/youtube/link', '/api/youtube/account'], youtubeHomeCache.invalidateOnWrite)
   app.get('/api/youtube/home', youtubeHomeCache.middleware)
 
-  app.use('/api/youtube', createYoutubeRouter())
+  app.use('/api/youtube', artistCacheHeaders, createYoutubeRouter())
 
   app.post('/api/auth/register', authLimiter, auth.register)
   app.post('/api/auth/login', authLimiter, auth.login)

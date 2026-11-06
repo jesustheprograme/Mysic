@@ -6,6 +6,8 @@ function HomeRail({
   emptyMessage = 'Todavía no hay elementos.',
   headingAction,
   items,
+  onIntent,
+  onIntentEnd,
   onPlaybackToggle,
   onArtistSelect,
   onDetailSelect,
@@ -64,8 +66,17 @@ function HomeRail({
                 aria-label={onSelect ? `Abrir ${item.title}${item.artist ? ` de ${item.artist}` : ''}` : item.title}
                 aria-pressed={onSelect ? isSelected : undefined}
                 onClick={selectItem}
-                onPointerEnter={() => item.audioUrl && !isSelected && onPreviewStart?.(item)}
-                onPointerLeave={onPreviewStop}
+                onPointerEnter={() => {
+                  if (item.audioUrl && !isSelected) onPreviewStart?.(item)
+                  onIntent?.(item)
+                }}
+                onPointerLeave={() => {
+                  onPreviewStop?.()
+                  onIntentEnd?.(item)
+                }}
+                onPointerDown={() => onIntent?.(item)}
+                onFocus={() => onIntent?.(item)}
+                onBlur={() => onIntentEnd?.(item)}
               >
                 <span className={`home-shelf-card__visual${item.artwork ? '' : ' home-shelf-card__visual--empty'}`}>
                   {item.artwork && <img src={item.artwork} alt="" loading={index < 3 ? 'eager' : 'lazy'} decoding="async" />}
