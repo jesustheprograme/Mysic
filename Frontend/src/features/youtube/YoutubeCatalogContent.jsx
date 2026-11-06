@@ -1,13 +1,19 @@
-import { Check, Compass, Copy, Download, ExternalLink, Heart, Headphones, Info, Library, Link2Off, ListMusic, LoaderCircle, Play, RefreshCw, Sparkles, UserRound, WifiOff } from 'lucide-react'
-import { useState } from 'react'
+import { Check, Compass, Copy, Download, ExternalLink, Heart, Headphones, LayoutGrid, Library, Link2, Link2Off, ListMusic, LoaderCircle, Play, Sparkles, UserRound, WifiOff } from 'lucide-react'
+import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import ArtistSongsView from '../collections/ArtistSongsView.jsx'
 import ArtistView from '../collections/ArtistView.jsx'
 import CollectionDetailView from '../collections/CollectionDetailView.jsx'
 import CatalogSearchControls from '../discovery/CatalogSearchControls.jsx'
 import HomeRail from '../discovery/HomeRail.jsx'
+import CommunityShelf from './CommunityShelf.jsx'
+import { applyHomeLayout, CARD_SIZES, DEFAULT_LAYOUT, shelfKey } from './homeLayout.js'
 import { prefetchHandlers } from './prefetchDetail.js'
+import { translateShelfTitle } from './shelfTitles.js'
+import useHomeLayout from './useHomeLayout.js'
 import SongList from '../discovery/SongList.jsx'
 import { adaptAlbum, adaptArtist, adaptBrowseItem, adaptReleases, adaptSong } from './lib/adapters.js'
+
+const HomeLayoutPanel = lazy(() => import('./HomeLayoutPanel.jsx'))
 
 const ignorePreview = () => {}
 
@@ -153,7 +159,7 @@ function AccountActions({ account, busy, onDisconnect, pending }) {
   return null
 }
 
-function AccountHelp({ account, busy, desktopSession, error, onConnect, onDesktopConnect, onDisconnect, onOfficialSync, officialBusy, open }) {
+function AccountHelp({ account, busy, desktopSession, error, onConnect, onDesktopConnect, onDisconnect, open }) {
   const pending = account?.status === 'pending'
 
   return (
@@ -162,7 +168,6 @@ function AccountHelp({ account, busy, desktopSession, error, onConnect, onDeskto
         <AccountIntro account={account} pending={pending} />
         {pending && <AccountCode account={account} />}
         <AccountActions account={account} busy={busy} onDisconnect={onDisconnect} pending={pending} />
-        <div className="yt-account-help__actions"><button className="yt-account-action yt-account-action--primary" type="button" disabled={officialBusy} onClick={onOfficialSync}>{officialBusy ? <LoaderCircle className="yt-spin" size={16} aria-hidden="true" /> : <RefreshCw size={16} aria-hidden="true" />} Sincronizar playlists y Me gusta</button></div>
         {!account?.connected && !pending && (desktopSession
           ? <DesktopSessionConnect busy={busy} onConnect={onDesktopConnect} />
           : <MusicSessionForm busy={busy} onConnect={onConnect} />)}
@@ -192,21 +197,19 @@ function CatalogTabs({ browse, downloads, player, showDownloads, showingDownload
   )
 }
 
-function CatalogNavigation({ controller }) {
-  const { account, accountBusy, accountError, accountHelpOpen, actionError, browse, changeTab, connectDesktopSession, connectMusicSession, desktopSessionAvailable, disconnectAccount, downloads, officialLibraryBusy, player, searchType, setAccountHelpOpen, showDownloads, syncOfficialLibrary } = controller
+function CatalogNavigation({ controller, editingHome = false, onEditHome }) {
+  const { account, accountError, actionError, browse, changeTab, downloads, player, searchType, showDownloads } = controller
   const showingDownloads = browse.view.kind === 'downloads'
   const heading = getCatalogHeading(browse.view.kind, account?.personalized)
 
   return (
     <header className="yt-hub">
-      <div className="yt-hub__topline">
-        <div><span className="yt-hub__eyebrow">YOUTUBE MUSIC</span><h1>{heading}</h1></div>
-        <button className={`yt-account${account?.connected ? ' yt-account--connected' : ''}`} type="button" aria-controls="yt-account-help" aria-expanded={accountHelpOpen} onClick={() => setAccountHelpOpen((open) => !open)}>
-          <UserRound size={17} aria-hidden="true" /><span>{account?.connected ? 'YouTube Music conectado' : 'Conectar YouTube Music'}</span><Info size={15} aria-hidden="true" />
-        </button>
+      <h1 className="sr-only">{heading}</h1>
+      {accountError && <div className="collection-empty" role="alert">{accountError}</div>}
+      <div className="yt-hub__tabs-row">
+        {onEditHome && <button className="yt-edit-home" type="button" aria-label="Editar inicio" aria-expanded={editingHome} title="Editar inicio" onClick={onEditHome}><LayoutGrid size={16} aria-hidden="true" /></button>}
+        <CatalogTabs browse={browse} downloads={downloads} player={player} showDownloads={showDownloads} showingDownloads={showingDownloads} />
       </div>
-      <AccountHelp account={account} busy={accountBusy} desktopSession={desktopSessionAvailable} error={accountError} onConnect={connectMusicSession} onDesktopConnect={connectDesktopSession} onDisconnect={disconnectAccount} onOfficialSync={syncOfficialLibrary} officialBusy={officialLibraryBusy} open={accountHelpOpen} />
-      <CatalogTabs browse={browse} downloads={downloads} player={player} showDownloads={showDownloads} showingDownloads={showingDownloads} />
       {actionError && <div className="collection-empty" role="alert">{actionError}</div>}
       {(browse.view.kind === 'search' || showingDownloads) && (
         <CatalogSearchControls activeType={searchType} downloadsActive={showingDownloads} downloadsLabel={`Descargas${downloads.downloads.items.length ? ` (${downloads.downloads.items.length})` : ''}`} onDownloadsSelect={showDownloads} onQueryChange={browse.setQuery} onSubmit={() => browse.runSearch(browse.query, searchType)} onTypeSelect={changeTab} query={browse.query} showField={false} showDownloads={false} />
@@ -215,11 +218,24 @@ function CatalogNavigation({ controller }) {
   )
 }
 
-function BrowseShelves({ controller, data }) {
-  const { openAlbum, openArtist, openPlaylist, player, playSongs } = controller
-  if (!data?.shelves?.length) return <div className="collection-empty">No hay recomendaciones disponibles por ahora.</div>
-  return data.shelves.map((shelf) => (
-    <HomeRail
+const COMMUNITY_KEY = 'de la comunidad'
+
+function BrowseShelves({ controller, shelves }) {
+  const { openAlbum, openArtist, openPlaylist, player, playSongs, startPlaylist } = controller
+  if (!shelves.length) return <div className="collection-empty">No hay recomendaciones disponibles por ahora.</div>
+  return shelves.map((shelf) => (shelfKey(shelf.title) === COMMUNITY_KEY && shelf.items.every((item) => item.kind === 'playlist')
+    ? (
+      <CommunityShelf
+        currentSongId={player.currentSong?.id}
+        items={shelf.items.map(adaptBrowseItem)}
+        key={`${shelf.title}-${shelf.items[0]?.id}`}
+        onOpen={openPlaylist}
+        onPlayPlaylist={startPlaylist}
+        onPlaySong={playSongs}
+        title={translateShelfTitle(shelf.title)}
+      />
+    )
+    : <HomeRail
       items={shelf.items.map(adaptBrowseItem)}
       key={`${shelf.title}-${shelf.items[0]?.id}`}
       {...intentProps((item) => shelf.items.find((entry) => entry.id === item.id)?.kind)}
@@ -235,7 +251,7 @@ function BrowseShelves({ controller, data }) {
       }}
       selectedId={player.currentSong?.id}
       selectedItemPlaying={player.isPlaying}
-      title={shelf.title}
+      title={translateShelfTitle(shelf.title)}
       variant={shelf.items.every((item) => item.kind === 'artist') ? 'artist' : 'default'}
     />
   ))
@@ -243,13 +259,26 @@ function BrowseShelves({ controller, data }) {
 
 function LandingView({ controller }) {
   const { browse } = controller
+  const isHome = browse.view.kind === 'home'
+  const { layout, reset, update } = useHomeLayout()
+  const [editing, setEditing] = useState(false)
+  const rawShelves = browse.view.data?.shelves
+  // Orden y visibilidad solo en el inicio; Explorar y Recomendado muestran todo tal como llega.
+  const applied = useMemo(() => applyHomeLayout(rawShelves, isHome ? layout : DEFAULT_LAYOUT), [isHome, layout, rawShelves])
+  const closePanel = useCallback(() => setEditing(false), [])
+
   return (
-    <div className="home-page yt-landing">
-      <CatalogNavigation controller={controller} />
+    <div className="home-page yt-landing" style={{ '--shelf-card': CARD_SIZES[layout.cardSize].css }}>
+      <CatalogNavigation controller={controller} onEditHome={isHome ? () => setEditing((open) => !open) : undefined} editingHome={editing} />
       {browse.error && <div className="collection-empty" role="alert">{browse.error}</div>}
       {browse.loading && <div className="yt-feed-skeleton" role="status" aria-label="Cargando recomendaciones"><i /><i /><i /></div>}
-      {!browse.loading && browse.view.data && <BrowseShelves controller={controller} data={browse.view.data} />}
+      {!browse.loading && browse.view.data && <BrowseShelves controller={controller} shelves={applied.visible} />}
       {!browse.loading && !browse.view.data && !browse.error && <div className="collection-empty">No hay contenido disponible por ahora.</div>}
+      {editing && isHome && (
+        <Suspense fallback={null}>
+          <HomeLayoutPanel layout={layout} onChange={update} onClose={closePanel} onReset={reset} sections={applied.sections} />
+        </Suspense>
+      )}
     </div>
   )
 }
@@ -372,8 +401,31 @@ function PlaylistDetail({ controller }) {
   return <CollectionDetailView collection={{ artist: 'YouTube Music', artwork: data.thumbnail, description: data.description, id: data.id, kind: 'Playlist', title: data.title }} likedSongIds={likedSongIds} onAddToPlaylist={onAddToPlaylist} onAlbumSelect={openAlbum} onArtistSelect={openArtist} onBack={controller.goBack} onDownloadCollection={() => downloads.downloadMany(sourceSongs)} onPlaybackToggle={player.togglePlay} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleFavorite={toggleSongFavorite} renderTrackActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} selectedSongSource="youtube" songs={sourceSongs.map(adaptSong)} />
 }
 
+// Sin cuenta vinculada la portada no muestra nada más que este botón centrado. La vinculación en
+// escritorio abre la ventana segura de Google; en la web se despliega el formulario de sesión.
+function UnlinkedPrompt({ controller }) {
+  const { account, accountBusy, accountError, accountHelpOpen, connectDesktopSession, connectMusicSession, desktopSessionAvailable, setAccountHelpOpen } = controller
+  const pending = account?.status === 'pending'
+  const showHelp = pending || (!desktopSessionAvailable && accountHelpOpen)
+  return (
+    <div className="home-page yt-landing">
+      <div className="yt-connect">
+        <button className="yt-connect__button" type="button" disabled={accountBusy} onClick={() => (desktopSessionAvailable ? connectDesktopSession() : setAccountHelpOpen((open) => !open))}>
+          {accountBusy ? <LoaderCircle className="yt-spin" size={18} aria-hidden="true" /> : <Link2 size={18} aria-hidden="true" />}
+          <span>Vincular YT Music</span>
+        </button>
+        {desktopSessionAvailable && accountError && <p className="yt-account-help__error" role="alert">{accountError}</p>}
+      </div>
+      {showHelp && <AccountHelp account={account} busy={accountBusy} desktopSession={desktopSessionAvailable} error={accountError} onConnect={connectMusicSession} onDesktopConnect={connectDesktopSession} open />}
+    </div>
+  )
+}
+
 export default function YoutubeCatalogContent({ controller }) {
   const kind = controller.browse.view.kind
+  const isLanding = ['home', 'explore', 'recommendations'].includes(kind)
+  if (isLanding && controller.account === null) return null
+  if (isLanding && !controller.account.connected) return <UnlinkedPrompt controller={controller} />
   if (kind === 'search') return <SearchView controller={controller} />
   if (['home', 'explore', 'recommendations'].includes(kind)) return <LandingView controller={controller} />
   if (kind === 'artist') return <ArtistDetail controller={controller} />

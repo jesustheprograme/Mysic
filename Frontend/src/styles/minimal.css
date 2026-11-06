@@ -285,12 +285,253 @@
   transform: none;
 }
 
-/* Escritorio: el usuario vive en la barra de título y ya no hay iconos a la derecha del buscador.
-   Sin esta columna espejo de la izquierda, el buscador quedaría descentrado respecto a la ventana. */
+/* ==========================================================================
+ * Escritorio sin cabecera (como limusic): logo y buscador viven arriba del sidebar y el usuario
+ * en la barra de título. La fila de la cabecera mide 0 y sus elementos se colocan de forma
+ * absoluta sobre el sidebar. Solo aplica al escritorio de Tauri (.app-header--desktop-shell);
+ * la web y el móvil conservan su cabecera.
+ * ========================================================================== */
 @media (min-width: 761px) {
-  .music-app .app-header--desktop-shell .app-header__inner {
-    grid-template-columns: var(--sidebar-width, 220px) minmax(0, 1fr) var(--sidebar-width, 220px);
+  .music-app:has(> .app-header--desktop-shell),
+  .music-app--player-open:has(> .app-header--desktop-shell) {
+    grid-template-rows: 0 minmax(0, 1fr);
   }
+
+  .music-app .app-header--desktop-shell {
+    height: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .music-app .app-header--desktop-shell .app-header__inner {
+    display: block;
+    height: 0;
+    padding: 0;
+  }
+
+  .music-app .app-header--desktop-shell .app-header__leading {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    width: calc(var(--sidebar-width, 220px) - 28px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .music-app .app-header--desktop-shell .app-header__identity { order: 1; }
+  .music-app .app-header--desktop-shell .app-header__toggle { order: 2; width: 34px; height: 34px; }
+  .music-app .app-header--desktop-shell .app-header__brand { width: 92px; min-height: 32px; }
+  .music-app .app-header--desktop-shell .app-header__logo { width: 92px; height: 30px; }
+  .music-app .app-header--desktop-shell .app-header__context-title,
+  .music-app .app-header--desktop-shell .app-header__actions { display: none; }
+
+  .music-app .app-header--desktop-shell .music-search {
+    position: absolute;
+    top: 58px;
+    left: 14px;
+    width: calc(var(--sidebar-width, 220px) - 28px);
+    margin: 0;
+    transform: none;
+  }
+
+  .music-app .app-header--desktop-shell .sx-bar {
+    height: 36px;
+    gap: 8px;
+    padding: 0 6px 0 11px;
+    border-radius: 10px;
+  }
+
+  .music-app .app-header--desktop-shell .sx-bar input { font-size: 13px; }
+
+  /* El panel de resultados sale hacia la derecha, sobre el contenido, no centrado en la barra. */
+  .music-app .app-header--desktop-shell .sx-popover {
+    left: 0;
+    width: min(560px, calc(100vw - var(--sidebar-width, 220px) - 32px));
+    transform: translateY(-6px);
+  }
+
+  .music-app .app-header--desktop-shell .yt-music-search--open .sx-popover { transform: none; }
+
+  .music-app:has(> .app-header--desktop-shell) .app-sidebar { padding-top: 108px; }
+
+  /* Sidebar plegado: solo el botón de plegar; el buscador sigue en Ctrl+K. */
+  .music-app--sidebar-collapsed .app-header--desktop-shell .app-header__leading {
+    left: 0;
+    width: var(--sidebar-width, 92px);
+    justify-content: center;
+  }
+
+  .music-app--sidebar-collapsed .app-header--desktop-shell .app-header__identity,
+  .music-app--sidebar-collapsed .app-header--desktop-shell .music-search { display: none; }
+
+  .music-app--sidebar-collapsed:has(> .app-header--desktop-shell) .app-sidebar { padding-top: 64px; }
+}
+
+/* ==========================================================================
+ * Portadas y textos más contenidos (escala de limusic: título 14, apoyo 12).
+ * Las tarjetas dejan de estirarse con la ventana: tamaño fijo y acotado.
+ * ========================================================================== */
+.music-app .home-page .home-shelf > .home-shelf__rail {
+  /* --shelf-card lo fija "Editar inicio" (Pequeño / Mediano / Grande). */
+  grid-auto-columns: var(--shelf-card, clamp(124px, 9vw, 148px));
+  gap: 18px;
+}
+
+.music-app .yt-hub__tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.music-app .home-page .home-shelf__heading h2 {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.music-app .home-page .home-shelf-card__meta {
+  gap: 2px;
+  margin-top: 8px;
+}
+
+.music-app .home-page .home-shelf-card__title,
+.music-app .home-page .home-shelf-card__meta strong {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.music-app .home-page .home-shelf-card__meta span,
+.music-app .home-page .home-shelf-card__meta small,
+.music-app .home-page .home-shelf-card__meta-link,
+.music-app .home-page .home-shelf-card__detail-link {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.music-app .home-page .home-shelf-card__visual {
+  border-radius: var(--m-radius);
+  box-shadow: 0 0 0 1px var(--m-line);
+}
+
+/* ==========================================================================
+ * Todas las canciones: bloques por lanzamiento en columnas fluidas, portada de 48px,
+ * filas compactas de una línea y cabecera sobria.
+ * ========================================================================== */
+.music-app .artist-songs-page {
+  padding: 28px clamp(20px, 3vw, 40px) 80px;
+  background: transparent;
+}
+
+.music-app .artist-songs-page__header {
+  min-height: 0;
+  padding: 0 0 20px 64px;
+  border-bottom-color: var(--m-line);
+}
+
+.music-app .artist-songs-page__header h1 {
+  font-size: clamp(22px, 2.2vw, 28px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.music-app .artist-songs-page__header span,
+.music-app .artist-songs-page__header p {
+  color: var(--m-text-dim);
+  font-size: 13px;
+}
+
+.music-app .artist-songs-page__grid {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 32px 28px;
+  padding-top: 28px;
+}
+
+.music-app .artist-songs-album { gap: 10px; }
+
+.music-app .artist-songs-album__header {
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.music-app .artist-songs-album__header img {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px var(--m-line);
+}
+
+.music-app .artist-songs-album__titles {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.music-app .artist-songs-album__header button {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.music-app .artist-songs-album__titles small {
+  color: var(--m-text-dim);
+  font-size: 12px;
+}
+
+.music-app .artist-songs-album ol { gap: 1px; }
+
+.music-app .artist-songs-album li {
+  border-radius: var(--m-radius);
+  background: transparent;
+  transition: none;
+}
+
+.music-app .artist-songs-album li:hover { background: var(--m-hover); }
+.music-app .artist-songs-album li.is-active { background: color-mix(in srgb, var(--m-accent) 11%, transparent); }
+.music-app .artist-songs-album li.is-active > button { color: var(--m-accent); }
+
+.music-app .artist-songs-album li > button {
+  padding: 7px 10px;
+  color: #d3d9d6;
+  font-size: 13px;
+}
+
+.music-app .artist-songs-album li > small {
+  color: var(--m-text-dim);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* YouTube Music sin cuenta vinculada: solo un botón, centrado en el área de contenido. */
+.music-app .yt-connect {
+  min-height: min(68vh, 560px);
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.music-app .yt-connect__button {
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 26px;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--m-accent);
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 160ms ease, opacity 160ms ease;
+}
+
+.music-app .yt-connect__button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--m-accent) 85%, white);
+}
+
+.music-app .yt-connect__button:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 @media (prefers-reduced-motion: reduce) {

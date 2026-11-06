@@ -57,15 +57,18 @@ function ArtistSongsView({
           return (
           <section className="artist-songs-album" aria-labelledby={headingId} key={album.id || album.title}>
             <div className="artist-songs-album__header">
-              <img src={album.artwork} alt="" loading="lazy" />
-              <button
-                id={headingId}
-                type="button"
-                disabled={!album.id}
-                onClick={() => album.id && onAlbumSelect(album.id)}
-              >
-                {album.title}
-              </button>
+              <img src={album.artwork} alt="" width="48" height="48" loading="lazy" decoding="async" />
+              <div className="artist-songs-album__titles">
+                <button
+                  id={headingId}
+                  type="button"
+                  disabled={!album.id}
+                  onClick={() => album.id && onAlbumSelect(album.id)}
+                >
+                  {album.title}
+                </button>
+                <small>{album.songs.length === 1 ? '1 canción' : `${album.songs.length} canciones`}</small>
+              </div>
             </div>
             <ol>
               {album.songs.map((song) => {

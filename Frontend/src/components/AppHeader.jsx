@@ -1,4 +1,4 @@
-import { ChevronDown, LogOut, Menu, Search, UserRound } from 'lucide-react'
+import { ChevronDown, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Search, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import BrandLogo from './BrandLogo.jsx'
 import { DesktopAppHeaderLink } from './DesktopAppDownload.jsx'
@@ -95,7 +95,9 @@ function AppHeader({
             title={collapsed ? 'Mostrar sidebar' : 'Ocultar sidebar'}
             onClick={onSidebarToggle}
           >
-            <Menu size={23} strokeWidth={1.8} aria-hidden="true" />
+            {collapsed
+              ? <PanelLeftOpen size={20} strokeWidth={1.8} aria-hidden="true" />
+              : <PanelLeftClose size={20} strokeWidth={1.8} aria-hidden="true" />}
           </button>
 
           <button

@@ -1,6 +1,7 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { ArrowLeft, ArrowRight, ChevronDown, Copy, LogOut, Minus, RotateCw, Square, UserRound, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronDown, Copy, Link2, Link2Off, LogOut, Minus, RefreshCw, RotateCw, Square, UserRound, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { useAccountMenu } from '../features/youtube/accountMenuBridge.js'
 import './title-bar.css'
 
 /**
@@ -72,6 +73,11 @@ function useWindowControls() {
 function UserMenu({ onLogout, user }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
+  const account = useAccountMenu()
+  const runAccountAction = (action) => {
+    setOpen(false)
+    action()
+  }
 
   useEffect(() => {
     if (!open) return undefined
@@ -110,6 +116,21 @@ function UserMenu({ onLogout, user }) {
 
       {open && (
         <div className="titlebar__menu" role="menu" aria-label="Menú de perfil">
+          {account && (
+            <>
+              {account.connected && (
+                <button className="titlebar__menu-item" type="button" role="menuitem" disabled={account.syncBusy} onClick={() => runAccountAction(account.actions.sync)}>
+                  <RefreshCw size={16} strokeWidth={1.8} aria-hidden="true" />
+                  <span>Sincronizar playlists y Me gusta</span>
+                </button>
+              )}
+              <button className="titlebar__menu-item" type="button" role="menuitem" disabled={account.busy} onClick={() => runAccountAction(account.connected ? account.actions.unlink : account.actions.link)}>
+                {account.connected ? <Link2Off size={16} strokeWidth={1.8} aria-hidden="true" /> : <Link2 size={16} strokeWidth={1.8} aria-hidden="true" />}
+                <span>{account.connected ? 'Desvincular YT Music' : 'Vincular YT Music'}</span>
+              </button>
+              <span className="titlebar__menu-separator" role="separator" />
+            </>
+          )}
           <button className="titlebar__menu-item titlebar__menu-item--danger" type="button" role="menuitem" onClick={onLogout}>
             <LogOut size={16} strokeWidth={1.8} aria-hidden="true" />
             <span>Cerrar sesión</span>

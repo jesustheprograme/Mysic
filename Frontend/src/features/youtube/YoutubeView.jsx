@@ -12,6 +12,7 @@ import { captureYoutubeMusicSession, desktopSessionAvailable } from './lib/deskt
 import { api } from './lib/api.js'
 import MusicSearchPanel from './MusicSearchPanel.jsx'
 import YoutubeCatalogContent from './YoutubeCatalogContent.jsx'
+import { setAccountMenu } from './accountMenuBridge.js'
 
 function getScrollTargets(workspace) {
   const content = workspace?.closest('.music-app__content')
@@ -104,7 +105,8 @@ function YoutubeView({
   useEffect(() => {
     const controller = new AbortController()
     api.account(controller.signal).then(setAccount).catch((error) => {
-      if (error.name !== 'AbortError') setAccount(null)
+      // Sin respuesta se trata como "no vinculada" para no dejar la portada vacía para siempre.
+      if (error.name !== 'AbortError') setAccount({ connected: false, status: 'unknown' })
     })
     return () => controller.abort()
   }, [])
@@ -381,6 +383,30 @@ function YoutubeView({
       setOfficialLibraryBusy(false)
     }
   }
+
+  // Opciones de cuenta en el menú de usuario de la barra de título (ver accountMenuBridge.js).
+  // Las acciones viven en un ref para que la instantánea publicada no cambie en cada render.
+  const accountActionsRef = useRef(null)
+  useEffect(() => {
+    accountActionsRef.current = {
+      link: () => (desktopSessionAvailable ? connectDesktopSession() : setAccountHelpOpen(true)),
+      sync: syncOfficialLibrary,
+      unlink: disconnectAccount,
+    }
+  })
+  const accountMenuActions = useMemo(() => ({
+    link: () => accountActionsRef.current?.link(),
+    sync: () => accountActionsRef.current?.sync(),
+    unlink: () => accountActionsRef.current?.unlink(),
+  }), [])
+  const accountKnown = account !== null
+  const accountConnected = Boolean(account?.connected)
+  useEffect(() => {
+    setAccountMenu(accountKnown
+      ? { actions: accountMenuActions, busy: accountBusy, connected: accountConnected, syncBusy: officialLibraryBusy }
+      : null)
+    return () => setAccountMenu(null)
+  }, [accountBusy, accountConnected, accountKnown, accountMenuActions, officialLibraryBusy])
 
   const controller = {
     account, accountBusy, accountError, accountHelpOpen, actionError, browse, changeTab, connectDesktopSession, connectMusicSession, desktopSessionAvailable, disconnectAccount, downloads, goBack, likedAlbumIds,
