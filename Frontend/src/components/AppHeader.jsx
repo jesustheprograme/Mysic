@@ -1,16 +1,16 @@
-import { Bell, ChevronDown, LogOut, Menu, Search, Sparkles, UserRound } from 'lucide-react'
+import { ChevronDown, LogOut, Menu, Search, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import BrandLogo from './BrandLogo.jsx'
 import { DesktopAppHeaderLink } from './DesktopAppDownload.jsx'
 import ShortcutsHelp from '../features/shortcuts/ShortcutsHelp.jsx'
 import { matchShortcut } from '../features/shortcuts/shortcuts.js'
+import { isDesktopShell } from '../lib/desktopShell.js'
 
 function AppHeader({
   collapsed,
   mobileBrandHidden,
   mobileContextTitle,
   mobileMenuOpen,
-  onArtistSpotlightOpen,
   onHome,
   onLogout,
   onMobileMenuClose,
@@ -26,6 +26,8 @@ function AppHeader({
   const [helpOpen, setHelpOpen] = useState(false)
   const menuRef = useRef(null)
   const searchInputRef = useRef(null)
+  // En escritorio el usuario y su menú viven en la barra de título (TitleBar), no aquí.
+  const desktopShell = isDesktopShell()
 
   useEffect(() => {
     function closeFromOutside(event) {
@@ -82,7 +84,7 @@ function AppHeader({
 
   return (
     <>
-    <header className={`app-header${searchOpen ? ' app-header--search-open' : ''}${mobileBrandHidden ? ' app-header--brand-hidden' : ''}`}>
+    <header className={`app-header${searchOpen ? ' app-header--search-open' : ''}${mobileBrandHidden ? ' app-header--brand-hidden' : ''}${desktopShell ? ' app-header--desktop-shell' : ''}`}>
       <div className="app-header__inner">
         <div className="app-header__leading">
           <button
@@ -172,21 +174,9 @@ function AppHeader({
 
         <div className="app-header__actions">
           <DesktopAppHeaderLink />
-          <button
-            className="header-icon-button"
-            type="button"
-            aria-label="Presentación del artista nuevo"
-            title="Artista nuevo"
-            onClick={onArtistSpotlightOpen}
-          >
-            <Sparkles size={19} strokeWidth={1.6} aria-hidden="true" />
-          </button>
-          <button className="header-icon-button" type="button" aria-label="Notificaciones" title="Notificaciones">
-            <Bell size={19} strokeWidth={1.6} aria-hidden="true" />
-          </button>
         </div>
 
-        <div className="profile-menu" ref={menuRef}>
+        {!desktopShell && <div className="profile-menu" ref={menuRef}>
           <button
             className="profile-menu__trigger"
             type="button"
@@ -223,7 +213,7 @@ function AppHeader({
               <strong>Cerrar sesión</strong>
             </button>
           </div>
-        </div>
+        </div>}
       </div>
     </header>
     {helpOpen && <ShortcutsHelp onClose={() => setHelpOpen(false)} />}

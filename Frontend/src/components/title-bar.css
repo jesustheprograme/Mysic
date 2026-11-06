@@ -1,0 +1,217 @@
+/*
+ * Barra de título de la app de escritorio. Medidas de Titlebar.svelte de limusic:
+ * 36px de alto, línea inferior tenue, controles de 44px sin fondo (el de cerrar solo cambia de color).
+ */
+.app-frame {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: #050606;
+}
+
+.app-frame__body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Pantallas que median el alto con 100vh: la barra les quita 36px. */
+.app-frame__body .auth-page,
+.app-frame__body .session-loading {
+  height: 100%;
+}
+
+.app-frame__body .music-app--player-open .playlist-page--reference {
+  min-height: calc(100dvh - 144px);
+}
+
+.titlebar {
+  --titlebar-height: 36px;
+  position: relative;
+  z-index: 60;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--titlebar-height);
+  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+  background: #050606;
+  color: #c9cdca;
+  font-size: 12px;
+  user-select: none;
+}
+
+.titlebar__brand,
+.titlebar__right {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.titlebar__brand {
+  flex: 1;
+  gap: 8px;
+  padding-left: 12px;
+}
+
+.titlebar__icon {
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+
+.titlebar__title {
+  color: #8f9795;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.titlebar__separator {
+  width: 1px;
+  height: 16px;
+  margin: 0 6px;
+  background: rgb(255 255 255 / 0.12);
+}
+
+/* ---- Usuario ---- */
+.titlebar__user {
+  position: relative;
+  height: 100%;
+}
+
+.titlebar__user-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.titlebar__user-trigger:hover,
+.titlebar__user-trigger[aria-expanded='true'] {
+  background: rgb(255 255 255 / 0.07);
+}
+
+.titlebar__avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #1c2120;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.14);
+  color: #aab2af;
+}
+
+.titlebar__avatar img {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+}
+
+.titlebar__username {
+  max-width: 112px;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titlebar__chevron {
+  color: #8f9795;
+  transition: transform 160ms ease;
+}
+
+.titlebar__chevron--open {
+  transform: rotate(180deg);
+}
+
+.titlebar__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 70;
+  min-width: 190px;
+  padding: 4px;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 10px;
+  background: #101312;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.55);
+}
+
+.titlebar__menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #e7e9e5;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.titlebar__menu-item:hover {
+  background: rgb(255 255 255 / 0.07);
+}
+
+.titlebar__menu-item--danger {
+  color: #ff8a7a;
+}
+
+.titlebar__menu-item--danger:hover {
+  background: rgb(255 101 66 / 0.12);
+}
+
+/* ---- Controles de ventana ---- */
+.titlebar__control {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: #8f9795;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.titlebar__control:hover {
+  background: rgb(255 255 255 / 0.07);
+  color: #fff;
+}
+
+.titlebar__control--close:hover {
+  background: transparent;
+  color: #ff6542;
+}
+
+.titlebar__user-trigger:focus-visible,
+.titlebar__control:focus-visible,
+.titlebar__menu-item:focus-visible {
+  outline: 2px solid #8b7cf6;
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .titlebar__user-trigger,
+  .titlebar__chevron,
+  .titlebar__control {
+    transition: none;
+  }
+}

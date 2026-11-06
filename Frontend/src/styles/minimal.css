@@ -285,6 +285,14 @@
   transform: none;
 }
 
+/* Escritorio: el usuario vive en la barra de título y ya no hay iconos a la derecha del buscador.
+   Sin esta columna espejo de la izquierda, el buscador quedaría descentrado respecto a la ventana. */
+@media (min-width: 761px) {
+  .music-app .app-header--desktop-shell .app-header__inner {
+    grid-template-columns: var(--sidebar-width, 220px) minmax(0, 1fr) var(--sidebar-width, 220px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .music-app *,
   .music-app *::before,

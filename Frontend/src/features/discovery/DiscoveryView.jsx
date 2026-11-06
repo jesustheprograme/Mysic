@@ -22,7 +22,6 @@ import {
 } from '../mini-player/playerBridge.ts'
 import { openMiniPlayerWindow } from '../mini-player/openMiniPlayerWindow.tsx'
 import { catalogApi } from '../../lib/api.js'
-import { primeAutoplay } from '../auth/autoplayUnlock.js'
 import { canImportMusic } from '../music-import/musicImportAccess.js'
 import { useDownloads } from '../youtube/hooks/useDownloads.js'
 import { useYoutubeFavorites } from '../youtube/hooks/useYoutubeFavorites.js'
@@ -636,21 +635,6 @@ function useDiscoveryPage({
     }
   }, [activeArtistId])
 
-  function presentArtistSpotlight(artist) {
-    setSpotlightArtist(artist)
-    setPlayerCollapsed(true)
-
-    const firstSong = artist?.songs?.[0]
-    if (!firstSong) return
-
-    selectSong(firstSong.id, {
-      animatePlayer: true,
-      contextSong: firstSong,
-      contextSongs: artist.songs,
-      fadeIn: true,
-    })
-  }
-
   useEffect(() => {
     let cancelled = false
 
@@ -747,12 +731,6 @@ function useDiscoveryPage({
     if (artistId) catalogApi.markArtistSpotlightViewed(artistId).catch(() => {})
   }
 
-  function openLatestArtistSpotlight() {
-    primeAutoplay()
-    catalogApi.getArtistSpotlight({ includeViewed: true })
-      .then(presentArtistSpotlight)
-      .catch(() => {})
-  }
 
   function playExternalSong(song, { contextSongs = null, preserveDiscoveryMix = false } = {}) {
     if (contextSongs) setDiscoveryMix(contextSongs)
@@ -880,7 +858,6 @@ function useDiscoveryPage({
         mobileBrandHidden={mobileBrandHidden}
         mobileContextTitle={mobileContextTitle}
         mobileMenuOpen={mobileMenuOpen}
-        onArtistSpotlightOpen={openLatestArtistSpotlight}
         onHome={() => navigateTo(DEFAULT_SECTION)}
         onLogout={onLogout}
         onMobileMenuClose={() => setMobileMenuOpen(false)}

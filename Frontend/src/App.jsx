@@ -1,8 +1,10 @@
 import { lazy, Suspense } from 'react'
 import useCatalogo from './estado/catalogo/useCatalogo.js'
 import useUserLibrary from './estado/useUserLibrary.js'
+import TitleBar from './components/TitleBar.jsx'
 import AuthView from './features/auth/AuthView.jsx'
 import useAuth from './features/auth/useAuth.js'
+import { isDesktopShell } from './lib/desktopShell.js'
 import './styles/app.css'
 
 // DiscoveryView arrastra casi toda la interfaz (y home.css, ~300 kB de CSS). Cargarlo aparte
@@ -17,6 +19,21 @@ function AppLoading() {
     <main className="session-loading" aria-label="Cargando aplicación">
       <span className="session-loading__disc" aria-hidden="true" />
     </main>
+  )
+}
+
+/**
+ * En la app de escritorio la ventana no tiene barra nativa: se dibuja TitleBar encima de todo,
+ * también en la pantalla de carga y en el login (si no, la ventana no se podría mover ni cerrar).
+ * En la web no se añade ningún contenedor.
+ */
+function AppFrame({ children, onLogout, user }) {
+  if (!isDesktopShell()) return children
+  return (
+    <div className="app-frame">
+      <TitleBar onLogout={onLogout} user={user} />
+      <div className="app-frame__body">{children}</div>
+    </div>
   )
 }
 
@@ -49,27 +66,31 @@ function MainApp() {
   // el spinner reaparecía y desmontaba la aplicación entera.
   if (auth.isLoading) {
     return (
-      <main className="session-loading" aria-label="Cargando sesion">
-        <span className="session-loading__disc" aria-hidden="true" />
-      </main>
+      <AppFrame onLogout={auth.logout} user={null}>
+        <main className="session-loading" aria-label="Cargando sesion">
+          <span className="session-loading__disc" aria-hidden="true" />
+        </main>
+      </AppFrame>
     )
   }
 
   if (!auth.user) {
     return (
-      <AuthView
-        authError={auth.error}
-        clearError={auth.clearError}
-        isSubmitting={auth.isSubmitting}
-        onGoogleLogin={auth.loginWithGoogle}
-        onLogin={auth.login}
-        onRegister={auth.register}
-      />
+      <AppFrame onLogout={auth.logout} user={null}>
+        <AuthView
+          authError={auth.error}
+          clearError={auth.clearError}
+          isSubmitting={auth.isSubmitting}
+          onGoogleLogin={auth.loginWithGoogle}
+          onLogin={auth.login}
+          onRegister={auth.register}
+        />
+      </AppFrame>
     )
   }
 
   return (
-    <>
+    <AppFrame onLogout={auth.logout} user={auth.user}>
       {catalogError && (
         <div role="alert" style={{ background: '#3b1717', color: '#ffd6d6', padding: '10px 16px', textAlign: 'center' }}>
           Catálogo: {catalogError.message}
@@ -117,7 +138,7 @@ function MainApp() {
         user={auth.user}
       />
       </Suspense>
-    </>
+    </AppFrame>
   )
 }
 
