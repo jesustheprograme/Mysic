@@ -1,0 +1,94 @@
+/* Esqueletos de carga. Medidas tomadas de MediaCardSkeleton y TrackRowSkeleton de limusic:
+   tarjeta de 10rem con portada cuadrada, fila de 56px con miniatura de 40px. */
+.skeleton {
+  display: block;
+  border-radius: 6px;
+  background: oklch(1 0 0 / 0.07);
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.home-skeleton {
+  display: grid;
+  gap: 16px;
+}
+
+.skeleton-heading {
+  width: 11rem;
+  height: 24px;
+}
+
+.skeleton-rail {
+  display: flex;
+  gap: 8px;
+  overflow: hidden;
+  padding-bottom: 8px;
+}
+
+.skeleton-card {
+  display: grid;
+  gap: 8px;
+  flex: 0 0 10rem;
+  width: 10rem;
+  padding: 8px;
+}
+
+.skeleton-card__cover {
+  aspect-ratio: 1;
+  width: 100%;
+  border-radius: 8px;
+}
+
+.skeleton-list {
+  display: grid;
+  gap: 2px;
+}
+
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px;
+}
+
+.skeleton-row__thumb {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+}
+
+.skeleton-row__copy {
+  display: grid;
+  flex: 1;
+  gap: 6px;
+  min-width: 0;
+}
+
+.skeleton-line--title {
+  width: 75%;
+  height: 14px;
+}
+
+.skeleton-line--meta {
+  width: 50%;
+  height: 12px;
+}
+
+.skeleton-line--time {
+  flex: none;
+  width: 32px;
+  height: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}

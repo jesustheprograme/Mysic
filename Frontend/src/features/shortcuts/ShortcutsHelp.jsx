@@ -29,11 +29,12 @@ export default function ShortcutsHelp({ onClose }) {
         onClick={(event) => event.stopPropagation()}
       >
         <h2 id="shortcuts-title">Atajos de teclado</h2>
+        <h3 className="shortcuts__group">General</h3>
         <dl>
           {SHORTCUTS.map(({ keys, description }) => (
             <div key={keys}>
-              <dt><kbd>{keys}</kbd></dt>
-              <dd>{description}</dd>
+              <dt>{description}</dt>
+              <dd><kbd>{keys}</kbd></dd>
             </div>
           ))}
         </dl>

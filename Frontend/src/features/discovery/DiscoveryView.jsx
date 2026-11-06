@@ -11,6 +11,7 @@ import PlaylistView from '../playlists/PlaylistView.jsx'
 import { getPlaylistTrackCount, getPlaylistTracks, resolvePlaylistSongs } from '../playlists/playlistTracks.js'
 import HomeDiscoveryPrompt from './HomeDiscoveryPrompt.jsx'
 import HomeRail from './HomeRail.jsx'
+import HomeSkeleton from './HomeSkeleton.jsx'
 import SectionRoute from './SectionRoute.jsx'
 import SongList from './SongList.jsx'
 import {
@@ -934,6 +935,8 @@ function useDiscoveryPage({
                   loading={discoveryLoading}
                   onDiscover={startWeeklyDiscovery}
                 />
+
+                {!songs.length && catalogLoadingMore && <HomeSkeleton />}
 
                 {orderedPlaylists.length > 0 && (
                   <HomeRail items={orderedPlaylists} onSelect={navigateToPlaylist} selectedId={activePlaylistId} title="Tus playlists" />

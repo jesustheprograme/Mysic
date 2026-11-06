@@ -8,60 +8,77 @@
   background: rgb(0 0 0 / 0.6);
 }
 
+/* Estructura del diálogo de atajos de limusic: grupos con encabezado, acción en gris a la
+   izquierda, tecla en monoespaciada a la derecha y una línea fina entre filas. */
 .shortcuts {
-  width: min(420px, 100%);
-  padding: 20px;
-  border: 1px solid #414846;
-  border-radius: 14px;
-  background: #121413;
+  width: min(42rem, 100%);
+  padding: 24px;
+  border-radius: 16px;
+  background: oklch(0.19 0.008 165);
+  box-shadow: 0 0 0 1px oklch(1 0 0 / 0.08), 0 25px 50px -12px rgb(0 0 0 / 0.6);
   color: #e7e9e5;
 }
 
 .shortcuts h2 {
-  margin: 0 0 12px;
-  font-size: 1.1rem;
+  margin: 0 0 16px;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.shortcuts__group {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 600;
 }
 
 .shortcuts dl {
-  display: grid;
-  gap: 8px;
-  margin: 0 0 16px;
+  margin: 0 0 20px;
 }
 
 .shortcuts dl > div {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid oklch(1 0 0 / 0.08);
 }
 
-.shortcuts dt,
+.shortcuts dl > div:last-child {
+  border-bottom: 0;
+}
+
+.shortcuts dt {
+  margin: 0;
+  color: oklch(0.68 0.012 165);
+  font-size: 0.875rem;
+}
+
 .shortcuts dd {
   margin: 0;
 }
 
 .shortcuts kbd {
-  padding: 3px 8px;
-  border: 1px solid #414846;
-  border-radius: 6px;
-  background: #1c1f1e;
-  font: inherit;
-  font-size: 0.8rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
   white-space: nowrap;
 }
 
 .shortcuts button {
   padding: 8px 16px;
-  border: 1px solid #414846;
+  border: 1px solid oklch(1 0 0 / 0.14);
   border-radius: 999px;
   background: transparent;
   color: inherit;
   font: inherit;
+  font-size: 0.875rem;
   cursor: pointer;
 }
 
 .shortcuts button:hover {
-  background: #414846;
+  background: oklch(1 0 0 / 0.06);
 }
 
 .shortcuts button:focus-visible {

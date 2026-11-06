@@ -33,27 +33,33 @@
 .lyrics__lines {
   display: grid;
   gap: 2px;
-  max-height: 260px;
+  max-height: 320px;
   margin: 0;
-  padding: 8px 0;
+  /* Espacio inferior: sin él las últimas líneas nunca podrían llegar al centro al seguirlas. */
+  padding: 8px 0 45%;
   overflow-y: auto;
   list-style: none;
   overscroll-behavior: contain;
 }
 
+/* Valores de LyricsView de limusic: negrita, la activa crece 4 % desde la izquierda,
+   las ya cantadas se apagan más que las que vienen, 300 ms. */
 .lyrics__line {
   width: 100%;
-  padding: 6px 8px;
+  padding: 8px 8px;
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: #8b918e;
+  color: var(--m-text-dim, #9aa19e);
   font: inherit;
-  font-size: 1rem;
-  line-height: 1.35;
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.3;
   text-align: left;
   cursor: pointer;
-  transition: color 0.2s ease, transform 0.2s ease;
+  opacity: 0.8;
+  transform-origin: left center;
+  transition: color 0.3s ease-out, opacity 0.3s ease-out, transform 0.3s ease-out;
 }
 
 .lyrics__line:disabled {
@@ -61,17 +67,18 @@
 }
 
 .lyrics__line:not(:disabled):hover {
-  color: #e7e9e5;
+  color: #ffffff;
+  opacity: 1;
 }
 
 .lyrics__line--past {
-  color: #6c726f;
+  opacity: 0.45;
 }
 
 .lyrics__line--active {
   color: #ffffff;
-  font-weight: 700;
-  transform: translateX(4px);
+  opacity: 1;
+  transform: scale(1.04);
 }
 
 .lyrics__plain,

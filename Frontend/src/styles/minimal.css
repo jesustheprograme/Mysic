@@ -15,7 +15,7 @@
   --m-active: oklch(1 0 0 / 0.09);
   --m-surface: oklch(0.19 0.008 var(--m-hue));
   --m-text-dim: oklch(0.68 0.012 var(--m-hue));
-  --m-accent: #e75032;
+  --m-accent: var(--coral, #ff6542);
   --m-radius: 0.5rem;
   --m-radius-lg: 0.75rem;
   --m-ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -111,6 +111,109 @@
 .music-app ::selection {
   background: color-mix(in srgb, var(--m-accent) 45%, transparent);
   color: #fff;
+}
+
+/* ==========================================================================
+ * Pasada de UX inspirada en limusic
+ *
+ * Principios tomados de su código (no de capturas):
+ *  - Escala tipográfica con suelo de 12px (text-xs), cuerpo 14px, títulos de sección 20px bold.
+ *  - El acento comunica ESTADO (activo, reproduciendo, acción principal) y nada más.
+ *  - Un único botón relleno por zona: el de reproducir.
+ *  - Reposo sin sombras; la elevación aparece solo al interactuar.
+ *  - Cifras tabulares donde cambian (tiempos, duraciones) para que no "bailen".
+ * ========================================================================== */
+
+/* Legibilidad: tiempos, duraciones y metadatos estaban entre 9 y 10px. */
+.music-app .waveform-timeline > span,
+.music-app .player-dock__queue-item time,
+.music-app .app-sidebar__playlist small,
+.music-app .player-dock__tab,
+.music-app .home-page .home-shelf-card__detail-link,
+.music-app .home-page .collection-heading > span,
+.music-app .home-page .song-row__duration,
+.music-app .home-page .song-row__copy span {
+  font-size: 12px;
+}
+
+.music-app .waveform-timeline > span,
+.music-app .player-dock__queue-item time,
+.music-app .home-page .song-row__duration {
+  font-variant-numeric: tabular-nums;
+}
+
+.music-app .waveform-timeline > span {
+  color: var(--m-text-dim);
+}
+
+/* Jerarquía: los títulos de sección deben leerse como títulos, no como pies del bloque anterior. */
+.music-app .home-page .home-shelf__heading h2,
+.music-app .home-page .collection-heading h2 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.music-app .home-page {
+  gap: 40px;
+}
+
+/* Sidebar (solo escritorio: en móvil el indicador es una barra horizontal superior). */
+@media (min-width: 761px) {
+  .music-app .app-sidebar__item--active {
+    color: var(--m-accent);
+    background: color-mix(in srgb, var(--m-accent) 10%, transparent);
+  }
+
+  .music-app .app-sidebar__item--active svg {
+    color: var(--m-accent);
+  }
+
+  .music-app .app-sidebar__item--active::before,
+  .music-app .app-sidebar--collapsed .app-sidebar__item--active::before {
+    top: 50%;
+    bottom: auto;
+    width: 4px;
+    height: 20px;
+    border-radius: 0 999px 999px 0;
+    background: var(--m-accent);
+    opacity: 1;
+    transform: translateY(-50%);
+  }
+}
+
+/* Listas: la canción activa se reconoce por el acento en el título, no solo por el fondo. */
+.music-app .song-row--active .song-row__title-link {
+  color: var(--m-accent);
+}
+
+/* Tarjetas: en reposo solo el contorno; la sombra profunda aparece al apuntar o enfocar. */
+.music-app .album-card__visual {
+  box-shadow: 0 0 0 1px var(--m-line);
+}
+
+.music-app .album-card__button:hover .album-card__visual,
+.music-app .album-card__button:focus-visible .album-card__visual {
+  box-shadow:
+    0 0 0 1px var(--m-line-strong),
+    0 20px 25px -5px rgb(0 0 0 / 0.4),
+    0 8px 10px -6px rgb(0 0 0 / 0.35);
+}
+
+.music-app .album-card__meta strong {
+  font-weight: 600;
+}
+
+/* Reproductor: reproducir es la única acción rellena y toma el acento de la portada.
+   El respaldo es un coral más oscuro que --coral para que el icono blanco supere 4:1. */
+.music-app .player-dock__transport .player-dock__play {
+  color: #fff;
+  background: var(--player-accent, #d8452a);
+}
+
+.music-app .player-dock__transport .player-dock__play:hover {
+  color: #fff;
+  background: color-mix(in srgb, var(--player-accent, #d8452a) 85%, white);
 }
 
 @media (prefers-reduced-motion: reduce) {
