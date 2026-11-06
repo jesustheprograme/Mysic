@@ -168,7 +168,9 @@ async function start() {
   // vincular o desvincular la cuenta de YouTube.
   const youtubeHomeCache = createResponseCache({ ttlMs: 90 * 1000 })
   app.use(['/api/youtube/link', '/api/youtube/account'], youtubeHomeCache.invalidateOnWrite)
-  app.get('/api/youtube/home', youtubeHomeCache.middleware)
+  // El inicio con todas las continuaciones (la ruta generada solo sigue una; ver src/home-extended.mjs).
+  const { createExtendedHomeHandler } = await import('./src/home-extended.mjs')
+  app.get('/api/youtube/home', youtubeHomeCache.middleware, ...createExtendedHomeHandler())
 
   app.use('/api/youtube', artistCacheHeaders, createYoutubeRouter())
 
