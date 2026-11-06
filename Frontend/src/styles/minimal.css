@@ -216,6 +216,75 @@
   background: color-mix(in srgb, var(--player-accent, #d8452a) 85%, white);
 }
 
+/* ==========================================================================
+ * Rendimiento de pintura (reglas medidas en docs/UI-PERFORMANCE.md de limusic)
+ *
+ *  - backdrop-filter solo en elementos pequeños sobre contenido quieto. Un desenfoque que cubre
+ *    una superficie grande o que se desplaza se recalcula en cada fotograma.
+ *  - Las filas de una lista no llevan transiciones (en su cola eran ~90 % de los fotogramas
+ *    perdidos) y las portadas de lista no hacen zoom al apuntar (de 46-52 % de fotogramas de
+ *    más de 20 ms a 7-9 % al quitarlo).
+ *  - Sin sombras largas en superficies que se desplazan.
+ * Los modales, menús y chips pequeños conservan su desenfoque: son elementos únicos.
+ * ========================================================================== */
+
+/* Superficies siempre visibles con fondo ya opaco: el desenfoque no aportaba nada visible. */
+.music-app .app-header,
+.music-app .player-dock,
+.music-app .player-bar {
+  backdrop-filter: none;
+}
+
+/* Overlay a pantalla completa: plano y oscuro, como los de limusic (bg-black/80). */
+.music-app .new-artist-modal {
+  backdrop-filter: none;
+}
+
+/* Paneles grandes de la página de playlist: cubren la lista entera y se desplazan con ella.
+   Se compensa la pérdida de desenfoque con más opacidad para que el texto siga legible
+   sobre la imagen de cabecera. */
+.music-app .playlist-page--reference .playlist-page__tabs,
+.music-app .playlist-page--reference .playlist-page__tab-panel,
+.music-app .playlist-page--reference .playlist-table {
+  background: rgba(10, 14, 13, 0.74);
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.music-app .yt-library-overview {
+  box-shadow: none;
+}
+
+/* Filas: sin transiciones ni desplazamiento al apuntar. */
+.music-app :is(
+  .track-row,
+  .song-row,
+  .collection-detail__track,
+  .playlist-song-row,
+  .player-dock__queue-item,
+  .app-sidebar__playlist
+) {
+  transition: none;
+}
+
+.music-app .track-row:hover {
+  transform: none;
+}
+
+/* Portadas de lista y de tarjeta: sin zoom ni transición de filtro al apuntar. */
+.music-app :is(
+  .album-card__visual img,
+  .home-shelf-card__visual img,
+  .song-row__artwork img,
+  .collection-detail__track-artwork img
+) {
+  transition: none;
+}
+
+.music-app .album-card__button:hover img {
+  transform: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .music-app *,
   .music-app *::before,
