@@ -23,6 +23,7 @@ import {
 import { openMiniPlayerWindow } from '../mini-player/openMiniPlayerWindow.tsx'
 import { catalogApi } from '../../lib/api.js'
 import { canImportMusic } from '../music-import/musicImportAccess.js'
+import useLocalDownloads from '../offline/useLocalDownloads.js'
 import { useDownloads } from '../youtube/hooks/useDownloads.js'
 import { useYoutubeFavorites } from '../youtube/hooks/useYoutubeFavorites.js'
 import { adaptSong } from '../youtube/lib/adapters.js'
@@ -431,7 +432,8 @@ function useDiscoveryPage({
   const [playerAnalyser, setPlayerAnalyser] = useState(null)
   const [playlistPickerSong, setPlaylistPickerSong] = useState(null)
   const [playbackOwner, setPlaybackOwner] = useState(selectedSongId ? 'local' : null)
-  const downloads = useDownloads()
+  // En escritorio cada descarga del servidor también se guarda en el disco del usuario.
+  const downloads = useLocalDownloads(useDownloads())
   const userStorageId = user?.id ?? user?.email ?? user?.username
   const youtubeFavoriteStoragePrefix = `mysic:user:${userStorageId}:youtube`
   const youtubeSongFavorites = useYoutubeFavorites(

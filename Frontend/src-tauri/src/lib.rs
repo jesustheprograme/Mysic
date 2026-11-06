@@ -3,6 +3,7 @@ use std::process::Command;
 
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
+mod local_audio;
 mod youtube_session;
 
 fn automa_mysic_dir() -> PathBuf {
@@ -277,7 +278,25 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_oauth::init())
         .plugin(tauri_plugin_opener::init())
+        // Copias locales de audio: se guardan en el disco del usuario y se sirven por `mysicaudio://`
+        // (con soporte de Range) fuera del hilo de la interfaz.
+        .setup(|app| {
+            let dir = app.path().app_local_data_dir()?.join("audio");
+            app.manage(local_audio::LocalAudio::open(dir));
+            Ok(())
+        })
+        .register_asynchronous_uri_scheme_protocol(local_audio::SCHEME, |context, request, responder| {
+            let audio = context.app_handle().state::<local_audio::LocalAudio>().inner().clone();
+            tauri::async_runtime::spawn_blocking(move || responder.respond(local_audio::respond(&audio, &request)));
+        })
         .invoke_handler(tauri::generate_handler![
+            local_audio::local_audio_list,
+            local_audio::local_audio_usage,
+            local_audio::local_audio_begin,
+            local_audio::local_audio_append,
+            local_audio::local_audio_commit,
+            local_audio::local_audio_abort,
+            local_audio::local_audio_remove,
             pick_music_files,
             stage_music_files,
             analyze_music_import,
