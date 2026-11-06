@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import '../../styles/home.css'
 import afterglow from '../../assets/music/afterglow.webp'
 import heroConcert from '../../assets/music/hero-concert.webp'
 import lowTide from '../../assets/music/low-tide.webp'

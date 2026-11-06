@@ -3,10 +3,11 @@ import useCatalogo from './estado/catalogo/useCatalogo.js'
 import useUserLibrary from './estado/useUserLibrary.js'
 import AuthView from './features/auth/AuthView.jsx'
 import useAuth from './features/auth/useAuth.js'
-import DiscoveryView from './features/discovery/DiscoveryView.jsx'
 import './styles/app.css'
-import './styles/home.css'
 
+// DiscoveryView arrastra casi toda la interfaz (y home.css, ~300 kB de CSS). Cargarlo aparte
+// acelera la pantalla de login y el spinner inicial; main.jsx lo precarga en paralelo con la sesión.
+const DiscoveryView = lazy(() => import('./features/discovery/DiscoveryView.jsx'))
 const MiniPlayer = lazy(() => import('./features/mini-player/MiniPlayer.tsx'))
 const NewArtistSpotlightDemo = lazy(() => import('./features/discovery/NewArtistSpotlightDemo.jsx'))
 const DesktopGoogleAuth = lazy(() => import('./features/auth/DesktopGoogleAuth.jsx'))
@@ -37,13 +38,16 @@ function MainApp() {
   } = useCatalogo()
   const library = useUserLibrary({ libraryLoading, librarySongs, user: auth.user })
   const {
-    createPlaylist, deletePlaylist, favoritesError, favoritesLoading,
-    likedAlbumIds, likedArtistIds, likedSongIds, playlists, playlistsError, playlistsLoading,
+    createPlaylist, deletePlaylist, favoritesError,
+    likedAlbumIds, likedArtistIds, likedSongIds, playlists, playlistsError,
     reorderPlaylist, selectedSongId, selectedSongRestored, setFavorite, setSelectedSongId, setTrackInPlaylist,
     updatePlaylist,
   } = library
 
-  if (auth.isLoading || libraryLoading || (auth.user && (favoritesLoading || playlistsLoading))) {
+  // Solo la sesión bloquea la primera pintura. Catálogo, favoritos y playlists cargan en segundo
+  // plano (con copia local si existe): antes todo esperaba al más lento y, al cambiar el catálogo,
+  // el spinner reaparecía y desmontaba la aplicación entera.
+  if (auth.isLoading) {
     return (
       <main className="session-loading" aria-label="Cargando sesion">
         <span className="session-loading__disc" aria-hidden="true" />
@@ -81,9 +85,10 @@ function MainApp() {
           Playlists: {playlistsError}
         </div>
       )}
+      <Suspense fallback={<AppLoading />}>
       <DiscoveryView
         catalogHasMore={Boolean((searchQuery.trim() ? searchPagination : libraryPagination)?.hasNext)}
-        catalogLoadingMore={catalogLoadingMore || searchLoading}
+        catalogLoadingMore={catalogLoadingMore || searchLoading || libraryLoading}
         createPlaylist={createPlaylist}
         likedAlbumIds={likedAlbumIds}
         likedArtistIds={likedArtistIds}
@@ -111,6 +116,7 @@ function MainApp() {
         songs={librarySongs}
         user={auth.user}
       />
+      </Suspense>
     </>
   )
 }

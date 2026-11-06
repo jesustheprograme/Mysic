@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { songs as fallbackSongs } from '../../data/music.js'
-import { catalogApi } from '../../lib/api.js'
+import { API_URL, catalogApi } from '../../lib/api.js'
+import { persistedCache } from '../../lib/persistedCache.js'
 
 const CATALOG_PAGE_SIZE = 250
+// La URL de la API va en la clave: las canciones guardan `audioUrl` ya resuelta contra ella.
+const CATALOG_CACHE_KEY = `catalog:songs:${API_URL}`
 
 function addFallbackArtwork(catalogSongs, offset = 0) {
   return catalogSongs.map((song, index) => ({
@@ -18,9 +21,14 @@ function mergeUniqueSongs(currentSongs, incomingSongs) {
 }
 
 export default function useCatalogo() {
-  const [librarySongs, setLibrarySongs] = useState([])
-  const [libraryLoading, setLibraryLoading] = useState(true)
-  const [libraryPagination, setLibraryPagination] = useState(null)
+  // Una sola lectura y parseo de la copia local (puede pesar cientos de kB).
+  const initialCache = useRef(undefined)
+  if (initialCache.current === undefined) initialCache.current = persistedCache.read(CATALOG_CACHE_KEY)
+  const hasCachedLibrary = Boolean(initialCache.current?.songs?.length)
+
+  const [librarySongs, setLibrarySongs] = useState(() => initialCache.current?.songs ?? [])
+  const [libraryLoading, setLibraryLoading] = useState(!hasCachedLibrary)
+  const [libraryPagination, setLibraryPagination] = useState(() => initialCache.current?.pagination ?? null)
   const [searchSongs, setSearchSongs] = useState([])
   const [searchPagination, setSearchPagination] = useState(null)
   const [searchLoading, setSearchLoading] = useState(false)
@@ -33,6 +41,11 @@ export default function useCatalogo() {
     const songsWithArtwork = addFallbackArtwork(result.songs)
     setLibrarySongs(songsWithArtwork)
     setLibraryPagination(result.pagination)
+    if (songsWithArtwork.length) {
+      persistedCache.write(CATALOG_CACHE_KEY, { songs: songsWithArtwork, pagination: result.pagination })
+    } else {
+      persistedCache.remove(CATALOG_CACHE_KEY)
+    }
     setCatalogError(result.songs.length
       ? null
       : { kind: 'empty', message: 'El catálogo PostgreSQL todavía no contiene canciones.' })
@@ -115,7 +128,8 @@ export default function useCatalogo() {
       } catch (error) {
         console.warn('El catálogo PostgreSQL todavía no está disponible:', error)
         if (!cancelled) {
-          setLibrarySongs([])
+          // Sin conexión se conserva la copia local en lugar de vaciar el catálogo.
+          if (!hasCachedLibrary) setLibrarySongs([])
           setCatalogError({
             kind: 'error',
             message: error.message || 'No se pudo conectar con el catálogo PostgreSQL.',
@@ -130,7 +144,7 @@ export default function useCatalogo() {
     return () => {
       cancelled = true
     }
-  }, [refreshLibrary])
+  }, [hasCachedLibrary, refreshLibrary])
 
   return {
     catalogError,

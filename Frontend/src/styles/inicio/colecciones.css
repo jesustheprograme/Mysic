@@ -1,3 +1,7 @@
+/* Solo esta hoja usa Noto Sans JP (.collection-detail__creator); viaja con el chunk de la
+   interfaz principal en lugar de sumar sus 124 @font-face al CSS de arranque. */
+@import "@fontsource-variable/noto-sans-jp";
+
 /* Playlist detail: atmospheric hero and reference-style song table. */
 .playlist-page--reference {
   position: relative;
@@ -1185,14 +1189,21 @@
 }
 
 .collection-detail__track:hover,
-.collection-detail__track:focus-within,
-.collection-detail__track--active {
+.collection-detail__track:focus-within {
   color: #f4f5f2;
   background: rgba(255, 255, 255, 0.085);
 }
 
 .collection-detail__track--active {
   z-index: 6;
+  color: #f4f5f2;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.collection-detail__track--active:hover,
+.collection-detail__track--active:focus-within {
+  background: rgba(255, 255, 255, 0.065);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
 }
 
 .collection-detail__active-track-arrow {
@@ -1322,13 +1333,13 @@
 .collection-detail__track-playback:focus-visible .collection-detail__track-playback-status,
 .collection-detail__track:hover .collection-detail__track-playback-status,
 .collection-detail__track:focus-within .collection-detail__track-playback-status,
-.collection-detail__track-playback--playing .collection-detail__track-playback-status {
+.collection-detail__track-playback--selected .collection-detail__track-playback-status {
   opacity: 1;
 }
 
 .collection-detail__track-artwork:hover img,
 .collection-detail__track-artwork:focus-visible img,
-.collection-detail__track-playback--playing.collection-detail__track-artwork img {
+.collection-detail__track-playback--selected.collection-detail__track-artwork img {
   filter: brightness(0.68);
   transform: scale(1.025);
 }
@@ -1362,7 +1373,7 @@
 .collection-detail__track-index:focus-visible .collection-detail__track-number,
 .collection-detail__track:hover .collection-detail__track-number,
 .collection-detail__track:focus-within .collection-detail__track-number,
-.collection-detail__track-playback--playing .collection-detail__track-number {
+.collection-detail__track-playback--selected .collection-detail__track-number {
   opacity: 0;
 }
 
@@ -2637,8 +2648,7 @@
   }
 
   .collection-detail__track--active {
-    background: #171a19;
-    box-shadow: none;
+    background: rgba(255, 255, 255, 0.035);
   }
 
   .collection-detail__track-main strong {

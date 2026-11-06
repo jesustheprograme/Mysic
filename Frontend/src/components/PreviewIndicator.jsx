@@ -4,7 +4,7 @@ import Spinner from './Spinner.jsx'
 function PreviewIndicator({ status }) {
   if (status === 'loading') return <Spinner />
 
-  if (status === 'paused') return <Pause size={17} fill="currentColor" aria-hidden="true" />
+  if (status === 'paused') return <Play size={17} fill="currentColor" aria-hidden="true" />
 
   if (status === 'playing') {
     return (

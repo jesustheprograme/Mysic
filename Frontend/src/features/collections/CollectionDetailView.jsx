@@ -26,11 +26,14 @@ function CollectionDetailView({
   selectedSongId,
   selectedSongAlbumId,
   selectedSongPlaying,
+  selectedSongSource,
   songs,
 }) {
   const showsTrackArtwork = collection.kind === 'Playlist'
   const selectedSongBelongsToCollection = songs.some((song) => (
-    song.id === selectedSongId && (!selectedSongAlbumId || song.albumId === selectedSongAlbumId)
+    song.id === selectedSongId
+      && (!selectedSongSource || selectedSongSource === (song.source === 'youtube' ? 'youtube' : 'local'))
+      && (!selectedSongAlbumId || song.albumId === selectedSongAlbumId)
   ))
   const collectionIsPlaying = selectedSongBelongsToCollection && selectedSongPlaying
   const collectionIsSaved = onTogglePinned ? Boolean(collection.pinned) : collectionFavorite
@@ -40,7 +43,9 @@ function CollectionDetailView({
     trackGroups.flatMap((group) => group.tracks).map((song, index) => [song.id, index + 1]),
   )
   const selectedSong = songs.find((song) => (
-    song.id === selectedSongId && (!selectedSongAlbumId || song.albumId === selectedSongAlbumId)
+    song.id === selectedSongId
+      && (!selectedSongSource || selectedSongSource === (song.source === 'youtube' ? 'youtube' : 'local'))
+      && (!selectedSongAlbumId || song.albumId === selectedSongAlbumId)
   ))
   const activeTrack = useActiveTrackArrow({
     selectedSongAlbumId,
@@ -123,6 +128,7 @@ function CollectionDetailView({
         selectedSongAlbumId={selectedSongAlbumId}
         selectedSongId={selectedSongId}
         selectedSongPlaying={selectedSongPlaying}
+        selectedSongSource={selectedSongSource}
         showsDiscHeadings={showsDiscHeadings}
         showsTrackArtwork={showsTrackArtwork}
         songs={songs}

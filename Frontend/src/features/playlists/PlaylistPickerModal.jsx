@@ -36,7 +36,7 @@ function PlaylistPickerModal({ analyser, onAdd, onClose, onCreate, playing, play
 
         <div className="playlist-picker__content">
           <div className={`playlist-picker__song${showSpectrum ? ' playlist-picker__song--spectrum' : ''}`}>
-            <img src={song.artwork} alt="" />
+            <img loading="lazy" decoding="async" src={song.artwork} alt="" />
             <span className="playlist-picker__song-copy">
               <strong>{song.title}</strong>
               <span className="playlist-picker__song-meta">
@@ -72,7 +72,7 @@ function PlaylistPickerModal({ analyser, onAdd, onClose, onCreate, playing, play
                   className="playlist-picker__item"
                   key={playlist.id}
                 >
-                  {playlist.artwork ? <img src={playlist.artwork} alt="" /> : <span className="playlist-picker__empty-art" />}
+                  {playlist.artwork ? <img loading="lazy" decoding="async" src={playlist.artwork} alt="" /> : <span className="playlist-picker__empty-art" />}
                   <span className="playlist-picker__item-copy">
                     <strong>{playlist.title}</strong>
                     <small>{getPlaylistTrackCount(playlist)} canciones</small>

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
-import { clearPlaylists, loadPlaylists } from '../data/playlists.js'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { clearPlaylists, hasStoredPlaylists, loadPlaylists } from '../data/playlists.js'
 import { favoritesApi, playlistsApi } from '../lib/api.js'
+import { persistedCache } from '../lib/persistedCache.js'
 import { readStorage, writeStorage } from '../lib/storage.js'
 import { playlistHasTrack, setPlaylistTrack } from '../features/playlists/playlistTracks.js'
 
@@ -17,6 +18,15 @@ export default function useUserLibrary({ libraryLoading, librarySongs, user }) {
   const [playlistsError, setPlaylistsError] = useState('')
   const userStorageId = user?.id ?? user?.email ?? user?.username ?? null
   const selectedSongStorageKey = userStorageId ? `mysic:user:${userStorageId}:selected-song` : null
+  const favoritesCacheKey = userStorageId ? `favorites:${userStorageId}` : null
+  const playlistsCacheKey = userStorageId ? `playlists:${userStorageId}` : null
+  const [pendingLocalMigration, setPendingLocalMigration] = useState(false)
+  const migrationRunningRef = useRef(false)
+  // Clave de la cuenta a la que pertenecen los datos en memoria. Es estado (no ref) a propósito:
+  // el efecto de persistencia debe ver el valor del render anterior al cambio de cuenta, para que
+  // los favoritos o playlists del usuario previo nunca se guarden en la caché del nuevo.
+  const [favoritesOwner, setFavoritesOwner] = useState(null)
+  const [playlistsOwner, setPlaylistsOwner] = useState(null)
 
   useEffect(() => {
     const savedSongId = selectedSongStorageKey ? readStorage(selectedSongStorageKey, null) : null
@@ -41,7 +51,15 @@ export default function useUserLibrary({ libraryLoading, librarySongs, user }) {
       return undefined
     }
 
-    setFavoritesLoading(true)
+    // Stale-while-revalidate: si hay copia local se pintan los corazones al instante
+    // y se revalidan contra el servidor en segundo plano.
+    const cached = favoritesCacheKey ? persistedCache.read(favoritesCacheKey) : null
+    setFavoritesOwner(favoritesCacheKey)
+    setLikedSongIds(new Set(cached?.songs ?? []))
+    setLikedAlbumIds(new Set(cached?.albums ?? []))
+    setLikedArtistIds(new Set(cached?.artists ?? []))
+    setFavoritesLoading(!cached)
+
     favoritesApi.getAll()
       .then((favorites) => {
         if (cancelled) return
@@ -58,7 +76,17 @@ export default function useUserLibrary({ libraryLoading, librarySongs, user }) {
       })
 
     return () => { cancelled = true }
-  }, [user])
+  }, [user, favoritesCacheKey])
+
+  useEffect(() => {
+    // Solo se persiste lo que ya validó el servidor o una acción del usuario, nunca el estado inicial vacío.
+    if (!favoritesCacheKey || favoritesLoading || favoritesOwner !== favoritesCacheKey) return
+    persistedCache.write(favoritesCacheKey, {
+      songs: [...likedSongIds],
+      albums: [...likedAlbumIds],
+      artists: [...likedArtistIds],
+    })
+  }, [favoritesCacheKey, favoritesLoading, favoritesOwner, likedAlbumIds, likedArtistIds, likedSongIds])
 
   useEffect(() => {
     let cancelled = false
@@ -66,38 +94,67 @@ export default function useUserLibrary({ libraryLoading, librarySongs, user }) {
     if (!user) {
       setPlaylists([])
       setPlaylistsLoading(false)
-      return undefined
-    }
-    if (libraryLoading) {
-      setPlaylistsLoading(true)
+      setPendingLocalMigration(false)
       return undefined
     }
 
-    setPlaylistsLoading(true)
-    async function loadUserPlaylists() {
+    // Se piden en cuanto hay sesión, en paralelo con el catálogo (antes esperaban a que el
+    // catálogo terminara y se volvían a pedir cada vez que cambiaba `librarySongs`).
+    const cached = playlistsCacheKey ? persistedCache.read(playlistsCacheKey) : null
+    setPlaylistsOwner(playlistsCacheKey)
+    setPlaylists(cached ?? [])
+    setPlaylistsLoading(!cached)
+
+    playlistsApi.list()
+      .then((storedPlaylists) => {
+        if (cancelled) return
+        setPlaylists(storedPlaylists)
+        setPlaylistsError('')
+        // Solo la migración de playlists antiguas guardadas en este navegador necesita el catálogo.
+        if (!storedPlaylists.length && hasStoredPlaylists()) setPendingLocalMigration(true)
+        else clearPlaylists()
+      })
+      .catch((error) => {
+        if (!cancelled) setPlaylistsError(error.message || 'No se pudieron cargar tus playlists.')
+      })
+      .finally(() => {
+        if (!cancelled) setPlaylistsLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [user, playlistsCacheKey])
+
+  useEffect(() => {
+    if (!pendingLocalMigration || libraryLoading || migrationRunningRef.current) return undefined
+
+    let cancelled = false
+    migrationRunningRef.current = true
+    async function migrateLocalPlaylists() {
       try {
-        let storedPlaylists = await playlistsApi.list()
-        if (!storedPlaylists.length) {
-          const localPlaylists = loadPlaylists(librarySongs)
-          if (localPlaylists.length) {
-            storedPlaylists = await Promise.all(localPlaylists.map(({ id: _id, ...playlist }) => playlistsApi.create(playlist)))
-          }
-        }
+        const localPlaylists = loadPlaylists(librarySongs)
+        const created = localPlaylists.length
+          ? await Promise.all(localPlaylists.map(({ id: _id, ...playlist }) => playlistsApi.create(playlist)))
+          : []
         clearPlaylists()
         if (!cancelled) {
-          setPlaylists(storedPlaylists)
-          setPlaylistsError('')
+          if (created.length) setPlaylists(created)
+          setPendingLocalMigration(false)
         }
       } catch (error) {
-        if (!cancelled) setPlaylistsError(error.message || 'No se pudieron cargar tus playlists.')
+        if (!cancelled) setPlaylistsError(error.message || 'No se pudieron migrar tus playlists locales.')
       } finally {
-        if (!cancelled) setPlaylistsLoading(false)
+        migrationRunningRef.current = false
       }
     }
 
-    void loadUserPlaylists()
+    void migrateLocalPlaylists()
     return () => { cancelled = true }
-  }, [libraryLoading, librarySongs, user])
+  }, [libraryLoading, librarySongs, pendingLocalMigration])
+
+  useEffect(() => {
+    if (!playlistsCacheKey || playlistsLoading || playlistsOwner !== playlistsCacheKey) return
+    persistedCache.write(playlistsCacheKey, playlists)
+  }, [playlists, playlistsCacheKey, playlistsLoading, playlistsOwner])
 
   function replacePlaylist(savedPlaylist) {
     setPlaylists((current) => current.map((playlist) => playlist.id === savedPlaylist.id ? savedPlaylist : playlist))

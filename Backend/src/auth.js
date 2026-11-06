@@ -5,8 +5,13 @@ const { OAuth2Client } = require('google-auth-library')
 const { z } = require('zod')
 const { getUsersCollection } = require('./database')
 const { hasMusicImportAccess } = require('./music-import-access')
+const { createTtlCache } = require('./ttl-cache')
 
 const SESSION_COOKIE = 'mysic_session'
+// Evita un findOne en Mongo por cada petición autenticada (incluidas las Range del audio).
+// Compromiso: una cuenta borrada sigue siendo válida hasta AUTH_USER_CACHE_TTL_MS.
+const AUTH_USER_CACHE_TTL_MS = 30 * 1000
+const authUserCache = createTtlCache({ ttlMs: AUTH_USER_CACHE_TTL_MS, maxSize: 500 })
 const SESSION_DURATION = '12h'
 const REMEMBERED_SESSION_DURATION = '7d'
 
@@ -108,7 +113,14 @@ function buildGoogleLinkChanges(user, payload, updatedAt = new Date()) {
   return changes
 }
 
-async function getAuthenticatedUser(req, res, config) {
+function invalidateAuthenticatedUser(userId) {
+  if (userId) authUserCache.delete(String(userId))
+}
+
+/**
+ * `fresh: true` ignora la caché y la renueva; úsalo donde se devuelvan datos de perfil.
+ */
+async function getAuthenticatedUser(req, res, config, { fresh = false } = {}) {
   const token = req.cookies[SESSION_COOKIE]
 
   if (!token) {
@@ -132,7 +144,11 @@ async function getAuthenticatedUser(req, res, config) {
     return null
   }
 
-  const user = await getUsersCollection().findOne({ _id: new ObjectId(payload.sub) })
+  if (fresh) authUserCache.delete(payload.sub)
+  const user = await authUserCache.getOrLoad(
+    payload.sub,
+    () => getUsersCollection().findOne({ _id: new ObjectId(payload.sub) }),
+  )
 
   if (!user) {
     clearSession(req, res, config)
@@ -255,6 +271,7 @@ function createAuthHandlers(config) {
           const changes = buildGoogleLinkChanges(sameEmailUser, payload)
 
           await users.updateOne({ _id: sameEmailUser._id }, { $set: changes })
+          invalidateAuthenticatedUser(sameEmailUser._id)
           user = { ...sameEmailUser, ...changes }
         } else {
           const now = new Date()
@@ -287,7 +304,7 @@ function createAuthHandlers(config) {
 
   async function me(req, res, next) {
     try {
-      const user = await getAuthenticatedUser(req, res, config)
+      const user = await getAuthenticatedUser(req, res, config, { fresh: true })
       if (!user) return undefined
 
       return res.json({ user: publicUser(user, config) })
@@ -297,6 +314,9 @@ function createAuthHandlers(config) {
   }
 
   function logout(req, res) {
+    const token = req.cookies?.[SESSION_COOKIE]
+    // decode (sin verificar) basta: solo se usa para vaciar la caché de esa cuenta.
+    if (token) invalidateAuthenticatedUser(jwt.decode(token)?.sub)
     clearSession(req, res, config)
     return res.status(204).end()
   }
@@ -309,4 +329,5 @@ module.exports = {
   createAuthHandlers,
   getAuthenticatedUser,
   googleVerificationMessage,
+  invalidateAuthenticatedUser,
 }

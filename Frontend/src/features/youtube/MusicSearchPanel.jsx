@@ -42,7 +42,7 @@ function SearchOption({ active, featured, index, listboxId, onChoose, onHistoryR
         onClick={() => onChoose(row)}
       >
         {row.thumbnail ? (
-          <img src={imageUrl(row.thumbnail)} alt="" />
+          <img loading="lazy" decoding="async" src={imageUrl(row.thumbnail)} alt="" />
         ) : row.kind === 'history' ? (
           <Clock3 size={19} aria-hidden="true" />
         ) : (

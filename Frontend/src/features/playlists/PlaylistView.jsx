@@ -12,6 +12,8 @@ function PlaylistView({
   onDelete,
   onEdit,
   onExternalSongSelect,
+  onExternalPlaybackToggle,
+  onDownloadCollection,
   onPlaybackToggle,
   onReorderPlaylist,
   onSongSelect,
@@ -20,6 +22,8 @@ function PlaylistView({
   playlist,
   selectedSongId,
   selectedSongPlaying,
+  selectedSongSource,
+  renderTrackActions,
   songs,
 }) {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
@@ -69,17 +73,23 @@ function PlaylistView({
         onBack={onBack}
         onDelete={() => setDeleteModalOpen(true)}
         onEdit={() => onEdit?.(playlist)}
+        onDownloadCollection={onDownloadCollection}
         onMoveSong={moveSong}
-        onPlaybackToggle={onPlaybackToggle}
+        onPlaybackToggle={selectedSongSource === 'youtube' ? onExternalPlaybackToggle : onPlaybackToggle}
         onSongSelect={(songId, options) => {
           const song = playlistSongs.find((item) => item.id === songId)
-          if (song?.source === 'youtube') onExternalSongSelect?.(song)
+          if (song?.source === 'youtube') {
+            if (selectedSongSource === 'youtube' && selectedSongId === song.id) onExternalPlaybackToggle?.()
+            else onExternalSongSelect?.(song, options)
+          }
           else onSongSelect(songId, options)
         }}
         onToggleFavorite={onToggleFavorite}
         onTogglePinned={() => onTogglePinned?.(playlist)}
         selectedSongId={selectedSongId}
         selectedSongPlaying={selectedSongPlaying}
+        selectedSongSource={selectedSongSource}
+        renderTrackActions={renderTrackActions}
         songs={playlistSongs}
       />
       {deleteModalOpen && (

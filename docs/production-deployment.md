@@ -67,6 +67,14 @@ GOOGLE_CLIENT_IDS=...
 MUSIC_IMPORT_ADMIN_EMAIL=jesusobregon2010@gmail.com
 # Caché y descargas del módulo YouTube Music. No requiere Prisma.
 YOUTUBE_DATA_DIR=/srv/mysic/data/youtube
+# Caché en disco de letras de canciones (LRCLIB). Si no se define, usa Backend/data/lyrics.
+LYRICS_DATA_DIR=/srv/mysic/data/lyrics
+```
+
+Crea también el directorio de letras con el mismo propietario que el servicio:
+
+```bash
+sudo install -d -m 0750 -o USUARIO_SERVICIO -g USUARIO_SERVICIO /srv/mysic/data/lyrics
 ```
 
 Genera `JWT_SECRET` con un generador criptográfico; debe tener al menos 32 caracteres y no debe guardarse en Git. Después aplica las migraciones:
@@ -147,7 +155,9 @@ El módulo YouTube Music usa únicamente su API HTTP y archivos bajo `YOUTUBE_DA
 
 Usa `deploy/nginx/mysic.conf.template`:
 
-1. Reemplaza `__DOMAIN__` y `__FRONTEND_ROOT__`.
+1. Reemplaza `__DOMAIN__`, `__FRONTEND_ROOT__` y `__DOWNLOADS_ROOT__`.
+   - El instalador de escritorio (`Mysic-Setup.exe`, ~42 MB) ya **no va dentro de `dist`**. Se guarda en `deploy/downloads/` y se sirve desde `__DOWNLOADS_ROOT__` en la misma URL pública `/downloads/Mysic-Setup.exe`. Copia el archivo una sola vez, por ejemplo: `sudo install -d /srv/mysic/downloads && sudo cp deploy/downloads/Mysic-Setup.exe /srv/mysic/downloads/`.
+   - Al publicar el frontend con `rsync --delete` (sección 11) no borrará el instalador, porque ya no está en `dist`.
 2. Instala el archivo en `/etc/nginx/sites-available/mysic` y habilítalo en `sites-enabled`.
 3. Obtén un certificado con Certbot o instala un certificado de origen de Cloudflare.
 4. Verifica y recarga:
@@ -158,6 +168,10 @@ sudo systemctl reload nginx
 ```
 
 Mantén el puerto 4000 cerrado en el firewall. Solo Nginx debe poder alcanzarlo por `127.0.0.1`.
+
+### Caché y compresión
+
+Nginx ya comprime JSON, JavaScript y CSS (`gzip on` en la plantilla), por lo que el backend **no** añade compresión propia: hacerlo comprimiría dos veces. El backend envía `Cache-Control: public, max-age=60, stale-while-revalidate=120` en las lecturas del catálogo y guarda en memoria, durante 30-90 segundos, la sesión validada y la respuesta de `/api/youtube/home` por usuario. Tras ejecutar `music:*:apply` los cambios del catálogo pueden tardar unos minutos en verse.
 
 ## 9. DNS y Cloudflare
 

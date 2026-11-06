@@ -1,0 +1,124 @@
+/*
+ * Capa minimalista de Mysic. Se carga al final de home.css y solo ajusta color,
+ * bordes, radios, elevación y movimiento; no cambia la geometría de la interfaz.
+ * Para revertir el rediseño basta con quitar el @import de home.css.
+ *
+ * Criterios tomados de limusic (superficies con tinte de tono, bordes translúcidos,
+ * radio pequeño, sombras discretas) sobre la base negra y el acento coral de Mysic.
+ */
+
+.music-app {
+  --m-hue: 165;
+  --m-line: oklch(1 0 0 / 0.08);
+  --m-line-strong: oklch(1 0 0 / 0.14);
+  --m-hover: oklch(1 0 0 / 0.05);
+  --m-active: oklch(1 0 0 / 0.09);
+  --m-surface: oklch(0.19 0.008 var(--m-hue));
+  --m-text-dim: oklch(0.68 0.012 var(--m-hue));
+  --m-accent: #e75032;
+  --m-radius: 0.5rem;
+  --m-radius-lg: 0.75rem;
+  --m-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  letter-spacing: -0.005em;
+}
+
+/* Estructura: una sola línea fina y casi invisible entre zonas. */
+.music-app .app-header {
+  border-bottom-color: var(--m-line);
+}
+
+.music-app .app-sidebar {
+  border-right-color: var(--m-line);
+}
+
+.music-app .player-dock {
+  border-left-color: var(--m-line);
+  box-shadow: none;
+}
+
+/* Navegación lateral. */
+.music-app .app-sidebar__item {
+  border-radius: var(--m-radius);
+  color: var(--m-text-dim);
+  transition: color 160ms ease, background-color 160ms ease;
+}
+
+.music-app .app-sidebar__item:hover {
+  color: #fff;
+  background: var(--m-hover);
+}
+
+.music-app .app-sidebar__item--active {
+  color: #fff;
+  background: var(--m-active);
+}
+
+/* Listas: sin divisores; el hover y el activo marcan la fila. */
+.music-app .track-row {
+  border-bottom-color: transparent;
+  border-radius: var(--m-radius);
+  transition: color 160ms ease, background-color 160ms ease;
+}
+
+.music-app .track-row:hover {
+  background: var(--m-hover);
+}
+
+.music-app .track-row--active {
+  background: color-mix(in srgb, var(--m-accent) 11%, transparent);
+}
+
+.music-app .song-row {
+  border-radius: var(--m-radius);
+  background: transparent;
+}
+
+.music-app .song-row:hover {
+  background: var(--m-hover);
+}
+
+/* Tarjetas y portadas: contorno de 1px y sombra corta en lugar de sombras largas. */
+.music-app .album-card__visual {
+  border-radius: var(--m-radius);
+  box-shadow: 0 0 0 1px var(--m-line), 0 6px 16px rgb(0 0 0 / 0.28);
+}
+
+.music-app .album-card__play {
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.35);
+}
+
+.music-app .home-welcome-card {
+  border-color: var(--m-line);
+  border-radius: var(--m-radius-lg);
+  background: var(--m-surface);
+  box-shadow: none;
+}
+
+.music-app .profile-menu {
+  border-color: var(--m-line-strong);
+  border-radius: var(--m-radius-lg);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+}
+
+/* Foco visible y selección con el acento de la marca. `:where` no añade especificidad,
+   así que cualquier estilo de foco propio de un componente sigue ganando. */
+:where(.music-app) :where(button, a, input, [role='slider'], [tabindex]):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--m-accent) 75%, white);
+  outline-offset: 2px;
+}
+
+.music-app ::selection {
+  background: color-mix(in srgb, var(--m-accent) 45%, transparent);
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .music-app *,
+  .music-app *::before,
+  .music-app *::after {
+    animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

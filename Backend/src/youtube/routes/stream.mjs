@@ -6,7 +6,24 @@ import express from 'express';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { asyncRoute, requireYoutube, validateParam, VIDEO_ID_RE } from '../utils/http.mjs';
+import { getYoutubeForUser } from '../youtube/accountLink.mjs';
+import { getYoutube } from '../youtube/client.mjs';
 import { invalidateStream, resolveAudioStream } from '../youtube/stream.mjs';
+
+async function requestYoutube(req) {
+  return await getYoutubeForUser(req.mysicUser) ?? getYoutube();
+}
+
+function requestCacheScope(req) {
+  return req.mysicUser?._id ? `user:${req.mysicUser._id}` : 'anonymous';
+}
+
+function streamErrorDetails(error) {
+  if (/confirm you.re not a bot|login_required/i.test(error?.message || '')) {
+    return 'YouTube exige una sesión verificada para reproducir desde este servidor. Conecta YouTube Music en Mysic Global.';
+  }
+  return error?.message || 'Error desconocido';
+}
 
 export function createStreamRouter() {
   const router = express.Router();
@@ -18,10 +35,14 @@ export function createStreamRouter() {
     validId,
     asyncRoute(async (req, res) => {
       try {
-        const { mimeType, contentLength, client } = await resolveAudioStream(req.params.id);
+        const youtube = await requestYoutube(req);
+        const { mimeType, contentLength, client } = await resolveAudioStream(req.params.id, {
+          youtube,
+          cacheScope: requestCacheScope(req),
+        });
         res.json({ id: req.params.id, mimeType, contentLength, client });
       } catch (error) {
-        res.status(502).json({ error: 'No se pudo obtener el audio', details: error.message });
+        res.status(502).json({ error: 'No se pudo obtener el audio', details: streamErrorDetails(error) });
       }
     })
   );
@@ -37,20 +58,22 @@ export function createStreamRouter() {
     let stream;
     let upstream;
     try {
+      const youtube = await requestYoutube(req);
+      const cacheScope = requestCacheScope(req);
       for (let attempt = 0; attempt < 2; attempt += 1) {
-        stream = await resolveAudioStream(id);
+        stream = await resolveAudioStream(id, { youtube, cacheScope });
         upstream = await fetch(stream.url, {
           headers: { Range: req.headers.range || 'bytes=0-' },
           signal: controller.signal,
         });
         if (upstream.status !== 403 && upstream.status !== 410) break;
         await upstream.body?.cancel();
-        invalidateStream(id);
+        invalidateStream(id, cacheScope);
       }
     } catch (error) {
       if (controller.signal.aborted) return;
       console.error(`[stream] fallo al preparar ${id}:`, error.message);
-      return res.status(502).json({ error: 'No se pudo obtener el audio', details: error.message });
+      return res.status(502).json({ error: 'No se pudo obtener el audio', details: streamErrorDetails(error) });
     }
 
     if (upstream.status === 403 || upstream.status === 410) {

@@ -393,7 +393,7 @@ function useMiniPlayerController({ hostDocument = document, hostWindow = window 
   }
 
   function renderCatalogResults() {
-    if (catalogLoading) return <p className="mini-player__empty">Buscando en Mysic global…</p>
+    if (catalogLoading) return <p className="mini-player__empty">Buscando en YouTube Music…</p>
     if (catalogError) return <p className="mini-player__empty" role="alert">{catalogError}</p>
     if (!catalogResults) return <p className="mini-player__empty">Busca canciones, artistas o álbumes.</p>
     const hasResults = catalogResults.songs.length || catalogResults.artists.length || catalogResults.albums.length
@@ -408,7 +408,7 @@ function useMiniPlayerController({ hostDocument = document, hostWindow = window 
               <div className="mini-player__related-song-column">
                 {catalogResults.songs.slice(0, 12).map((song) => (
                   <button type="button" key={song.id} onClick={() => playCatalogSong(song)}>
-                    <img src={imageUrl(song.thumbnail ?? song.artwork)} alt="" />
+                    <img loading="lazy" decoding="async" src={imageUrl(song.thumbnail ?? song.artwork)} alt="" />
                     <span><strong>{song.title}</strong><small>{song.artist}</small></span>
                   </button>
                 ))}
@@ -422,7 +422,7 @@ function useMiniPlayerController({ hostDocument = document, hostWindow = window 
             <div className="mini-player__related-grid mini-player__related-grid--albums">
               {catalogResults.albums.slice(0, 10).map((album) => (
                 <button type="button" key={album.id} onClick={() => dispatchMiniPlayerCommand({ type: 'open-global', kind: 'album', id: album.id })}>
-                  <img src={imageUrl(album.thumbnail)} alt="" />
+                  <img loading="lazy" decoding="async" src={imageUrl(album.thumbnail)} alt="" />
                   <span><strong>{album.title}</strong><small>{album.artist ?? album.subtitle}</small></span>
                 </button>
               ))}
@@ -435,7 +435,7 @@ function useMiniPlayerController({ hostDocument = document, hostWindow = window 
             <div className="mini-player__related-grid mini-player__related-grid--artists">
               {catalogResults.artists.slice(0, 10).map((artist) => (
                 <button type="button" key={artist.id} onClick={() => dispatchMiniPlayerCommand({ type: 'open-global', kind: 'artist', id: artist.id })}>
-                  <img className="mini-player__related-artist" src={imageUrl(artist.thumbnail)} alt="" />
+                  <img loading="lazy" decoding="async" className="mini-player__related-artist" src={imageUrl(artist.thumbnail)} alt="" />
                   <span><strong>{artist.name ?? artist.title}</strong><small>{artist.subtitle ?? 'Artista'}</small></span>
                 </button>
               ))}
@@ -618,7 +618,7 @@ function renderMiniPlayer(controller: ReturnType<typeof useMiniPlayerController>
                   activeType={catalogType}
                   className="mini-player__catalog-search"
                   downloadsActive={catalogDownloads}
-                  label="Buscar en Mysic global"
+                  label="Buscar en YouTube Music"
                   onDownloadsSelect={showCatalogDownloads}
                   onQueryChange={setQueueSearch}
                   onSubmit={() => searchCatalog()}
@@ -646,7 +646,7 @@ function renderMiniPlayer(controller: ReturnType<typeof useMiniPlayerController>
                           <div className="mini-player__related-song-column" key={songs[0].id}>
                             {songs.map((song) => (
                               <button type="button" key={song.id} onClick={() => selectQueueSong(song)}>
-                                <img src={song.artwork} alt="" />
+                                <img loading="lazy" decoding="async" src={song.artwork} alt="" />
                                 <span><strong>{song.title}</strong><small>{song.artist}</small></span>
                               </button>
                             ))}
@@ -672,7 +672,7 @@ function renderMiniPlayer(controller: ReturnType<typeof useMiniPlayerController>
                       <div className="mini-player__related-grid mini-player__related-grid--albums" ref={relatedAlbumsRef}>
                         {relatedAlbums.map(([album, song]) => (
                           <button type="button" key={album} onClick={() => selectQueueSong(song)}>
-                            <img src={song.artwork} alt="" />
+                            <img loading="lazy" decoding="async" src={song.artwork} alt="" />
                             <span><strong>{album}</strong><small>{song.artist}</small></span>
                           </button>
                         ))}
@@ -696,7 +696,7 @@ function renderMiniPlayer(controller: ReturnType<typeof useMiniPlayerController>
                       <div className="mini-player__related-grid mini-player__related-grid--artists" ref={relatedArtistsRef}>
                         {relatedArtists.map(([artist, song]) => (
                           <button type="button" key={artist} onClick={() => selectQueueSong(song)}>
-                            <img className="mini-player__related-artist" src={song.artwork} alt="" />
+                            <img loading="lazy" decoding="async" className="mini-player__related-artist" src={song.artwork} alt="" />
                             <span><strong>{artist}</strong><small>Artista</small></span>
                           </button>
                         ))}
@@ -710,7 +710,7 @@ function renderMiniPlayer(controller: ReturnType<typeof useMiniPlayerController>
                     <li key={song.id}>
                       <button type="button" onClick={() => selectQueueSong(song)}>
                         <span className="mini-player__queue-index">{queue.findIndex((item) => item.id === song.id) + 1}</span>
-                        <img src={song.artwork} alt="" />
+                        <img loading="lazy" decoding="async" src={song.artwork} alt="" />
                         <span className="mini-player__queue-copy">
                           <strong>{song.title}</strong>
                           <small>{song.artist}</small>

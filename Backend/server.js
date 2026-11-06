@@ -28,6 +28,8 @@ const { createAuthHandlers, getAuthenticatedUser } = require('./src/auth')
 const { createCatalogRouter } = require('./src/catalog')
 const { createFavoritesRouter } = require('./src/favorites')
 const { createPlaylistsRouter } = require('./src/playlists')
+const { createLyricsRouter } = require('./src/lyrics/router')
+const { createResponseCache } = require('./src/response-cache')
 const { getConfig } = require('./src/config')
 const { checkDatabaseHealth, closeDatabase, connectDatabase } = require('./src/database')
 const { checkPrismaHealth, closePrisma, connectPrisma } = require('./src/prisma')
@@ -75,6 +77,12 @@ function isTauriOrigin(origin) {
 async function start() {
   const config = getConfig()
   const auth = createAuthHandlers(config)
+
+  // El router de YouTube importa youtubei.js, sharp y jsdom (lento): se carga mientras
+  // se conectan las bases de datos en vez de después. El catch vacío evita un rechazo sin
+  // manejar si las bases fallan primero; el `await` posterior sigue propagando el error.
+  const youtubeRouterModule = import('./src/youtube/routes/index.mjs')
+  youtubeRouterModule.catch(() => {})
 
   await Promise.all([connectDatabase(config), connectPrisma()])
 
@@ -133,6 +141,7 @@ async function start() {
   app.use('/api/catalog', createCatalogRouter(config))
   app.use('/api/favorites', createFavoritesRouter(config))
   app.use('/api/playlists', createPlaylistsRouter(config))
+  app.use('/api/lyrics', createLyricsRouter())
 
   // Los feeds personales nunca se exponen sin una sesión válida de Mysic.
   app.use(
@@ -151,7 +160,15 @@ async function start() {
   )
 
   // YouTube Music (Yotubei). Código en src/youtube (ESM, generado).
-  const { createApiRouter: createYoutubeRouter } = await import('./src/youtube/routes/index.mjs')
+  const { createApiRouter: createYoutubeRouter } = await youtubeRouterModule
+
+  // /home se rehace entero en cada apertura (decenas de peticiones a YouTube) y la ruta generada
+  // lo marca no-store. Esta caché por usuario vive fuera del código generado y se vacía al
+  // vincular o desvincular la cuenta de YouTube.
+  const youtubeHomeCache = createResponseCache({ ttlMs: 90 * 1000 })
+  app.use(['/api/youtube/link', '/api/youtube/account'], youtubeHomeCache.invalidateOnWrite)
+  app.get('/api/youtube/home', youtubeHomeCache.middleware)
+
   app.use('/api/youtube', createYoutubeRouter())
 
   app.post('/api/auth/register', authLimiter, auth.register)

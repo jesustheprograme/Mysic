@@ -1,24 +1,34 @@
 import { LoaderCircle, MoreVertical, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import VerticalSpectrum from '../VerticalSpectrum.jsx'
 import { formatTime } from './utilidadesReproductor.js'
+
+// El dock se repinta unas 5 veces por segundo (currentTime). Estas piezas no dependen del tiempo:
+// con `memo` solo se vuelven a renderizar cuando cambian sus propios datos.
+const TrackSummary = memo(function TrackSummary({ artwork, artist, title }) {
+  return (
+    <>
+      <div className="player-dock__artwork">
+        <span
+          className="player-dock__artwork-backdrop"
+          style={{ backgroundImage: artwork ? `url(${artwork})` : undefined }}
+          aria-hidden="true"
+        />
+        {artwork && <img src={artwork} alt="" decoding="async" />}
+      </div>
+      <div className="player-dock__details">
+        <strong>{title}</strong>
+        <span>{artist}</span>
+      </div>
+    </>
+  )
+})
 
 export function PlayerPanelContent({ artwork, artist, currentTime, duration, error, hasAudio, isBuffering = false, isPlaying, onNext, onPrevious, onTogglePlayback, progress, title, trackAction = null }) {
   return (
     <>
       <div className={`player-dock__track${trackAction ? '' : ' player-dock__track--without-action'}`}>
-        <div className="player-dock__artwork">
-          <span
-            className="player-dock__artwork-backdrop"
-            style={{ backgroundImage: artwork ? `url(${artwork})` : undefined }}
-            aria-hidden="true"
-          />
-          {artwork && <img src={artwork} alt="" />}
-        </div>
-        <div className="player-dock__details">
-          <strong>{title}</strong>
-          <span>{artist}</span>
-        </div>
+        <TrackSummary artwork={artwork} artist={artist} title={title} />
         {trackAction}
       </div>
 
@@ -59,7 +69,26 @@ export function PlayerPanelContent({ artwork, artist, currentTime, duration, err
   )
 }
 
-export function PlayerQueue({ activeIndex = null, activeTrackId = null, onQueueSelect, queue }) {
+const QueueItem = memo(function QueueItem({ index, isActive, item, onSelect }) {
+  return (
+    <button
+      className={`player-dock__queue-item${isActive ? ' player-dock__queue-item--active' : ''}`}
+      type="button"
+      onClick={() => onSelect(item, index)}
+    >
+      <img src={item.artwork} alt="" loading="lazy" decoding="async" />
+      <span>
+        <strong>{item.title}</strong>
+        <small>{item.artist}</small>
+      </span>
+      <time>{formatTime(item.durationSeconds)}</time>
+      <MoreVertical size={16} aria-hidden="true" />
+    </button>
+  )
+})
+
+// Requiere `queue` y `onQueueSelect` estables entre renders para que `memo` sirva.
+export const PlayerQueue = memo(function PlayerQueue({ activeIndex = null, activeTrackId = null, onQueueSelect, queue }) {
   return (
     <section className="player-dock__queue" aria-labelledby="player-queue-title">
       <div className="player-dock__tabs" role="tablist" aria-label="Contenido del reproductor">
@@ -79,20 +108,13 @@ export function PlayerQueue({ activeIndex = null, activeTrackId = null, onQueueS
           const isActive = activeIndex === index || (activeIndex === null && item.id === activeTrackId)
 
           return (
-            <button
-              className={`player-dock__queue-item${isActive ? ' player-dock__queue-item--active' : ''}`}
-              type="button"
+            <QueueItem
+              index={index}
+              isActive={isActive}
+              item={item}
               key={item.id}
-              onClick={() => onQueueSelect(item, index)}
-            >
-              <img src={item.artwork} alt="" />
-              <span>
-                <strong>{item.title}</strong>
-                <small>{item.artist}</small>
-              </span>
-              <time>{formatTime(item.durationSeconds)}</time>
-              <MoreVertical size={16} aria-hidden="true" />
-            </button>
+              onSelect={onQueueSelect}
+            />
           )
         })}
       </div>
@@ -101,7 +123,7 @@ export function PlayerQueue({ activeIndex = null, activeTrackId = null, onQueueS
       </button>
     </section>
   )
-}
+})
 
 export function PlayerPanelToggleIcon({ collapsed }) {
   return (

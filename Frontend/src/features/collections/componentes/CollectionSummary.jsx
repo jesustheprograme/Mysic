@@ -12,7 +12,7 @@ function formatCollectionLength(seconds) {
 
 function CollectionCreator({ collection }) {
   const artwork = collection.artistArtwork ?? collection.artwork
-  const content = <>{artwork && <img src={artwork} alt="" />}<span>{collection.artist}</span></>
+  const content = <>{artwork && <img loading="lazy" decoding="async" src={artwork} alt="" />}<span>{collection.artist}</span></>
   if (!collection.onArtistSelect) return <span className="collection-detail__creator">{content}</span>
   return <button className="collection-detail__creator collection-detail__creator--link" type="button" aria-label={`Abrir artista ${collection.artist}`} onClick={collection.onArtistSelect}>{content}</button>
 }

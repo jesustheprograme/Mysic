@@ -1,31 +1,17 @@
 import { Download, LoaderCircle, Radio, Trash2 } from 'lucide-react'
-import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import PlayerDock from '../../components/PlayerDock.jsx'
 import { connectAudioAnalyser, disconnectAudioAnalyser, resumeAudioContext } from '../../lib/audioAnalyser.js'
 import useGlobalMiniPlayer from '../mini-player/useGlobalMiniPlayer.js'
 import { useBrowse } from './hooks/useBrowse.js'
-import { useDownloads } from './hooks/useDownloads.js'
-import { usePlayer } from './hooks/usePlayer.js'
+import { preloadYoutubePlayer, usePlayer } from './hooks/usePlayer.js'
+import { useYoutubeFavorites } from './hooks/useYoutubeFavorites.js'
 import { adaptSong } from './lib/adapters.js'
+import { captureYoutubeMusicSession, desktopSessionAvailable } from './lib/desktopSession.js'
 import { api } from './lib/api.js'
-import { readStorage, writeStorage } from './lib/storage.js'
 import MusicSearchPanel from './MusicSearchPanel.jsx'
 import YoutubeCatalogContent from './YoutubeCatalogContent.jsx'
-
-function useFavoriteIds(storageKey) {
-  const [ids, setIds] = useState(() => new Set(readStorage(storageKey, [])))
-  function toggle(id, liked) {
-    setIds((current) => {
-      const next = new Set(current)
-      if (liked) next.add(id)
-      else next.delete(id)
-      writeStorage(storageKey, [...next])
-      return next
-    })
-  }
-  return [ids, toggle]
-}
 
 function getScrollTargets(workspace) {
   const content = workspace?.closest('.music-app__content')
@@ -33,24 +19,53 @@ function getScrollTargets(workspace) {
   return [content, workspace.querySelector('.artist-profile__content'), workspace.querySelector('.collection-detail__tracks')].filter(Boolean)
 }
 
-function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, onPlayerVisibilityChange, onSearchNavigate, playerCollapsed = false, playbackRequest, searchRequest, stopNonce = 0 }) {
+function YoutubeView({
+  active = true,
+  downloads,
+  likedSongIds,
+  onAddToPlaylist,
+  onPlaybackOwnerClaim,
+  onPlaybackStateChange,
+  onPlayerCollapseToggle,
+  onQueueEnd,
+  onQueueStart,
+  onSearchNavigate,
+  onToggleSongFavorite,
+  favoriteStoragePrefix = 'mysic:youtube',
+  playbackToggleNonce = 0,
+  playerCollapsed = false,
+  playbackRequest,
+  searchRequest,
+  stopNonce = 0,
+  suppressed = false,
+}) {
   const scrollPositionsRef = useRef(new Map())
   const workspaceRef = useRef(null)
   const queueRequestRef = useRef(null)
   const browse = useBrowse({ progressive: true })
-  const downloads = useDownloads()
-  const [likedSongIds, toggleSongFavorite] = useFavoriteIds('mysic:youtube:favorite-songs')
-  const [likedArtistIds, toggleArtistFavorite] = useFavoriteIds('mysic:youtube:favorite-artists')
-  const [likedAlbumIds, toggleAlbumFavorite] = useFavoriteIds('mysic:youtube:favorite-albums')
+  const { ids: likedArtistIds, toggleFavorite: toggleArtistFavorite } = useYoutubeFavorites(
+    `${favoriteStoragePrefix}:favorite-artists`,
+    'mysic:youtube:favorite-artists',
+  )
+  const { ids: likedAlbumIds, toggleFavorite: toggleAlbumFavorite } = useYoutubeFavorites(
+    `${favoriteStoragePrefix}:favorite-albums`,
+    'mysic:youtube:favorite-albums',
+  )
   const [account, setAccount] = useState(null)
   const [searchRoot, setSearchRoot] = useState(null)
   const [accountHelpOpen, setAccountHelpOpen] = useState(false)
   const [accountBusy, setAccountBusy] = useState(false)
   const [accountError, setAccountError] = useState('')
+  const [officialLibraryBusy, setOfficialLibraryBusy] = useState(false)
   const [actionError, setActionError] = useState('')
   const [queueLoadingKey, setQueueLoadingKey] = useState(null)
-  const player = usePlayer({ enabled: active, isDownloaded: downloads.isDownloaded, onPlayerVisibilityChange })
-  const playRequestedSong = useEffectEvent((song) => player.playFrom([song], 0))
+  const player = usePlayer({
+    enabled: active,
+    isDownloaded: downloads.isDownloaded,
+    onQueueEnd,
+    onQueueStart,
+  })
+  const playRequestedSong = useEffectEvent((song) => playFrom([song], 0, { preserveContext: true }))
   const closeRequestedPlayer = useEffectEvent(() => player.closePlayer())
   const playerAudioRef = player.audioProps.ref
   const playerSongId = player.currentSong?.id
@@ -58,6 +73,20 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
   const [playerAnalyser, setPlayerAnalyser] = useState(null)
   const openMiniPlayer = useGlobalMiniPlayer(player, browse)
   const refreshPersonalizedHome = useEffectEvent(() => browse.showHome())
+  const reportPlaybackState = useEffectEvent(() => onPlaybackStateChange?.({
+    currentSong: player.currentSong,
+    isPlaying: player.isPlaying,
+  }))
+  const toggleRequestedPlayback = useEffectEvent(() => player.togglePlay())
+
+  useEffect(() => {
+    preloadYoutubePlayer().catch(() => {})
+  }, [])
+
+  function playFrom(songs, index, { preserveContext = false } = {}) {
+    onPlaybackOwnerClaim?.({ preserveContext })
+    player.playFrom(songs, index)
+  }
 
   useLayoutEffect(() => {
     setSearchRoot(document.getElementById('global-header-search-root'))
@@ -143,6 +172,10 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
     if (playbackRequest?.song?.id) playRequestedSong(playbackRequest.song)
   }, [playbackRequest?.nonce, playbackRequest?.song, playbackRequest?.song?.id])
 
+  useEffect(() => {
+    reportPlaybackState()
+  }, [player.currentSong, player.isPlaying])
+
   const previousStopNonceRef = useRef(stopNonce)
   useEffect(() => {
     if (stopNonce === previousStopNonceRef.current) return
@@ -150,14 +183,24 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
     closeRequestedPlayer()
   }, [stopNonce])
 
+  const previousPlaybackToggleNonceRef = useRef(playbackToggleNonce)
+  useEffect(() => {
+    if (playbackToggleNonce === previousPlaybackToggleNonceRef.current) return
+    previousPlaybackToggleNonceRef.current = playbackToggleNonce
+    toggleRequestedPlayback()
+  }, [playbackToggleNonce])
+
   function playSongs(sourceSongs, songId) {
     const index = sourceSongs.findIndex((song) => song.id === songId)
-    if (index >= 0) player.playFrom(sourceSongs, index)
+    if (index >= 0) playFrom(sourceSongs, index)
   }
 
   function toggleDownload(song) {
     if (downloads.downloadedIds.has(song.id)) downloads.deleteDownload(song.id)
-    else downloads.downloadSong(song)
+    else if (!account?.connected) {
+      setAccountError('Conecta una sesión verificada de YouTube Music para descargar canciones.')
+      setAccountHelpOpen(true)
+    } else downloads.downloadSong(song)
   }
 
   async function loadQueue(key, loader) {
@@ -169,7 +212,7 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
     try {
       const queue = await loader(controller.signal)
       if (!queue.songs?.length) throw new Error('Esta selección no tiene canciones reproducibles.')
-      if (queueRequestRef.current === controller) player.playFrom(queue.songs, 0)
+      if (queueRequestRef.current === controller) playFrom(queue.songs, 0)
     } catch (error) {
       if (error.name !== 'AbortError') setActionError(error.message || 'No se pudo iniciar la reproducción.')
     } finally {
@@ -228,6 +271,10 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
     saveCurrentScrollPosition()
     browse.openArtistSongs(artistId)
   }
+  function openPlaylist(playlistId) {
+    saveCurrentScrollPosition()
+    browse.openPlaylist(playlistId)
+  }
   function showDownloads() {
     saveCurrentScrollPosition()
     browse.showDownloads()
@@ -250,7 +297,7 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
   }, [active, workspaceKey])
 
   function selectSearchEntity(entity) {
-    if (entity.kind === 'song' && entity.song) player.playFrom([entity.song], 0)
+    if (entity.kind === 'song' && entity.song) playFrom([entity.song], 0)
     if (entity.kind === 'artist') {
       if (!active) onSearchNavigate?.()
       openArtist(entity.id)
@@ -289,6 +336,23 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
     }
   }
 
+  async function connectDesktopSession() {
+    setAccountBusy(true)
+    setAccountError('')
+    try {
+      const session = await captureYoutubeMusicSession()
+      const nextAccount = await api.connectCapturedSession(session)
+      setAccount(nextAccount)
+      browse.showHome()
+      return true
+    } catch (error) {
+      setAccountError(error.message || 'No se pudo validar la sesión de YouTube Music.')
+      return false
+    } finally {
+      setAccountBusy(false)
+    }
+  }
+
   async function disconnectAccount() {
     setAccountBusy(true)
     setAccountError('')
@@ -302,15 +366,46 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
     }
   }
 
+  async function syncOfficialLibrary() {
+    setOfficialLibraryBusy(true)
+    setAccountError('')
+    try {
+      const library = await api.sessionLibrary()
+      library.likedSongs.forEach((song) => onToggleSongFavorite(song.id, true, adaptSong(song)))
+      browse.showOfficialLibrary(library)
+      setAccountHelpOpen(false)
+    } catch (error) {
+      setAccountError(error.message || 'No se pudo sincronizar la biblioteca oficial de YouTube.')
+      setAccountHelpOpen(true)
+    } finally {
+      setOfficialLibraryBusy(false)
+    }
+  }
+
   const controller = {
-    account, accountBusy, accountError, accountHelpOpen, actionError, browse, changeTab, connectMusicSession, disconnectAccount, downloads, goBack, likedAlbumIds,
-    likedArtistIds, likedSongIds, onAddToPlaylist, openAlbum, openArtist, openArtistSongs, player, playSongs,
+    account, accountBusy, accountError, accountHelpOpen, actionError, browse, changeTab, connectDesktopSession, connectMusicSession, desktopSessionAvailable, disconnectAccount, downloads, goBack, likedAlbumIds,
+    likedArtistIds, likedSongIds, onAddToPlaylist, openAlbum, openArtist, openArtistSongs, openPlaylist, player, playSongs,
     renderSongActions, searchType: browse.searchType, selectSearchEntity, setAccountHelpOpen, startAccountLink,
-    showDownloads, startPlaylist, toggleAlbumFavorite, toggleArtistFavorite, toggleSongFavorite,
+    officialLibraryBusy, showDownloads, startPlaylist, syncOfficialLibrary, toggleAlbumFavorite, toggleArtistFavorite, toggleSongFavorite: onToggleSongFavorite,
   }
   const root = document.getElementById('music-home')
   const focusHeaderSearch = searchRoot?.contains(document.activeElement)
-  const currentTrack = player.currentSong ? adaptSong(player.currentSong) : null
+
+  // usePlayer actualiza `currentTime` cada 500 ms, así que esta vista se repinta dos veces por
+  // segundo mientras suena algo. Estos tres valores deben conservar su identidad entre ticks:
+  // si se recrean, el dock repinta la cola entera y `memo` no sirve de nada.
+  const playerRef = useRef(player)
+  useEffect(() => {
+    playerRef.current = player
+  })
+  const currentSong = player.currentSong
+  const currentTrack = useMemo(() => (currentSong ? adaptSong(currentSong) : null), [currentSong])
+  const playerQueue = player.queue
+  const adaptedQueue = useMemo(() => playerQueue.map(adaptSong), [playerQueue])
+  const handleQueueSelect = useCallback(
+    (index) => playerRef.current.playFrom(playerRef.current.queue, index),
+    [],
+  )
 
   return (
     <div className="youtube-catalog">
@@ -343,12 +438,13 @@ function YoutubeView({ active = true, onAddToPlaylist, onPlayerCollapseToggle, o
           onOpenMiniPlayer={() => openMiniPlayer().catch(() => {})}
           onNext={player.playNext}
           onPrevious={player.playPrev}
-          onQueueSelect={(index) => player.playFrom(player.queue, index)}
+          onQueueSelect={handleQueueSelect}
           onToggleCollapsed={onPlayerCollapseToggle}
           liked={likedSongIds.has(player.currentSong.id)}
-          onToggleFavorite={(liked) => toggleSongFavorite(player.currentSong.id, liked)}
-          queue={player.queue.map(adaptSong)}
+          onToggleFavorite={(liked) => onToggleSongFavorite(player.currentSong.id, liked, currentTrack)}
+          queue={adaptedQueue}
           track={currentTrack}
+          suppressed={suppressed}
         />,
         root,
       )}

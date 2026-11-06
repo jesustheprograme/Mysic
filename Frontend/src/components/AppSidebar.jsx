@@ -24,6 +24,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { getPlaylistTrackCount } from '../features/playlists/playlistTracks.js'
 
+// YouTube Music es la sección principal; Mysic (catálogo propio) queda como grupo secundario.
+const mainNavigationItem = { id: 'youtube', label: 'YouTube Music', icon: MonitorPlay }
+
 const primaryNavigationItems = [
   { id: 'home', label: 'Inicio', icon: House },
   { id: 'explore', label: 'Explorar', icon: Compass },
@@ -36,7 +39,6 @@ const libraryNavigationItems = [
   { id: 'artists', label: 'Artistas', icon: UsersRound },
   { id: 'playlists', label: 'Playlists', icon: ListMusic },
   { id: 'downloads', label: 'Descargas', icon: Download },
-  { id: 'youtube', label: 'Mysic global', icon: MonitorPlay },
 ]
 
 function AppSidebar({
@@ -88,6 +90,8 @@ function AppSidebar({
         id="mobile-navigation"
       >
         <nav className="app-sidebar__navigation" aria-label="Navegación principal">
+          {renderItem(mainNavigationItem)}
+          {!collapsed && <p className="app-sidebar__label">Mysic</p>}
           {primaryNavigationItems.map(renderItem)}
           {canImportMusic && (
             <button
@@ -125,7 +129,7 @@ function AppSidebar({
                   onClick={() => onOpenPlaylist(playlist.id)}
                 >
                   {playlist.artwork ? (
-                    <img className="app-sidebar__playlist-art" src={playlist.artwork} alt="" />
+                    <img loading="lazy" decoding="async" className="app-sidebar__playlist-art" src={playlist.artwork} alt="" />
                   ) : (
                     <span className="app-sidebar__playlist-art" aria-hidden="true" />
                   )}

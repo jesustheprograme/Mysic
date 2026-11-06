@@ -66,7 +66,7 @@ export function useBrowse({ progressive = false } = {}) {
   const resultsRef = useRef(results);
   const viewRef = useRef(view);
   const viewHistoryRef = useRef([]);
-  const savedViewRef = useRef(readStorage(BROWSE_STORAGE_KEY, { kind: 'home' }));
+  const [savedView] = useState(() => readStorage(BROWSE_STORAGE_KEY, { kind: 'home' }));
   const restoringViewRef = useRef(true);
 
   useEffect(() => {
@@ -367,6 +367,7 @@ export function useBrowse({ progressive = false } = {}) {
   }, [openDetail]);
   const openArtistSongs = useCallback((id) => id && openDetail('artist-songs', (signal) => api.artistSongs(id, signal)), [openDetail]);
   const openAlbum = useCallback((id) => id && openDetail('album', (signal) => api.album(id, signal)), [openDetail]);
+  const openPlaylist = useCallback((id) => id && openDetail('playlist', (signal) => api.playlist(id, signal)), [openDetail]);
 
   const showDownloads = () => {
     cancelRequests();
@@ -375,13 +376,20 @@ export function useBrowse({ progressive = false } = {}) {
     setView({ kind: 'downloads' });
   };
 
+  const showOfficialLibrary = (data) => {
+    cancelRequests();
+    if (viewHistoryRef.current.at(-1) !== viewRef.current) viewHistoryRef.current.push(viewRef.current);
+    setError('');
+    setView({ kind: 'official-library', data });
+  };
+
   useEffect(() => {
     if (restoringViewRef.current) return;
 
     let savedView = null;
     if (['home', 'explore', 'downloads'].includes(view.kind)) {
       savedView = { kind: view.kind };
-    } else if (['artist', 'artist-songs', 'album'].includes(view.kind) && view.data?.id) {
+    } else if (['artist', 'artist-songs', 'album', 'playlist'].includes(view.kind) && view.data?.id) {
       savedView = { kind: view.kind, id: view.data.id };
     } else if (view.kind === 'search' && (results?.query || query.trim())) {
       savedView = { kind: 'search', query: results?.query || query.trim(), type: searchType };
@@ -391,12 +399,12 @@ export function useBrowse({ progressive = false } = {}) {
   }, [query, results?.query, searchType, view.data?.id, view.kind]);
 
   useEffect(() => {
-    const savedView = savedViewRef.current;
     let restoreRequest;
 
     if (savedView?.kind === 'artist' && savedView.id) restoreRequest = openArtist(savedView.id);
     else if (savedView?.kind === 'artist-songs' && savedView.id) restoreRequest = openArtistSongs(savedView.id);
     else if (savedView?.kind === 'album' && savedView.id) restoreRequest = openAlbum(savedView.id);
+    else if (savedView?.kind === 'playlist' && savedView.id) restoreRequest = openPlaylist(savedView.id);
     else if (savedView?.kind === 'explore') restoreRequest = showExplore();
     else if (savedView?.kind === 'search' && savedView.query) {
       const type = SEARCH_TABS.some((tab) => tab.type === savedView.type) ? savedView.type : 'all';
@@ -409,7 +417,7 @@ export function useBrowse({ progressive = false } = {}) {
     Promise.resolve(restoreRequest).finally(() => {
       restoringViewRef.current = false;
     });
-  }, [openAlbum, openArtist, openArtistSongs, runSearch, showExplore, showHome]);
+  }, [openAlbum, openArtist, openArtistSongs, openPlaylist, runSearch, savedView, showExplore, showHome]);
 
   useEffect(() => {
     globalThis.addEventListener?.('mysic:global-home', showHome);
@@ -457,10 +465,12 @@ export function useBrowse({ progressive = false } = {}) {
     openArtist,
     openArtistSongs,
     openAlbum,
+    openPlaylist,
     showHome,
     showExplore,
     showRecommendations,
     showDownloads,
+    showOfficialLibrary,
     goBack,
   };
 }

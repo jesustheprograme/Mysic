@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { decryptCredentials, encryptCredentials, parseBrowserAuth, validateVerificationUrl } from './accountLink.mjs';
+import {
+  decryptCredentials,
+  encryptCredentials,
+  normalizeBrowserAuth,
+  parseBrowserAuth,
+  validateVerificationUrl,
+  verifyMusicPersonalization,
+} from './accountLink.mjs';
 
 test('cifra y descifra credenciales de YouTube Music sin exponer el contenido', () => {
   const credentials = { access_token: 'token-secreto', refresh_token: 'refresh-secreto', expiry_date: '2030-01-01' };
@@ -51,4 +58,45 @@ test('acepta cookies copiadas por Chrome con -b y normaliza la variante segura',
     "curl 'https://music.youtube.com/youtubei/v1/browse' --cookie='SID=x; __Secure-3PAPISID=segura'",
   );
   assert.match(secure.cookie, /SAPISID=segura$/);
+});
+
+test('valida y normaliza una sesión capturada por la aplicación de escritorio', () => {
+  assert.deepEqual(
+    normalizeBrowserAuth({
+      cookie: ' SID=uno ; __Secure-3PAPISID=segura ; PREF=hl=es ',
+      accountIndex: 1,
+      onBehalfOfUser: 'canal_123',
+    }),
+    {
+      cookie: 'SID=uno; __Secure-3PAPISID=segura; PREF=hl=es; SAPISID=segura',
+      accountIndex: 1,
+      onBehalfOfUser: 'canal_123',
+    },
+  );
+});
+
+test('rechaza sesiones capturadas manipuladas antes de consultar YouTube', () => {
+  assert.throws(() => normalizeBrowserAuth({ cookie: 'SID=uno' }), /sesión válida/);
+  assert.throws(() => normalizeBrowserAuth({ cookie: 'SAPISID=uno\nCookie: SID=dos' }), /caracteres no válidos/);
+  assert.throws(() => normalizeBrowserAuth({ cookie: 'SAPISID=uno', accountIndex: -1 }), /selector de cuenta/);
+  assert.throws(() => normalizeBrowserAuth({ cookie: 'SAPISID=uno', onBehalfOfUser: '../canal' }), /canal seleccionado/);
+});
+
+test('comprueba la cuenta activa antes de aceptar un Inicio personalizado', async () => {
+  const home = { sections: [{ title: 'Para ti' }] };
+  const client = {
+    account: { getInfo: async (all) => all ? [{ id: 'canal-1' }] : [] },
+    music: { getHomeFeed: async () => home },
+  };
+
+  assert.equal(await verifyMusicPersonalization(client), home);
+});
+
+test('rechaza cookies presentes que YouTube no reconoce como una cuenta', async () => {
+  const client = {
+    account: { getInfo: async () => [] },
+    music: { getHomeFeed: async () => ({ sections: [{ title: 'General' }] }) },
+  };
+
+  await assert.rejects(verifyMusicPersonalization(client), /cuenta activa/);
 });

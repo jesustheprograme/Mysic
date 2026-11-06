@@ -9,7 +9,7 @@ const dragModifiers = [restrictToFirstScrollableAncestor, restrictToVerticalAxis
 export default function CollectionTrackList({
   activeTrackRef, albumTrackNumbers, likedSongIds, onAddToPlaylist, onAlbumSelect, onArtistSelect,
   onMoveSong, onPlaybackToggle, onSongSelect, onToggleFavorite, renderTrackActions, selectedSongAlbumId,
-  selectedSongId, selectedSongPlaying, showsDiscHeadings, showsTrackArtwork, songs, trackGroups, tracksRef,
+  selectedSongId, selectedSongPlaying, selectedSongSource, showsDiscHeadings, showsTrackArtwork, songs, trackGroups, tracksRef,
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -18,7 +18,10 @@ export default function CollectionTrackList({
 
   function renderTrack(song, index) {
     const trackKey = song.trackKey ?? song.id
-    const selected = selectedSongId === song.id && (!selectedSongAlbumId || selectedSongAlbumId === song.albumId)
+    const songSource = song.source === 'youtube' ? 'youtube' : 'local'
+    const selected = selectedSongId === song.id
+      && (!selectedSongSource || selectedSongSource === songSource)
+      && (!selectedSongAlbumId || selectedSongAlbumId === song.albumId)
     return (
       <FilaCancionOrdenable
         displayTrackNumber={showsDiscHeadings ? albumTrackNumbers.get(song.id) : null}

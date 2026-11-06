@@ -3,6 +3,8 @@ use std::process::Command;
 
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
+mod youtube_session;
+
 fn automa_mysic_dir() -> PathBuf {
     let exe = std::env::current_exe().unwrap_or_default();
     let mut dir = exe.parent().unwrap_or(&exe).to_path_buf();
@@ -289,6 +291,7 @@ pub fn run() {
             apply_music_import,
             open_mini_player,
             set_mini_player_bounds,
+            youtube_session::open_youtube_music_login,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Mysic");

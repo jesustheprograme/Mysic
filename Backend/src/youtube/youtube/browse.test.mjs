@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { enrichShelfAlbums, getPlaylistQueue, mapBrowseItem, mapShelf, mergeHomeShelves } from './browse.mjs';
+import { collectLibraryPlaylists, collectLikedSongs, enrichShelfAlbums, getPlaylistQueue, mapBrowseItem, mapShelf, mergeHomeShelves } from './browse.mjs';
 
 test('normaliza una canción de radio al contrato del reproductor', () => {
   const item = mapBrowseItem({
@@ -155,12 +155,26 @@ test('conserva primero el feed personal y añade continuaciones sin duplicarlo',
 
 test('carga playlists con el cliente de la cuenta solicitante', async () => {
   const calls = [];
+  const continuation = {
+    items: [{
+      type: 'MusicResponsiveListItem',
+      item_type: 'song',
+      id: 'lmnopqrstuv',
+      title: 'Segunda canción',
+      artists: [{ name: 'Artista privado', channel_id: 'UC123' }],
+    }],
+    has_continuation: false,
+  };
   const youtube = {
     music: {
       async getPlaylist(id) {
         calls.push(id);
         return {
-          header: { title: { text: 'Playlist privada' } },
+          header: {
+            title: { text: 'Playlist privada' },
+            description: { text: 'Selección personal' },
+            thumbnail: [{ url: 'https://img.test/playlist.jpg', width: 512 }],
+          },
           items: [{
             type: 'MusicResponsiveListItem',
             item_type: 'song',
@@ -168,6 +182,8 @@ test('carga playlists con el cliente de la cuenta solicitante', async () => {
             title: 'Canción privada',
             artists: [{ name: 'Artista privado', channel_id: 'UC123' }],
           }],
+          has_continuation: true,
+          getContinuation: async () => continuation,
         };
       },
     },
@@ -175,6 +191,45 @@ test('carga playlists con el cliente de la cuenta solicitante', async () => {
 
   const playlist = await getPlaylistQueue('PLprivada', youtube);
   assert.deepEqual(calls, ['PLprivada']);
+  assert.equal(playlist.id, 'PLprivada');
   assert.equal(playlist.title, 'Playlist privada');
+  assert.equal(playlist.description, 'Selección personal');
+  assert.equal(playlist.thumbnail, 'https://img.test/playlist.jpg');
   assert.equal(playlist.songs[0].title, 'Canción privada');
+  assert.equal(playlist.songs[1].title, 'Segunda canción');
+});
+
+test('sincroniza y deduplica todas las páginas de playlists de la sesión', async () => {
+  const playlistCard = (id, title, count) => ({
+    item_type: 'playlist', id: `VL${id}`, title, subtitle: `${count} canciones`, item_count: `${count} canciones`,
+  });
+  const secondPage = { contents_memo: new Map([
+    ['MusicTwoRowItem', [playlistCard('PLuno', 'Repetida', 3), playlistCard('PLdos', 'Dos', 8)]],
+  ]) };
+  const firstPage = { contents_memo: new Map([
+    ['MusicTwoRowItem', [playlistCard('PLuno', 'Uno', 3)]],
+    ['ContinuationItem', [{ endpoint: { call: async () => secondPage } }]],
+  ]) };
+  const youtube = { actions: { execute: async () => firstPage } };
+
+  const playlists = await collectLibraryPlaylists(youtube);
+
+  assert.deepEqual(playlists.map((playlist) => [playlist.id, playlist.itemCount]), [['PLuno', 3], ['PLdos', 8]]);
+});
+
+test('sincroniza canciones con Me gusta usando VLLM y sus continuaciones', async () => {
+  const song = (id, title) => ({ item_type: 'song', id, title, artists: [{ name: 'Artista' }] });
+  const secondPage = { items: [song('abcdefghijk', 'Repetida'), song('lmnopqrstuv', 'Dos')], has_continuation: false };
+  const firstPage = {
+    items: [song('abcdefghijk', 'Uno')],
+    has_continuation: true,
+    getContinuation: async () => secondPage,
+  };
+  const requested = [];
+  const youtube = { music: { getPlaylist: async (id) => { requested.push(id); return firstPage; } } };
+
+  const likedSongs = await collectLikedSongs(youtube);
+
+  assert.deepEqual(requested, ['LM']);
+  assert.deepEqual(likedSongs.map((item) => item.id), ['abcdefghijk', 'lmnopqrstuv']);
 });

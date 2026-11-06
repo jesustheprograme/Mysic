@@ -29,9 +29,13 @@ function loadIframeApi() {
   return iframeApiPromise;
 }
 
-export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChange }) {
-  const restoredSongRef = useRef(readStorage(PLAYER_STORAGE_KEY, null));
-  const restoringPausedSongRef = useRef(Boolean(restoredSongRef.current?.id));
+export function preloadYoutubePlayer() {
+  return loadIframeApi();
+}
+
+export function usePlayer({ isDownloaded, enabled = true, onQueueEnd, onQueueStart }) {
+  const [restoredSong] = useState(() => readStorage(PLAYER_STORAGE_KEY, null));
+  const restoringPausedSongRef = useRef(Boolean(restoredSong?.id));
   const audioRef = useRef(null);
   const iframeHostRef = useRef(null);
   const youtubeRef = useRef(null);
@@ -40,8 +44,9 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
   const youtubeReadyRef = useRef(false);
   const pendingVideoIdRef = useRef(null);
   const nextRef = useRef(() => {});
-  const [queue, setQueue] = useState(() => restoredSongRef.current?.id ? [restoredSongRef.current] : []);
-  const [currentIndex, setCurrentIndex] = useState(() => restoredSongRef.current?.id ? 0 : -1);
+  const queueBoundaryRef = useRef({ onQueueEnd, onQueueStart });
+  const [queue, setQueue] = useState(() => restoredSong?.id ? [restoredSong] : []);
+  const [currentIndex, setCurrentIndex] = useState(() => restoredSong?.id ? 0 : -1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
   const [playerError, setPlayerError] = useState('');
@@ -53,6 +58,15 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
   const videoId = currentSong?.id;
   const isLocal = Boolean(currentSong && (currentSong.local || isDownloaded(currentSong.id)));
   const volumeRef = useRef(volume);
+  const nextSong = currentIndex >= 0 && queue.length > 1
+    ? queue[(currentIndex + 1) % queue.length]
+    : null;
+  const nextSongId = nextSong?.id ?? null;
+  const nextSongIsLocal = Boolean(nextSong && (nextSong.local || isDownloaded(nextSong.id)));
+
+  useEffect(() => {
+    queueBoundaryRef.current = { onQueueEnd, onQueueStart };
+  }, [onQueueEnd, onQueueStart]);
 
   const playFrom = useCallback((list, index) => {
     if (!list || index < 0 || index >= list.length) return;
@@ -63,8 +77,7 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
     setCurrentTime(0);
     setDuration(list[index].durationSeconds || 0);
     setIsBuffering(true);
-    onPlayerVisibilityChange?.(true);
-  }, [onPlayerVisibilityChange]);
+  }, []);
 
   const playShuffled = useCallback((list) => {
     if (!list?.length) return;
@@ -78,7 +91,10 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
 
   const playNext = useCallback(() => {
     if (currentIndex < queue.length - 1) playFrom(queue, currentIndex + 1);
-    else setIsPlaying(false);
+    else {
+      setIsPlaying(false);
+      queueBoundaryRef.current.onQueueEnd?.();
+    }
   }, [currentIndex, queue, playFrom]);
   useEffect(() => {
     nextRef.current = playNext;
@@ -112,6 +128,7 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
       return;
     }
     if (currentIndex > 0) playFrom(queue, currentIndex - 1);
+    else queueBoundaryRef.current.onQueueStart?.();
   }, [currentIndex, queue, playFrom, isLocal]);
 
   const closePlayer = useCallback(() => {
@@ -125,13 +142,28 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
     setIsPlaying(false);
     setIsBuffering(false);
     setPlayerError('');
-    onPlayerVisibilityChange?.(false);
-  }, [onPlayerVisibilityChange]);
+  }, []);
 
   useEffect(() => {
     writeStorage(PLAYER_STORAGE_KEY, currentSong?.id ? currentSong : null);
-    onPlayerVisibilityChange?.(Boolean(currentSong));
-  }, [currentSong, onPlayerVisibilityChange]);
+  }, [currentSong]);
+
+  useEffect(() => {
+    if (!nextSongId) return undefined;
+    if (!nextSongIsLocal) {
+      preloadYoutubePlayer().catch(() => {});
+      return undefined;
+    }
+
+    const audio = new Audio();
+    audio.preload = 'auto';
+    audio.src = localAudioUrl(nextSongId);
+    audio.load();
+    return () => {
+      audio.removeAttribute('src');
+      audio.load();
+    };
+  }, [nextSongId, nextSongIsLocal]);
 
   useEffect(() => {
     if (!videoId || isLocal) return undefined;
@@ -222,7 +254,6 @@ export function usePlayer({ isDownloaded, enabled = true, onPlayerVisibilityChan
     audio.load();
     if (restoringPausedSongRef.current) {
       restoringPausedSongRef.current = false;
-      setIsBuffering(false);
     } else audio.play().catch(() => setPlayerError('No se pudo reproducir el archivo descargado.'));
   }, [videoId, isLocal]);
 

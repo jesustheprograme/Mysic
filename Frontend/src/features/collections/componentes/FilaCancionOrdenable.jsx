@@ -22,7 +22,7 @@ function TrackPlaybackButton({ displayTrackNumber, index, isPlaying, isSelected,
 
   return (
     <button
-      className={`${withArtwork ? 'collection-detail__track-artwork' : 'collection-detail__track-index'} collection-detail__track-playback playback-hover${isSelected ? ' collection-detail__track-playback--playing' : ''}`}
+      className={`${withArtwork ? 'collection-detail__track-artwork' : 'collection-detail__track-index'} collection-detail__track-playback playback-hover${isSelected ? ' collection-detail__track-playback--selected' : ''}`}
       type="button"
       aria-label={label}
       aria-pressed={isPlaying}
@@ -64,7 +64,7 @@ function TrackActions({ isLiked, onAddToPlaylist, onToggleFavorite, renderTrackA
           className="heart-container--song-row"
           label={`Me gusta ${song.title}`}
           liked={isLiked}
-          onToggle={(liked) => onToggleFavorite(song.id, liked)}
+          onToggle={(liked) => onToggleFavorite(song.id, liked, song)}
           removeLabel={`Quitar ${song.title} de favoritas`}
           size={17}
         />

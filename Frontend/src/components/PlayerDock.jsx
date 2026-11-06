@@ -7,6 +7,8 @@ import WaveSurfer from 'wavesurfer.js'
 import ControlledWaveform from './reproductor/ControlledWaveform.jsx'
 import { waveformOptions } from './reproductor/waveformOptions.js'
 import { takePrimedAudio } from '../features/auth/autoplayUnlock.js'
+import { useArtworkAccent } from '../features/adaptive-theme/useArtworkAccent.js'
+import LyricsSection from '../features/lyrics/LyricsSection.jsx'
 import { listenToMiniPlayerCommands, ownsMiniPlayer } from '../features/mini-player/playerBridge.ts'
 import { connectAudioAnalyser, disconnectAudioAnalyser } from '../lib/audioAnalyser.js'
 import HeartToggle from './HeartToggle.jsx'
@@ -30,8 +32,10 @@ function playerArtworkUrl(url) {
   return url.replace(/=w\d+-h\d+-/, '=w544-h544-')
 }
 
-function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = false, onClose, onNext, onOpenMiniPlayer, onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, queue, track }) {
+function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = false, onClose, onNext, onOpenMiniPlayer, onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, queue, suppressed = false, track }) {
   const [volumeExpanded, setVolumeExpanded] = useState(false)
+  // Referencia estable: con una función nueva en cada tick, `memo` de PlayerQueue no serviría.
+  const handleQueueSelect = useCallback((_item, index) => onQueueSelect(index), [onQueueSelect])
   const {
     analyser,
     commitSeek,
@@ -49,17 +53,22 @@ function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = fal
   const progress = duration > 0 ? Math.min((currentTime / duration) * 100, 100) : 0
   const artwork = playerArtworkUrl(track.artwork)
   const displayedTrack = artwork === track.artwork ? track : { ...track, artwork }
+  const accent = useArtworkAccent(artwork)
   const playerStyle = {
     '--mobile-player-progress': `${progress}%`,
+    ...(accent ? { '--player-accent': accent } : {}),
     ...(collapsed && artwork ? { '--compact-artwork': `url(${artwork})` } : {}),
   }
 
   return (
     <aside
-      className={`player-dock player-dock--animated${collapsed ? ' player-dock--collapsed' : ''}`}
+      className={`player-dock player-dock--animated${collapsed ? ' player-dock--collapsed' : ''}${suppressed ? ' player-dock--suppressed' : ''}`}
       aria-label={`Reproductor de ${track.title}`}
+      aria-hidden={suppressed || undefined}
+      inert={suppressed || undefined}
       style={playerStyle}
     >
+      <span className="player-dock__reveal-zone" aria-hidden="true" />
       <button
         className="player-dock__collapse"
         type="button"
@@ -147,9 +156,20 @@ function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = fal
           </div>
         </div>
 
+        <LyricsSection
+          currentTime={currentTime}
+          duration={duration}
+          onSeek={(time) => {
+            const event = { target: { value: time } }
+            handleSeek(event)
+            commitSeek(event)
+          }}
+          track={track}
+        />
+
         <PlayerQueue
           activeIndex={currentIndex}
-          onQueueSelect={(_item, index) => onQueueSelect(index)}
+          onQueueSelect={handleQueueSelect}
           queue={queue}
         />
       </div>
@@ -170,10 +190,11 @@ function useAudioPlayerDock({ animationNonce, autoPlay = true, collapsed = false
   const fadeInNonceRef = useRef(0)
   const fadeInPendingRef = useRef(false)
   const pauseFadeRef = useRef({ frameId: null, resolve: null, promise: null, waveSurfer: null })
+  const preloadedAudioRef = useRef(null)
   const onPlaybackChangeRef = useRef(onPlaybackChange)
   const onPlaybackStateChangeRef = useRef(onPlaybackStateChange)
   const onNextRef = useRef(onNext)
-  const hasNextTrackRef = useRef(Boolean(queue[0]?.audioUrl))
+  const hasNextTrackRef = useRef(queue.length > 1)
   const lastProgressUpdateRef = useRef(0)
   const playbackStateRef = useRef({
     currentTime: 0,
@@ -220,7 +241,7 @@ function useAudioPlayerDock({ animationNonce, autoPlay = true, collapsed = false
   }, [onNext])
 
   useEffect(() => {
-    hasNextTrackRef.current = Boolean(queue[0]?.audioUrl)
+    hasNextTrackRef.current = queue.length > 1
   }, [queue])
 
   const setOutputVolume = useCallback((nextVolume) => {
@@ -341,10 +362,16 @@ function useAudioPlayerDock({ animationNonce, autoPlay = true, collapsed = false
     const container = waveformRef.current
     if (!container || !hasAudio) return undefined
 
-    const media = takePrimedAudio(track.audioUrl) ?? new Audio()
+    const normalizedAudioUrl = new URL(track.audioUrl, window.location.href).href
+    const preloadedAudio = preloadedAudioRef.current?.url === normalizedAudioUrl
+      ? preloadedAudioRef.current.audio
+      : null
+    if (preloadedAudio) preloadedAudioRef.current = null
+
+    const media = preloadedAudio ?? takePrimedAudio(track.audioUrl) ?? new Audio()
     media.crossOrigin = 'anonymous'
-    if (media.getAttribute('src') !== track.audioUrl) media.src = track.audioUrl
-    media.preload = 'metadata'
+    if (media.src !== normalizedAudioUrl) media.src = track.audioUrl
+    media.preload = 'auto'
     media.hidden = true
     media.muted = false
     media.setAttribute('aria-hidden', 'true')
@@ -361,9 +388,11 @@ function useAudioPlayerDock({ animationNonce, autoPlay = true, collapsed = false
     }
 
 
-    const mediaDuration = Number.isFinite(track.durationSeconds) && track.durationSeconds > 0
-      ? track.durationSeconds
-      : 1
+    // La duración se lee de una ref (se actualiza antes en el mismo commit) en vez de ser dependencia
+    // del efecto: si el catálogo la completa después, no debe recrearse el audio ni WaveSurfer
+    // a mitad de reproducción. El evento 'ready' ya informa la duración real.
+    const knownDuration = trackDurationRef.current
+    const mediaDuration = Number.isFinite(knownDuration) && knownDuration > 0 ? knownDuration : 1
 
     const waveSurfer = WaveSurfer.create({
       ...waveformOptions,
@@ -451,7 +480,36 @@ function useAudioPlayerDock({ animationNonce, autoPlay = true, collapsed = false
       media.remove()
       if (waveSurferRef.current === waveSurfer) waveSurferRef.current = null
     }
-  }, [autoPlay, fadeInNonce, hasAudio, isLoading, notifyPlaybackState, setOutputVolume, startFadeIn, stopPauseFade, track.audioUrl, track.durationSeconds, track.id, updatePlaybackState])
+  }, [autoPlay, fadeInNonce, hasAudio, isLoading, notifyPlaybackState, setOutputVolume, startFadeIn, stopPauseFade, track.audioUrl, track.id, updatePlaybackState])
+
+  const currentTrackIndex = queue.findIndex((item) => (
+    item.id === track.id && (item.source === 'youtube') === (track.source === 'youtube')
+  ))
+  const nextTrack = currentTrackIndex >= 0 && queue.length > 1
+    ? queue[(currentTrackIndex + 1) % queue.length]
+    : null
+  const nextAudioUrl = nextTrack?.source === 'youtube' ? null : nextTrack?.audioUrl
+
+  useEffect(() => {
+    if (!nextAudioUrl) return undefined
+
+    const normalizedAudioUrl = new URL(nextAudioUrl, window.location.href).href
+    if (preloadedAudioRef.current?.url === normalizedAudioUrl) return undefined
+
+    const media = new Audio()
+    media.crossOrigin = 'anonymous'
+    media.preload = 'auto'
+    media.src = nextAudioUrl
+    media.load()
+    preloadedAudioRef.current = { audio: media, url: normalizedAudioUrl }
+
+    return () => {
+      if (preloadedAudioRef.current?.audio !== media) return
+      preloadedAudioRef.current = null
+      media.removeAttribute('src')
+      media.load()
+    }
+  }, [nextAudioUrl])
 
   useEffect(() => {
     const previousTrack = previousTrackRef.current
@@ -646,6 +704,7 @@ function useAudioPlayerDock({ animationNonce, autoPlay = true, collapsed = false
     hasAudio,
     isPlaying,
     playerStyle,
+    seekTo,
     setVolumeExpanded,
     togglePlayback,
     trackChangeAnimationEnabled,
@@ -661,6 +720,8 @@ function AudioPlayerDock(props) {
     onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, queue, suppressed = false, track,
   } = props
   const player = useAudioPlayerDock(props)
+  const accent = useArtworkAccent(track.artwork)
+  const dockStyle = accent ? { ...player.playerStyle, '--player-accent': accent } : player.playerStyle
 
   return (
     <aside
@@ -668,8 +729,9 @@ function AudioPlayerDock(props) {
       aria-label={`Reproductor de ${track.title}`}
       aria-hidden={suppressed || undefined}
       inert={suppressed || undefined}
-      style={player.playerStyle}
+      style={dockStyle}
     >
+      <span className="player-dock__reveal-zone" aria-hidden="true" />
       <button
         className="player-dock__collapse"
         type="button"
@@ -780,9 +842,16 @@ function AudioPlayerDock(props) {
             </div>
           </div>
 
+          <LyricsSection
+            currentTime={player.currentTime}
+            duration={player.duration}
+            onSeek={player.seekTo}
+            track={track}
+          />
+
           <PlayerQueue
             activeTrackId={track.id}
-            onQueueSelect={(item) => onQueueSelect(item.id)}
+            onQueueSelect={onQueueSelect}
             queue={queue}
           />
         </>

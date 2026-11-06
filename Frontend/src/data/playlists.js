@@ -41,6 +41,15 @@ export function loadPlaylists(songs) {
   }
 }
 
+/** ¿Hay playlists antiguas guardadas en este navegador pendientes de migrar al servidor? */
+export function hasStoredPlaylists() {
+  try {
+    return Boolean(window.localStorage.getItem(STORAGE_KEY))
+  } catch {
+    return false
+  }
+}
+
 export function savePlaylists(playlists) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(playlists))
 }

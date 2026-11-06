@@ -21,8 +21,13 @@ const MAX = 220
 export default function VerticalSpectrum({ analyser, playing = true, width = 22, span = 0.7, pitch = 5, minBars = 36, maxBars = MAX, thickness = 1.6, amplitude = 1 }) {
   const cvRef = useRef(null)
   const live = useRef({ playing, analyser })
+  const wake = useRef(null)
 
-  useEffect(() => { live.current = { playing, analyser } }, [playing, analyser])
+  useEffect(() => {
+    live.current = { playing, analyser }
+    // El bucle se detiene en reposo; al cambiar a "reproduciendo" hay que despertarlo.
+    wake.current?.()
+  }, [playing, analyser])
 
   useEffect(() => {
     const cv = cvRef.current
@@ -31,8 +36,11 @@ export default function VerticalSpectrum({ analyser, playing = true, width = 22,
     const target = new Float32Array(MAX)
     const env = new Float32Array(MAX)
     const avg = new Float32Array(MAX).fill(0.25)
+    const bands = new Float32Array(MAX) // reutilizado: antes se reservaba un array nuevo en cada frame
     const cache = { an: null, n: 0, edges: null, spec: null }
     let N = 100, W = 0, H = 0, dpr = 1, raf = 0
+    let running = false
+    let color = ''
 
     const resize = () => {
       const r = cv.getBoundingClientRect()
@@ -45,7 +53,8 @@ export default function VerticalSpectrum({ analyser, playing = true, width = 22,
         env[i] = 0.3 + 0.7 * Math.pow(Math.cos((c * Math.PI) / 2), 1.2) // campana suave: las puntas sí reaccionan
       }
     }
-    const ro = new ResizeObserver(resize)
+    // Con el bucle parado hay que repintar tras un cambio de tamaño.
+    const ro = new ResizeObserver(() => { resize(); start() })
     ro.observe(cv)
     resize()
 
@@ -67,7 +76,6 @@ export default function VerticalSpectrum({ analyser, playing = true, width = 22,
       if (cache.an !== an || cache.n !== N) prepare(an)
       const { edges, spec } = cache
       an.getByteFrequencyData(spec)
-      const bands = new Float32Array(N)
       for (let k = 0; k < N; k++) {
         const lo = Math.floor(edges[k])
         const hi = Math.max(lo + 1, Math.ceil(edges[k + 1]))
@@ -107,8 +115,23 @@ export default function VerticalSpectrum({ analyser, playing = true, width = 22,
     }
 
     let last = performance.now()
+    function start() {
+      if (running || document.hidden) return
+      running = true
+      last = performance.now()
+      color = getComputedStyle(cv).color // una consulta por arranque del bucle, no una por frame
+      raf = requestAnimationFrame(frame)
+    }
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(raf)
+        running = false
+      } else {
+        start()
+      }
+    }
     const frame = (now) => {
-      const dt = Math.min(0.05, (now - last) / 1000)
+      const dt = Math.max(0, Math.min(0.05, (now - last) / 1000))
       last = now
       const { playing: p, analyser: an } = live.current
       if (p && an && an.context.state === 'running') audioTargets(an)
@@ -122,17 +145,34 @@ export default function VerticalSpectrum({ analyser, playing = true, width = 22,
 
       g.setTransform(dpr, 0, 0, dpr, 0, 0)
       g.clearRect(0, 0, W, H)
-      g.fillStyle = getComputedStyle(cv).color
+      g.fillStyle = color
       const total = H * span, y0 = (H - total) / 2, step = total / N
       const t = Math.min(step * 0.72, thickness)
+      let peak = 0
       for (let i = 0; i < N; i++) {
         const w = t + vals[i] * (W - t) * amplitude // punto en reposo
         pill(W / 2 - w / 2, y0 + i * step + (step - t) / 2, w, t)
+        if (vals[i] > peak) peak = vals[i]
+      }
+
+      // En pausa y con todas las barras ya asentadas en reposo no hay nada más que animar:
+      // se deja el último frame dibujado y se detiene el bucle (antes seguía a 60 fps).
+      if (!p && peak < 0.003) {
+        running = false
+        return
       }
       raf = requestAnimationFrame(frame)
     }
-    raf = requestAnimationFrame(frame)
-    return () => { cancelAnimationFrame(raf); ro.disconnect() }
+    wake.current = start
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    start()
+    return () => {
+      cancelAnimationFrame(raf)
+      running = false
+      wake.current = null
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      ro.disconnect()
+    }
   }, [amplitude, maxBars, minBars, pitch, span, thickness])
 
   return (

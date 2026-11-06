@@ -1,4 +1,4 @@
-import { Check, Compass, Copy, Download, ExternalLink, Headphones, Info, Link2Off, LoaderCircle, Sparkles, UserRound, WifiOff } from 'lucide-react'
+import { Check, Compass, Copy, Download, ExternalLink, Heart, Headphones, Info, Library, Link2Off, ListMusic, LoaderCircle, Play, RefreshCw, Sparkles, UserRound, WifiOff } from 'lucide-react'
 import { useState } from 'react'
 import ArtistSongsView from '../collections/ArtistSongsView.jsx'
 import ArtistView from '../collections/ArtistView.jsx'
@@ -63,15 +63,15 @@ function SearchResults({ controller }) {
 }
 
 function AccountIntro({ account, pending }) {
-  let title = 'Conecta tus recomendaciones reales'
-  let description = 'El acceso con Google identifica YouTube, pero no permite leer el Inicio privado de YouTube Music. Añade una sesión verificada para usar tus gustos reales.'
+  let title = 'Conecta YouTube Music'
+  let description = 'Añade una sesión verificada para usar tus recomendaciones reales y descargar canciones de Mysic Global.'
   if (pending) {
     title = 'Autoriza este dispositivo'
     description = 'Abre YouTube, inicia sesión si hace falta e introduce el código temporal.'
   }
   if (account?.connected) {
     title = 'Tu Inicio real de YouTube Music está conectado'
-    description = 'La sesión fue comprobada contra el feed personal. Inicio, radios y recomendaciones ya usan esta cuenta.'
+    description = 'La sesión fue comprobada. Inicio, radios, recomendaciones y descargas ya usan esta cuenta.'
   }
   return <div className="yt-account-help__copy"><strong>{title}</strong><p>{description}</p></div>
 }
@@ -106,17 +106,30 @@ function MusicSessionForm({ busy, onConnect }) {
   return (
     <form className="yt-account-session" onSubmit={submit}>
       <ol>
-        <li>Abre <a href="https://music.youtube.com" target="_blank" rel="noreferrer">music.youtube.com</a> con la cuenta correcta.</li>
+        <li>Abre una ventana privada, entra en <a href="https://music.youtube.com" target="_blank" rel="noreferrer">music.youtube.com</a> e inicia sesión con la cuenta correcta.</li>
         <li>En DevTools → Red → Fetch/XHR, recarga la página y elige <code>account_menu</code>, <code>browse</code> o <code>next</code>.</li>
         <li>Clic derecho sobre la solicitud → Copiar → Copiar como cURL, y pégala aquí.</li>
+        <li>Cuando Mysic confirme la conexión, cierra la ventana privada.</li>
       </ol>
       <label htmlFor="yt-music-request">Solicitud de YouTube Music</label>
       <textarea id="yt-music-request" value={requestText} onChange={(event) => setRequestText(event.target.value)} autoComplete="off" spellCheck="false" placeholder="curl 'https://music.youtube.com/youtubei/v1/account/account_menu?...' ..." />
       <div className="yt-account-session__footer">
-        <span>Contiene una sesión sensible: no la compartas. Mysic la cifra y no guarda este texto en el navegador.</span>
+        <span>Contiene una sesión sensible: equivale a acceso a tu cuenta. Mysic extrae la cookie y los selectores de cuenta, los cifra y no conserva este texto en el navegador.</span>
         <button className="yt-account-action yt-account-action--primary" type="submit" disabled={busy || !requestText.trim()}>{busy ? <LoaderCircle className="yt-spin" size={16} aria-hidden="true" /> : <UserRound size={16} aria-hidden="true" />} Verificar y conectar</button>
       </div>
     </form>
+  )
+}
+
+function DesktopSessionConnect({ busy, onConnect }) {
+  return (
+    <div className="yt-account-session">
+      <p>Se abrirá una ventana segura de Google. Mysic detectará la sesión al llegar a YouTube Music y la enviará cifrada al servidor después de verificarla.</p>
+      <div className="yt-account-session__footer">
+        <span>La contraseña y la verificación en dos pasos se introducen únicamente en la página de Google.</span>
+        <button className="yt-account-action yt-account-action--primary" type="button" disabled={busy} onClick={onConnect}>{busy ? <LoaderCircle className="yt-spin" size={16} aria-hidden="true" /> : <UserRound size={16} aria-hidden="true" />} Iniciar sesión con YouTube Music</button>
+      </div>
+    </div>
   )
 }
 
@@ -130,7 +143,7 @@ function AccountActions({ account, busy, onDisconnect, pending }) {
   return null
 }
 
-function AccountHelp({ account, busy, error, onConnect, onDisconnect, open }) {
+function AccountHelp({ account, busy, desktopSession, error, onConnect, onDesktopConnect, onDisconnect, onOfficialSync, officialBusy, open }) {
   const pending = account?.status === 'pending'
 
   return (
@@ -139,7 +152,10 @@ function AccountHelp({ account, busy, error, onConnect, onDisconnect, open }) {
         <AccountIntro account={account} pending={pending} />
         {pending && <AccountCode account={account} />}
         <AccountActions account={account} busy={busy} onDisconnect={onDisconnect} pending={pending} />
-        {!account?.connected && !pending && <MusicSessionForm busy={busy} onConnect={onConnect} />}
+        <div className="yt-account-help__actions"><button className="yt-account-action yt-account-action--primary" type="button" disabled={officialBusy} onClick={onOfficialSync}>{officialBusy ? <LoaderCircle className="yt-spin" size={16} aria-hidden="true" /> : <RefreshCw size={16} aria-hidden="true" />} Sincronizar playlists y Me gusta</button></div>
+        {!account?.connected && !pending && (desktopSession
+          ? <DesktopSessionConnect busy={busy} onConnect={onDesktopConnect} />
+          : <MusicSessionForm busy={busy} onConnect={onConnect} />)}
         {error && <p className="yt-account-help__error" role="alert">{error}</p>}
       </div>
     </div>
@@ -147,6 +163,7 @@ function AccountHelp({ account, busy, error, onConnect, onDisconnect, open }) {
 }
 
 function getCatalogHeading(kind, personalized) {
+  if (kind === 'official-library') return 'Tu biblioteca de YouTube'
   if (kind === 'explore') return 'Explorar'
   if (kind === 'home') return personalized ? 'Hecho para ti' : 'Descubre música'
   if (kind === 'recommendations') return personalized ? 'Recomendado para ti' : 'Música relacionada'
@@ -160,12 +177,13 @@ function CatalogTabs({ browse, downloads, player, showDownloads, showingDownload
       <button className={browse.view.kind === 'explore' ? 'is-active' : ''} type="button" onClick={browse.showExplore}><Compass size={16} aria-hidden="true" /> Explorar</button>
       {player.currentSong && <button className={browse.view.kind === 'recommendations' ? 'is-active' : ''} type="button" onClick={() => browse.showRecommendations(player.currentSong.id)}><Sparkles size={16} aria-hidden="true" /> Recomendado</button>}
       <button className={showingDownloads ? 'is-active' : ''} type="button" onClick={showDownloads}><Download size={16} aria-hidden="true" /> Descargas{downloads.downloads.items.length ? ` (${downloads.downloads.items.length})` : ''}</button>
+      {browse.view.data && browse.view.kind === 'official-library' && <button className="is-active" type="button"><Library size={16} aria-hidden="true" /> Biblioteca</button>}
     </nav>
   )
 }
 
 function CatalogNavigation({ controller }) {
-  const { account, accountBusy, accountError, accountHelpOpen, actionError, browse, changeTab, connectMusicSession, disconnectAccount, downloads, player, searchType, setAccountHelpOpen, showDownloads } = controller
+  const { account, accountBusy, accountError, accountHelpOpen, actionError, browse, changeTab, connectDesktopSession, connectMusicSession, desktopSessionAvailable, disconnectAccount, downloads, officialLibraryBusy, player, searchType, setAccountHelpOpen, showDownloads, syncOfficialLibrary } = controller
   const showingDownloads = browse.view.kind === 'downloads'
   const heading = getCatalogHeading(browse.view.kind, account?.personalized)
 
@@ -174,10 +192,10 @@ function CatalogNavigation({ controller }) {
       <div className="yt-hub__topline">
         <div><span className="yt-hub__eyebrow">YOUTUBE MUSIC</span><h1>{heading}</h1></div>
         <button className={`yt-account${account?.connected ? ' yt-account--connected' : ''}`} type="button" aria-controls="yt-account-help" aria-expanded={accountHelpOpen} onClick={() => setAccountHelpOpen((open) => !open)}>
-          <UserRound size={17} aria-hidden="true" /><span>{account?.connected ? 'Personalización verificada' : 'Conectar recomendaciones'}</span><Info size={15} aria-hidden="true" />
+          <UserRound size={17} aria-hidden="true" /><span>{account?.connected ? 'YouTube Music conectado' : 'Conectar YouTube Music'}</span><Info size={15} aria-hidden="true" />
         </button>
       </div>
-      <AccountHelp account={account} busy={accountBusy} error={accountError} onConnect={connectMusicSession} onDisconnect={disconnectAccount} open={accountHelpOpen} />
+      <AccountHelp account={account} busy={accountBusy} desktopSession={desktopSessionAvailable} error={accountError} onConnect={connectMusicSession} onDesktopConnect={connectDesktopSession} onDisconnect={disconnectAccount} onOfficialSync={syncOfficialLibrary} officialBusy={officialLibraryBusy} open={accountHelpOpen} />
       <CatalogTabs browse={browse} downloads={downloads} player={player} showDownloads={showDownloads} showingDownloads={showingDownloads} />
       {actionError && <div className="collection-empty" role="alert">{actionError}</div>}
       {(browse.view.kind === 'search' || showingDownloads) && (
@@ -188,7 +206,7 @@ function CatalogNavigation({ controller }) {
 }
 
 function BrowseShelves({ controller, data }) {
-  const { openAlbum, openArtist, player, playSongs, startPlaylist } = controller
+  const { openAlbum, openArtist, openPlaylist, player, playSongs } = controller
   if (!data?.shelves?.length) return <div className="collection-empty">No hay recomendaciones disponibles por ahora.</div>
   return data.shelves.map((shelf) => (
     <HomeRail
@@ -202,7 +220,7 @@ function BrowseShelves({ controller, data }) {
         if (item?.kind === 'song') playSongs(shelf.items.filter((entry) => entry.kind === 'song'), id)
         if (item?.kind === 'artist') openArtist(id)
         if (item?.kind === 'album') openAlbum(id)
-        if (item?.kind === 'playlist') startPlaylist(id)
+        if (item?.kind === 'playlist') openPlaylist(id)
       }}
       selectedId={player.currentSong?.id}
       selectedItemPlaying={player.isPlaying}
@@ -239,6 +257,82 @@ function DownloadsView({ controller }) {
   return <div className="home-page"><CatalogNavigation controller={controller} /><ConnectivityNotice online={downloads.online} />{browse.error && <div className="collection-empty" role="alert">{browse.error}</div>}<SongResults controller={controller} sourceSongs={downloads.downloads.items} title="Descargas" /></div>
 }
 
+function LibraryArtwork({ artwork, fallback: Fallback }) {
+  return artwork
+    ? <img src={artwork} alt="" loading="eager" decoding="async" />
+    : <span aria-hidden="true"><Fallback size={22} strokeWidth={1.7} /></span>
+}
+
+function LibraryOverview({ controller, data }) {
+  const artwork = [
+    ...data.playlists.map((playlist) => playlist.thumbnail),
+    ...data.likedSongs.map((song) => song.thumbnail),
+  ].filter(Boolean).slice(0, 4)
+  const canPlayLikes = data.likedSongs.length > 0
+
+  return (
+    <section className="yt-library-overview" aria-labelledby="yt-library-overview-title">
+      <div className="yt-library-overview__copy">
+        <span>COLECCIÓN PERSONAL</span>
+        <h2 id="yt-library-overview-title">Tu música, reunida</h2>
+        <p>{data.playlists.length} playlists y {data.likedSongs.length} canciones que te gustan, sincronizadas con YouTube Music.</p>
+        <button type="button" disabled={!canPlayLikes} onClick={() => controller.playSongs(data.likedSongs, data.likedSongs[0].id)}>
+          <Play size={15} fill="currentColor" aria-hidden="true" /> Reproducir Me gusta
+        </button>
+      </div>
+      <div className="yt-library-overview__mosaic" aria-hidden="true">
+        {artwork.map((image, index) => <img loading="lazy" decoding="async" src={image} alt="" key={`${image}-${index}`} />)}
+        {artwork.length === 0 && <span><Library size={34} strokeWidth={1.4} /></span>}
+      </div>
+    </section>
+  )
+}
+
+function LibraryShortcuts({ controller, data }) {
+  const playlists = data.playlists.slice(0, 3)
+  return (
+    <section className="yt-library-shortcuts" aria-labelledby="yt-library-shortcuts-title">
+      <div className="yt-library-section-heading">
+        <ListMusic size={18} aria-hidden="true" />
+        <h2 id="yt-library-shortcuts-title">Accesos directos</h2>
+      </div>
+      <div className="yt-library-shortcuts__grid">
+        <button type="button" disabled={!data.likedSongs.length} onClick={() => controller.playSongs(data.likedSongs, data.likedSongs[0].id)}>
+          <span className="yt-library-shortcuts__artwork yt-library-shortcuts__artwork--liked"><LibraryArtwork artwork={data.likedSongs[0]?.thumbnail} fallback={Heart} /></span>
+          <span><strong>Tus Me gusta</strong><small>{data.likedSongs.length} canciones</small></span>
+          <Play size={16} fill="currentColor" aria-hidden="true" />
+        </button>
+        {playlists.map((playlist) => (
+          <button type="button" key={playlist.id} onClick={() => controller.openPlaylist(playlist.id)}>
+            <span className="yt-library-shortcuts__artwork"><LibraryArtwork artwork={playlist.thumbnail} fallback={ListMusic} /></span>
+            <span><strong>{playlist.title}</strong><small>{playlist.itemCount} canciones</small></span>
+            <Play size={16} fill="currentColor" aria-hidden="true" />
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function OfficialLibraryView({ controller }) {
+  const data = controller.browse.view.data
+  const playlists = data.playlists.map((playlist) => ({
+    artwork: playlist.thumbnail,
+    artist: `${playlist.itemCount} canciones`,
+    id: playlist.id,
+    title: playlist.title,
+  }))
+  return (
+    <div className="home-page yt-library">
+      <CatalogNavigation controller={controller} />
+      <LibraryOverview controller={controller} data={data} />
+      <LibraryShortcuts controller={controller} data={data} />
+      <HomeRail items={playlists} onSelect={controller.openPlaylist} title="Tus playlists de YouTube" />
+      <SongResults controller={controller} sourceSongs={data.likedSongs} title="Canciones que te gustan" />
+    </div>
+  )
+}
+
 function ArtistDetail({ controller }) {
   const { browse, likedArtistIds, likedSongIds, onAddToPlaylist, openAlbum, openArtistSongs, player, playSongs, renderSongActions, toggleArtistFavorite, toggleSongFavorite } = controller
   const sourceSongs = browse.view.data.topSongs
@@ -260,6 +354,13 @@ function AlbumDetail({ controller }) {
   return <CollectionDetailView collection={{ albumId: data.id, artist: data.artist, artistArtwork: data.thumbnail, artistId: data.artistId, artwork: data.thumbnail, kind: 'Álbum', title: data.title, year: data.year }} collectionFavorite={likedAlbumIds.has(data.id)} likedSongIds={likedSongIds} onAddToPlaylist={onAddToPlaylist} onArtistSelect={openArtist} onBack={controller.goBack} onDownloadCollection={() => downloads.downloadMany(sourceSongs)} onPlaybackToggle={player.togglePlay} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleCollectionFavorite={(liked) => toggleAlbumFavorite(data.id, liked)} onToggleFavorite={toggleSongFavorite} renderTrackActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} songs={sourceSongs.map(adaptSong)} />
 }
 
+function PlaylistDetail({ controller }) {
+  const { browse, downloads, likedSongIds, onAddToPlaylist, openAlbum, openArtist, player, playSongs, renderSongActions, toggleSongFavorite } = controller
+  const data = browse.view.data
+  const sourceSongs = data.songs
+  return <CollectionDetailView collection={{ artist: 'YouTube Music', artwork: data.thumbnail, description: data.description, id: data.id, kind: 'Playlist', title: data.title }} likedSongIds={likedSongIds} onAddToPlaylist={onAddToPlaylist} onAlbumSelect={openAlbum} onArtistSelect={openArtist} onBack={controller.goBack} onDownloadCollection={() => downloads.downloadMany(sourceSongs)} onPlaybackToggle={player.togglePlay} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleFavorite={toggleSongFavorite} renderTrackActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} selectedSongSource="youtube" songs={sourceSongs.map(adaptSong)} />
+}
+
 export default function YoutubeCatalogContent({ controller }) {
   const kind = controller.browse.view.kind
   if (kind === 'search') return <SearchView controller={controller} />
@@ -267,6 +368,8 @@ export default function YoutubeCatalogContent({ controller }) {
   if (kind === 'artist') return <ArtistDetail controller={controller} />
   if (kind === 'artist-songs') return <ArtistSongsDetail controller={controller} />
   if (kind === 'album') return <AlbumDetail controller={controller} />
+  if (kind === 'playlist') return <PlaylistDetail controller={controller} />
   if (kind === 'downloads') return <DownloadsView controller={controller} />
+  if (kind === 'official-library') return <OfficialLibraryView controller={controller} />
   return null
 }

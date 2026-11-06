@@ -2,6 +2,8 @@ import { Bell, ChevronDown, LogOut, Menu, Search, Sparkles, UserRound } from 'lu
 import { useEffect, useRef, useState } from 'react'
 import BrandLogo from './BrandLogo.jsx'
 import { DesktopAppHeaderLink } from './DesktopAppDownload.jsx'
+import ShortcutsHelp from '../features/shortcuts/ShortcutsHelp.jsx'
+import { matchShortcut } from '../features/shortcuts/shortcuts.js'
 
 function AppHeader({
   collapsed,
@@ -21,6 +23,7 @@ function AppHeader({
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const menuRef = useRef(null)
   const searchInputRef = useRef(null)
 
@@ -30,6 +33,24 @@ function AppHeader({
     }
 
     function closeFromKeyboard(event) {
+      const shortcut = matchShortcut(event)
+      if (shortcut === 'search') {
+        event.preventDefault()
+        setSearchOpen(true)
+        // Espera al render: en móvil el campo solo existe con la búsqueda abierta.
+        requestAnimationFrame(() => {
+          const input = document.querySelector('#global-header-search-root .yt-music-search input')
+          input?.focus()
+          input?.select?.()
+        })
+        return
+      }
+      if (shortcut === 'help') {
+        event.preventDefault()
+        setHelpOpen(true)
+        return
+      }
+
       if (event.key === 'Escape') {
         setMenuOpen(false)
         setSearchOpen(false)
@@ -60,6 +81,7 @@ function AppHeader({
   }
 
   return (
+    <>
     <header className={`app-header${searchOpen ? ' app-header--search-open' : ''}${mobileBrandHidden ? ' app-header--brand-hidden' : ''}`}>
       <div className="app-header__inner">
         <div className="app-header__leading">
@@ -204,6 +226,8 @@ function AppHeader({
         </div>
       </div>
     </header>
+    {helpOpen && <ShortcutsHelp onClose={() => setHelpOpen(false)} />}
+    </>
   )
 }
 

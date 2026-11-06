@@ -19,21 +19,26 @@ const STREAM_STRATEGIES = [
 // Caché acotada de URLs descifradas; además comparte una resolución simultánea.
 const streamCache = createAsyncTtlCache({ ttlMs: config.streamCacheTtlMs, maxSize: config.streamCacheMax });
 
-export function invalidateStream(videoId) {
-  streamCache.delete(videoId);
+function streamCacheKey(videoId, cacheScope) {
+  return `${cacheScope}:${videoId}`;
 }
 
-export async function resolveAudioStream(videoId) {
-  return streamCache.get(videoId, () => loadAudioStream(videoId));
+export function invalidateStream(videoId, cacheScope = 'anonymous') {
+  streamCache.delete(streamCacheKey(videoId, cacheScope));
 }
 
-async function loadAudioStream(videoId) {
-  const youtube = getYoutube();
+export async function resolveAudioStream(videoId, options = {}) {
+  const cacheScope = options.cacheScope || 'anonymous';
+  const youtube = options.youtube || getYoutube();
+  const mintToken = options.mintToken || mintPoToken;
+  return streamCache.get(streamCacheKey(videoId, cacheScope), () => loadAudioStream(videoId, youtube, mintToken));
+}
 
+export async function loadAudioStream(videoId, youtube, mintToken = mintPoToken) {
   let lastError = null;
   for (const { client, usePoToken } of STREAM_STRATEGIES) {
     try {
-      const poToken = usePoToken ? await mintPoToken(videoId) : null;
+      const poToken = usePoToken ? await mintToken(videoId) : null;
       const info = await youtube.getBasicInfo(videoId, poToken ? { client, po_token: poToken } : { client });
       const status = info.playability_status?.status;
       if (status && status !== 'OK') {

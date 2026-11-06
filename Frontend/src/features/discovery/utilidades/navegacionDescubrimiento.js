@@ -1,6 +1,11 @@
 import { readStorage, writeStorage } from '../../../lib/storage.js'
 
-const ROUTE_STORAGE_KEY = 'mysic:last-route'
+// v2: al cambiar la sección por defecto a YouTube Music se descarta la ruta guardada
+// anteriormente (casi siempre '#/inicio'); si no, los usuarios actuales seguirían aterrizando en Mysic.
+const ROUTE_STORAGE_KEY = 'mysic:last-route:v2'
+
+/** Sección que se abre al entrar sin una ruta válida. */
+export const DEFAULT_SECTION = 'youtube'
 
 export const sectionHashes = {
   home: '#/inicio',
@@ -37,8 +42,9 @@ export function restoreLastRoute() {
     return
   }
 
-  const savedHash = readStorage(ROUTE_STORAGE_KEY, sectionHashes.home)
-  const nextHash = isKnownRoute(savedHash) ? savedHash : sectionHashes.home
+  const defaultHash = sectionHashes[DEFAULT_SECTION]
+  const savedHash = readStorage(ROUTE_STORAGE_KEY, defaultHash)
+  const nextHash = isKnownRoute(savedHash) ? savedHash : defaultHash
   window.history.replaceState(window.history.state, '', nextHash)
 }
 
@@ -66,7 +72,7 @@ export function getSectionFromHash() {
   if (getPlaylistIdFromHash()) return 'playlist'
   if (getAlbumIdFromHash()) return 'album'
   if (getArtistIdFromHash()) return 'artist'
-  return hashSections[window.location.hash] ?? 'home'
+  return hashSections[window.location.hash] ?? DEFAULT_SECTION
 }
 
 export function createAlbumItems(songs) {
@@ -141,6 +147,20 @@ export function getFollowingSongs(songs, selectedSongId, count = 10) {
 export function getPlaybackQueue(songs, selectedSongId) {
   if (!selectedSongId || !songs.some((song) => song.id === selectedSongId)) return []
   return songs
+}
+
+export function getPlaybackTrackKey(song) {
+  if (!song?.id) return ''
+  return `${song.source === 'youtube' ? 'youtube' : 'local'}:${song.id}`
+}
+
+export function getRelativePlaybackSong(songs, currentSong, offset) {
+  if (!songs.length || !currentSong || !offset) return null
+  const currentKey = getPlaybackTrackKey(currentSong)
+  const currentIndex = songs.findIndex((song) => getPlaybackTrackKey(song) === currentKey)
+  if (currentIndex < 0) return null
+  const nextIndex = (currentIndex + offset + songs.length) % songs.length
+  return songs[nextIndex]
 }
 
 export function resolvePlaybackSongs(catalogSongs, contextSongs, restoredSongs, selectedSongId) {

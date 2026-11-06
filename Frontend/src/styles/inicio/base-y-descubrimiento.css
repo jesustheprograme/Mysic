@@ -513,11 +513,11 @@
 }
 
 .song-list--slide-next {
-  animation: song-page-slide-next 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: song-page-slide-next 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .song-list--slide-previous {
-  animation: song-page-slide-previous 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: song-page-slide-previous 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes song-page-slide-next {
@@ -561,8 +561,7 @@
     color 170ms ease,
     background-color 170ms ease,
     border-color 170ms ease,
-    box-shadow 170ms ease,
-    transform 170ms ease;
+    box-shadow 170ms ease;
 }
 
 .song-row::after {
@@ -573,15 +572,21 @@
   height: 1px;
   background: rgba(255, 255, 255, 0.04);
   content: '';
+  transition: opacity 170ms ease;
   pointer-events: none;
 }
 
-.song-row:hover {
-  color: #f4f3ef;
-  border-color: rgba(255, 255, 255, 0.06);
-  background: #090b0a;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
-  transform: translateY(-1px);
+.song-row:hover,
+.song-row:focus-within {
+  color: #edf0ec;
+  border-color: transparent;
+  background: rgba(194, 202, 198, 0.032);
+  box-shadow: inset 0 0 0 1px rgba(194, 202, 198, 0.08);
+}
+
+.song-row:hover::after,
+.song-row:focus-within::after {
+  opacity: 0;
 }
 
 .song-row:focus-visible,
@@ -591,9 +596,15 @@
 }
 
 .song-row--active {
-  border-color: rgba(255, 255, 255, 0.07);
-  background: #0a0c0b;
-  box-shadow: inset 2px 0 0 rgba(255, 255, 255, 0.16);
+  border-color: transparent;
+  background: rgba(194, 202, 198, 0.022);
+}
+
+.song-row--active:hover,
+.song-row--active:focus-within {
+  border-color: transparent;
+  background: rgba(194, 202, 198, 0.045);
+  box-shadow: inset 0 0 0 1px rgba(194, 202, 198, 0.09);
 }
 
 .song-row__artwork {
@@ -626,6 +637,7 @@
 
 .song-row:hover .song-row__artwork img,
 .song-row:focus-visible .song-row__artwork img,
+.song-row--active .song-row__artwork img,
 .song-row--playing .song-row__artwork img {
   filter: brightness(0.72);
   transform: scale(1.025);
@@ -633,6 +645,7 @@
 
 .song-row:hover .song-row__artwork > span,
 .song-row:focus-visible .song-row__artwork > span,
+.song-row--active .song-row__artwork > span,
 .song-row--playing .song-row__artwork > span,
 .song-row--preview-loading .song-row__artwork > span,
 .song-row--preview-playing .song-row__artwork > span {

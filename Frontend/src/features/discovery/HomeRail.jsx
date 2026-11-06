@@ -46,7 +46,7 @@ function HomeRail({
         {items.map((item, index) => {
           const previewStatus = preview?.itemId === item.id ? preview.status : null
           const isSelected = selectedId === item.id
-          const indicatorStatus = previewStatus ?? (isSelected && selectedItemPlaying ? 'playing' : null)
+          const indicatorStatus = previewStatus ?? (isSelected ? selectedItemPlaying ? 'playing' : 'paused' : null)
           const selectItem = () => {
             if (previewStatus) onPreviewStop?.()
             if (isSelected && onPlaybackToggle) {

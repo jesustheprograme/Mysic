@@ -53,3 +53,10 @@ desktop.ini
 *.njsproj
 *.sln
 *.sw?
+deploy/downloads/*.exe
+
+# Artefactos de despliegue y herramientas locales: no son codigo fuente
+deploy/*.tar.gz
+deploy/*-profile*/
+deploy/*.png
+limusic_*.exe

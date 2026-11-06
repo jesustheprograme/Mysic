@@ -124,7 +124,7 @@ function ArtworkEditor({ editor }) {
           <div className="playlist-artwork-picker" role="listbox" aria-label="Elegir portada">
             {editor.artworkOptions.map((song) => {
               const selected = !editor.artworkFile && editor.artwork === song.artwork
-              return <button className={`playlist-artwork-picker__option${selected ? ' playlist-artwork-picker__option--active' : ''}`} type="button" role="option" aria-selected={selected} aria-label={`Portada de ${song.title}`} key={song.artwork} onClick={() => editor.selectExistingArtwork(song.artwork)}><img src={song.artwork} alt="" />{selected && <Check size={14} strokeWidth={2.5} aria-hidden="true" />}</button>
+              return <button className={`playlist-artwork-picker__option${selected ? ' playlist-artwork-picker__option--active' : ''}`} type="button" role="option" aria-selected={selected} aria-label={`Portada de ${song.title}`} key={song.artwork} onClick={() => editor.selectExistingArtwork(song.artwork)}><img loading="lazy" decoding="async" src={song.artwork} alt="" />{selected && <Check size={14} strokeWidth={2.5} aria-hidden="true" />}</button>
             })}
           </div>
         )}

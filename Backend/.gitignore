@@ -5,3 +5,4 @@ npm-debug.log*
 
 # Yotubei: descargas y cachés
 data/youtube/
+data/lyrics/

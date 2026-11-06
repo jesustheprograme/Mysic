@@ -17,11 +17,13 @@ function SectionRoute({
   likedAlbumIds,
   likedArtistIds,
   likedSongIds,
+  externalFavoriteSongs = [],
   newReleaseSongs,
   onAddToPlaylist,
   onAlbumSelect,
   onArtistSelect,
   onPlaybackToggle,
+  onExternalSongSelect,
   onPreviewStart,
   onPreviewStop,
   onSongSelect,
@@ -45,7 +47,7 @@ function SectionRoute({
     const matchesQuery = (query, ...values) => !query || values.some((value) => (
       String(value ?? '').toLocaleLowerCase().includes(query)
     ))
-    const favoriteSongs = songs.filter((song) => (
+    const favoriteSongs = [...songs, ...externalFavoriteSongs].filter((song) => (
       likedSongIds?.has(song.id)
       && matchesQuery(normalizedSongQuery, song.title, song.artist, song.albumTitle, ...(song.genres ?? []))
     ))
@@ -71,6 +73,7 @@ function SectionRoute({
           onAlbumSelect={(albumId) => onAlbumSelect?.(`album-${albumId}`)}
           onArtistSelect={onArtistSelect}
           onPlaybackToggle={onPlaybackToggle}
+          onExternalSongSelect={onExternalSongSelect}
           onPreviewStart={onPreviewStart}
           onPreviewStop={onPreviewStop}
           onSongSelect={onSongSelect}

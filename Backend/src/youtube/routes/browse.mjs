@@ -1,8 +1,9 @@
 import express from 'express';
 import { asyncRoute, BROWSE_ID_RE, requireYoutube, validateParam, VIDEO_ID_RE } from '../utils/http.mjs';
-import { getExplore, getHome, getPlaylistQueue, getRadio, getRecommendations } from '../youtube/browse.mjs';
+import { getExplore, getHome, getPlaylistQueue, getRadio, getRecommendations, getSessionLibrary } from '../youtube/browse.mjs';
 import { getYoutube } from '../youtube/client.mjs';
-import { connectBrowserSession, getAccountStatus, getYoutubeForUser, startAccountLink, unlinkAccount } from '../youtube/accountLink.mjs';
+import { connectBrowserSession, connectCapturedBrowserSession, getAccountStatus, getYoutubeForUser, startAccountLink, unlinkAccount } from '../youtube/accountLink.mjs';
+import { getOfficialYoutubeLibrary } from '../youtube/dataApi.mjs';
 
 async function getRequestYoutube(req) {
   return await getYoutubeForUser(req.mysicUser) ?? getYoutube();
@@ -36,10 +37,43 @@ export function createBrowseRouter() {
     }
   });
 
+  router.post('/link/session', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    try {
+      res.json(await connectCapturedBrowserSession(req.mysicUser, req.body));
+    } catch (error) {
+      console.warn(`No se pudo validar una sesión capturada de YouTube Music: ${error.message}`);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   router.delete('/link', asyncRoute(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.json(await unlinkAccount(req.mysicUser));
   }, 'No se pudo desvincular YouTube Music'));
+
+  router.post('/official/library', async (req, res) => {
+    res.setHeader('Cache-Control', 'private, no-store');
+    try {
+      res.json(await getOfficialYoutubeLibrary(req.body?.accessToken));
+    } catch (error) {
+      res.status(error.status === 400 ? 400 : 502).json({ error: error.message });
+    }
+  });
+
+  router.get('/library', requireYoutube, async (req, res) => {
+    res.setHeader('Cache-Control', 'private, no-store');
+    const youtube = await getYoutubeForUser(req.mysicUser);
+    if (!youtube) {
+      return res.status(409).json({ error: 'Conecta una sesión de YouTube Music antes de sincronizar tu biblioteca.' });
+    }
+    try {
+      return res.json(await getSessionLibrary(youtube));
+    } catch (error) {
+      console.warn(`No se pudo sincronizar la biblioteca de YouTube Music: ${error.message}`);
+      return res.status(502).json({ error: 'YouTube Music no pudo entregar tu biblioteca. Inténtalo nuevamente.' });
+    }
+  });
 
   router.get('/home', requireYoutube, asyncRoute(async (req, res) => {
     res.setHeader('Cache-Control', 'private, no-store');

@@ -1,0 +1,96 @@
+.lyrics {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.lyrics__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  padding: 8px 12px;
+  border: 1px solid #414846;
+  border-radius: 999px;
+  background: transparent;
+  color: #e7e9e5;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.lyrics__toggle:hover,
+.lyrics__toggle--open {
+  background: #414846;
+}
+
+.lyrics__toggle:focus-visible,
+.lyrics__line:focus-visible {
+  outline: 2px solid #e7e9e5;
+  outline-offset: 2px;
+}
+
+.lyrics__lines {
+  display: grid;
+  gap: 2px;
+  max-height: 260px;
+  margin: 0;
+  padding: 8px 0;
+  overflow-y: auto;
+  list-style: none;
+  overscroll-behavior: contain;
+}
+
+.lyrics__line {
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #8b918e;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.lyrics__line:disabled {
+  cursor: default;
+}
+
+.lyrics__line:not(:disabled):hover {
+  color: #e7e9e5;
+}
+
+.lyrics__line--past {
+  color: #6c726f;
+}
+
+.lyrics__line--active {
+  color: #ffffff;
+  font-weight: 700;
+  transform: translateX(4px);
+}
+
+.lyrics__plain,
+.lyrics__message {
+  margin: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  color: #b7bcb9;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lyrics__line {
+    transition: none;
+  }
+
+  .lyrics__line--active {
+    transform: none;
+  }
+}

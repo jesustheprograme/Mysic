@@ -1,4 +1,6 @@
-import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import '../../styles/home.css'
+import { Download, LoaderCircle, Trash2 } from 'lucide-react'
 import AppHeader from '../../components/AppHeader.jsx'
 import AppSidebar from '../../components/AppSidebar.jsx'
 import AlbumView from '../collections/AlbumView.jsx'
@@ -21,6 +23,9 @@ import { openMiniPlayerWindow } from '../mini-player/openMiniPlayerWindow.tsx'
 import { catalogApi } from '../../lib/api.js'
 import { primeAutoplay } from '../auth/autoplayUnlock.js'
 import { canImportMusic } from '../music-import/musicImportAccess.js'
+import { useDownloads } from '../youtube/hooks/useDownloads.js'
+import { useYoutubeFavorites } from '../youtube/hooks/useYoutubeFavorites.js'
+import { adaptSong } from '../youtube/lib/adapters.js'
 
 const MusicImportView = lazy(() => import('../music-import/MusicImportView.jsx'))
 const NewArtistSpotlight = lazy(() => import('./NewArtistSpotlight.jsx'))
@@ -29,10 +34,12 @@ const YoutubeView = lazy(() => import('../youtube/YoutubeView.jsx'))
 import {
   createAlbumItems,
   createArtistItems,
+  DEFAULT_SECTION,
   getAlbumIdFromHash,
   getArtistIdFromHash,
   getFollowingSongs,
   getPlaybackQueue,
+  getRelativePlaybackSong,
   getPlaylistIdFromHash,
   getSectionFromHash,
   rememberRouteHash,
@@ -178,9 +185,9 @@ function usePlaylistActions({
 }
 
 function useSongSelection({
-  autoSpotlightBlockedRef, discoveryLoadingTimerRef, onSongSelect, playbackSongs, selectedSongId,
+  autoSpotlightBlockedRef, discoveryLoadingTimerRef, onSongSelect,
   setDiscoveryLoading, setDiscoveryMix, setPlayerAnimationNonce, setPlayerFadeInNonce,
-  setSelectedSongContext, setSelectedSongPlaying, songs, stopPreview,
+  setPlaybackOwner, setSelectedSongContext, setSelectedSongPlaying, songs, stopPreview,
 }) {
   function selectSong(songId, {
     animatePlayer = true,
@@ -190,6 +197,7 @@ function useSongSelection({
     preserveDiscoveryMix = false,
   } = {}) {
     if (songId !== null) autoSpotlightBlockedRef.current = true
+    if (songId !== null) setPlaybackOwner('local')
     clearTimeout(discoveryLoadingTimerRef.current)
     setDiscoveryLoading(false)
     if (contextSongs) setDiscoveryMix(contextSongs)
@@ -202,22 +210,12 @@ function useSongSelection({
     onSongSelect(songId)
   }
 
-  function selectRelativeSong(offset) {
-    const currentIndex = playbackSongs.findIndex((song) => song.id === selectedSongId)
-    const startIndex = currentIndex >= 0 ? currentIndex : 0
-    const nextIndex = (startIndex + offset + playbackSongs.length) % playbackSongs.length
-    selectSong(playbackSongs[nextIndex].id, {
-      animatePlayer: false,
-      contextSong: playbackSongs[nextIndex],
-      contextSongs: playbackSongs,
-    })
-  }
-
   function startWeeklyDiscovery() {
     const weeklyMix = shuffleSongs(songs)
     const firstSong = weeklyMix[0]
     if (!firstSong) return
     autoSpotlightBlockedRef.current = true
+    setPlaybackOwner('local')
     clearTimeout(discoveryLoadingTimerRef.current)
     stopPreview()
     setDiscoveryMix(weeklyMix)
@@ -228,21 +226,15 @@ function useSongSelection({
     onSongSelect(firstSong.id)
   }
 
-  return { selectRelativeSong, selectSong, startWeeklyDiscovery }
+  return { selectSong, startWeeklyDiscovery }
 }
 
-function useMiniPlayerCommandListener({ playbackSongs, selectRelativeSong, selectSong }) {
+function useMiniPlayerCommandListener({ onNext, onPrevious, onSelect }) {
   const handleCommand = useEffectEvent((command) => {
     if (!ownsMiniPlayer('mysic')) return
-    if (command.type === 'next') return selectRelativeSong(1)
-    if (command.type === 'previous') return selectRelativeSong(-1)
-    if (command.type === 'select') {
-      selectSong(command.songId, {
-        animatePlayer: false,
-        contextSong: playbackSongs.find((song) => song.id === command.songId) ?? null,
-        contextSongs: playbackSongs,
-      })
-    }
+    if (command.type === 'next') return onNext()
+    if (command.type === 'previous') return onPrevious()
+    if (command.type === 'select') onSelect(command.songId)
   })
 
   useEffect(() => {
@@ -287,7 +279,7 @@ function useDiscoveryNavigation({
     }
     setActiveSection(section)
     resetDetailIds()
-    pushHash(nextHash, sectionHashes.home)
+    pushHash(nextHash, sectionHashes[DEFAULT_SECTION])
   }
 
   function navigateToPlaylist(playlistId) {
@@ -325,6 +317,35 @@ function useDiscoveryNavigation({
   }
 
   return { navigateBack, navigateTo, navigateToAlbum, navigateToArtist, navigateToPlaylist }
+}
+
+const RECENT_SHELF_TITLES = [
+  'After Hours 3',
+  'Tidal Memory 3',
+  'Golden Hour 3',
+  'Red Horizon 3',
+  'Quiet Signal 3',
+  'Low Tide 3',
+]
+const NEW_RELEASE_SHELF_TITLES = [
+  'Open Roads 3',
+  'Paper Moons 3',
+  'Slow Signal 3',
+  'Northern Lines 3',
+  'Soft Focus 3',
+  'Ember Glass 3',
+]
+
+/** Canciones destacadas por título, completadas hasta 6 extra con las primeras que haya. */
+function getShelfSongs(songs, titles) {
+  const selectedSongs = titles.reduce((selected, title) => {
+    const song = songs.find((item) => item.title === title)
+    if (song) selected.push(song)
+    return selected
+  }, [])
+  const selectedIds = new Set(selectedSongs.map((song) => song.id))
+  const additionalSongs = songs.filter((song) => !selectedIds.has(song.id)).slice(0, 6)
+  return [...selectedSongs, ...additionalSongs]
 }
 
 function resolveSelectedSong(selectedSongContext, selectedSongId, songs) {
@@ -381,11 +402,13 @@ function useDiscoveryPage({
   const [activeSection, setActiveSection] = useState(() => {
     restoreLastRoute()
     const requestedSection = getSectionFromHash()
-    return requestedSection === 'import' && !mayImportMusic ? 'home' : requestedSection
+    return requestedSection === 'import' && !mayImportMusic ? DEFAULT_SECTION : requestedSection
   })
   // YouTube Music se monta la primera vez que se visita y ya no se desmonta (la música sigue al cambiar de sección)
   const [youtubeVisited, setYoutubeVisited] = useState(activeSection === 'youtube')
   const [youtubePlayerVisible, setYoutubePlayerVisible] = useState(false)
+  const [youtubePlaybackState, setYoutubePlaybackState] = useState({ currentSong: null, isPlaying: false })
+  const [youtubePlaybackToggleNonce, setYoutubePlaybackToggleNonce] = useState(0)
   const [youtubePlaybackRequest, setYoutubePlaybackRequest] = useState(null)
   const [youtubeSearchRequest, setYoutubeSearchRequest] = useState({ nonce: 0, query: '' })
   const [youtubeStopNonce, setYoutubeStopNonce] = useState(0)
@@ -407,6 +430,14 @@ function useDiscoveryPage({
   const [playbackToggleNonce, setPlaybackToggleNonce] = useState(0)
   const [playerAnalyser, setPlayerAnalyser] = useState(null)
   const [playlistPickerSong, setPlaylistPickerSong] = useState(null)
+  const [playbackOwner, setPlaybackOwner] = useState(selectedSongId ? 'local' : null)
+  const downloads = useDownloads()
+  const userStorageId = user?.id ?? user?.email ?? user?.username
+  const youtubeFavoriteStoragePrefix = `mysic:user:${userStorageId}:youtube`
+  const youtubeSongFavorites = useYoutubeFavorites(
+    `${youtubeFavoriteStoragePrefix}:favorite-songs`,
+    'mysic:youtube:favorite-songs',
+  )
   const autoSpotlightBlockedRef = useRef(false)
   const playbackStateRef = useRef({ currentTime: 0, duration: 0, isPlaying: false, volume: 75 })
   const contentRef = useRef(null)
@@ -416,6 +447,23 @@ function useDiscoveryPage({
   const activeRouteKey = `${activeSection}-${activePlaylistId ?? activeAlbumId ?? activeArtistId ?? ''}`
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase()
   const filteredSongs = normalizedQuery ? searchSongs : songs
+  // Este componente se repinta con cada cambio de reproducción, búsqueda o favorito; lo que sigue
+  // recorre listas de hasta 250 canciones, así que se recalcula solo cuando cambian sus entradas.
+  const youtubeFavoriteIds = youtubeSongFavorites.ids
+  const youtubeFavoriteItems = youtubeSongFavorites.items
+  const downloadItems = downloads.downloads.items
+  const combinedLikedSongIds = useMemo(
+    () => new Set([...likedSongIds, ...youtubeFavoriteIds]),
+    [likedSongIds, youtubeFavoriteIds],
+  )
+  const externalFavoriteSongs = useMemo(
+    () => youtubeFavoriteItems.map((song) => adaptSong(song)),
+    [youtubeFavoriteItems],
+  )
+  const downloadedSongs = useMemo(
+    () => downloadItems.map((song) => adaptSong(song)),
+    [downloadItems],
+  )
 
   useEffect(() => {
     if (!mobileMenuOpen) return undefined
@@ -436,61 +484,49 @@ function useDiscoveryPage({
     return () => window.removeEventListener('yotubei:play', pauseMysicPlayer)
   }, [selectedSongPlaying])
 
-  function getShelfSongs(titles) {
-    const selectedSongs = titles.reduce((selected, title) => {
-      const song = filteredSongs.find((item) => item.title === title)
-      if (song) selected.push(song)
-      return selected
-    }, [])
-    const selectedIds = new Set(selectedSongs.map((song) => song.id))
-    const additionalSongs = filteredSongs.filter((song) => !selectedIds.has(song.id)).slice(0, 6)
-    return [...selectedSongs, ...additionalSongs]
-  }
-
-  const recentSongs = getShelfSongs([
-    'After Hours 3',
-    'Tidal Memory 3',
-    'Golden Hour 3',
-    'Red Horizon 3',
-    'Quiet Signal 3',
-    'Low Tide 3',
-  ])
-  const newReleaseSongs = getShelfSongs([
-    'Open Roads 3',
-    'Paper Moons 3',
-    'Slow Signal 3',
-    'Northern Lines 3',
-    'Soft Focus 3',
-    'Ember Glass 3',
-  ]).map((song) => ({ ...song, badge: 'NUEVO', detail: 'EP \u00b7 2024' }))
-  const albumItems = createAlbumItems(filteredSongs)
-  const allAlbumItems = createAlbumItems(songs)
-  const artistItems = createArtistItems(filteredSongs)
-  const availableSongIds = new Set(songs.map((song) => song.id))
-  const resolvedPlaylists = playlists.map((playlist) => ({
-    ...playlist,
-    externalSongs: playlist.externalSongs ?? [],
-    songIds: playlist.songIds.filter((songId) => availableSongIds.has(songId)),
-    tracks: getPlaylistTracks(playlist),
-  }))
-  const playlistsWithArtwork = resolvedPlaylists.map((playlist) => {
+  const recentSongs = useMemo(() => getShelfSongs(filteredSongs, RECENT_SHELF_TITLES), [filteredSongs])
+  const newReleaseSongs = useMemo(
+    () => getShelfSongs(filteredSongs, NEW_RELEASE_SHELF_TITLES)
+      .map((song) => ({ ...song, badge: 'NUEVO', detail: 'EP \u00b7 2024' })),
+    [filteredSongs],
+  )
+  const albumItems = useMemo(() => createAlbumItems(filteredSongs), [filteredSongs])
+  const allAlbumItems = useMemo(() => createAlbumItems(songs), [songs])
+  const artistItems = useMemo(() => createArtistItems(filteredSongs), [filteredSongs])
+  const allArtistItems = useMemo(() => createArtistItems(songs), [songs])
+  const resolvedPlaylists = useMemo(() => {
+    const availableSongIds = new Set(songs.map((song) => song.id))
+    return playlists.map((playlist) => ({
+      ...playlist,
+      externalSongs: playlist.externalSongs ?? [],
+      songIds: playlist.songIds.filter((songId) => availableSongIds.has(songId)),
+      tracks: getPlaylistTracks(playlist),
+    }))
+  }, [playlists, songs])
+  const playlistsWithArtwork = useMemo(() => resolvedPlaylists.map((playlist) => {
     if (playlist.artwork) return playlist
     const firstSong = resolvePlaylistSongs(playlist, songs)[0]
     return firstSong?.artwork ? { ...playlist, artwork: firstSong.artwork } : playlist
-  })
-  const orderedPlaylists = playlistsWithArtwork
-    .toSorted((first, second) => Number(second.pinned) - Number(first.pinned))
-    .map((playlist) => ({ ...playlist, meta: `${getPlaylistTrackCount(playlist)} canciones` }))
+  }), [resolvedPlaylists, songs])
+  const orderedPlaylists = useMemo(
+    () => playlistsWithArtwork
+      .toSorted((first, second) => Number(second.pinned) - Number(first.pinned))
+      .map((playlist) => ({ ...playlist, meta: `${getPlaylistTrackCount(playlist)} canciones` })),
+    [playlistsWithArtwork],
+  )
   const activePlaylist = playlistsWithArtwork.find((playlist) => playlist.id === activePlaylistId) ?? null
-  const activePlaylistSongs = activePlaylist ? resolvePlaylistSongs(activePlaylist, songs) : []
+  const activePlaylistSongs = useMemo(
+    () => (activePlaylist ? resolvePlaylistSongs(activePlaylist, songs) : []),
+    [activePlaylist, songs],
+  )
   const restoredPlaylistSongs = selectedSongRestored && activeSection === 'playlist'
     ? activePlaylistSongs
     : []
   const selectedSong = resolveSelectedSong(selectedSongContext, selectedSongId, songs)
   const playbackSongs = resolvePlaybackSongs(songs, discoveryMix, restoredPlaylistSongs, selectedSongId)
   const playbackQueue = getPlaybackQueue(playbackSongs, selectedSongId)
+  const youtubeMounted = youtubeVisited || playbackSongs.some((song) => song.source === 'youtube')
   const activeAlbum = allAlbumItems.find((album) => album.id === activeAlbumId) ?? null
-  const allArtistItems = createArtistItems(songs)
   const activeArtistItem = allArtistItems.find((artist) => artist.artistId === activeArtistId) ?? null
   const activeArtist = resolveActiveArtist(activeArtistItem, activeArtistProfile, activeArtistId)
   const mobileContextTitle = getMobileContextTitle(activeSection, activeArtist, activeAlbum, activePlaylist)
@@ -498,9 +534,9 @@ function useDiscoveryPage({
   useEffect(() => {
     function syncSectionFromHash() {
       const requestedSection = getSectionFromHash()
-      const nextSection = requestedSection === 'import' && !mayImportMusic ? 'home' : requestedSection
+      const nextSection = requestedSection === 'import' && !mayImportMusic ? DEFAULT_SECTION : requestedSection
       if (requestedSection === 'import' && !mayImportMusic) {
-        window.history.replaceState(window.history.state, '', sectionHashes.home)
+        window.history.replaceState(window.history.state, '', sectionHashes[DEFAULT_SECTION])
       }
       if (nextSection !== 'home') autoSpotlightBlockedRef.current = true
       if (nextSection === 'youtube') setYoutubeVisited(true)
@@ -534,7 +570,10 @@ function useDiscoveryPage({
     const savedPositions = scrollPositions.get(activeRouteKey)
 
     scrollTargets.forEach((target, index) => {
-      target.scrollTop = savedPositions?.[index] ?? 0
+      target.scrollTo({
+        top: savedPositions?.[index] ?? 0,
+        behavior: 'instant',
+      })
     })
 
     const mobileViewport = window.matchMedia('(max-width: 760px)')
@@ -559,16 +598,20 @@ function useDiscoveryPage({
       setMobileBrandHidden(nextHidden)
     }
 
-    syncMobileBrand()
-    scrollTargets.forEach((target) => target.addEventListener('scroll', syncMobileBrand, { passive: true }))
-    mobileViewport.addEventListener('change', syncMobileBrand)
-
-    return () => {
+    function rememberScrollPosition() {
       scrollPositions.set(
         activeRouteKey,
         scrollTargets.map((target) => target.scrollTop),
       )
-      scrollTargets.forEach((target) => target.removeEventListener('scroll', syncMobileBrand))
+      syncMobileBrand()
+    }
+
+    syncMobileBrand()
+    scrollTargets.forEach((target) => target.addEventListener('scroll', rememberScrollPosition, { passive: true }))
+    mobileViewport.addEventListener('change', syncMobileBrand)
+
+    return () => {
+      scrollTargets.forEach((target) => target.removeEventListener('scroll', rememberScrollPosition))
       mobileViewport.removeEventListener('change', syncMobileBrand)
     }
   }, [activeAlbum?.title, activeArtist?.title, activePlaylist?.title, activeRouteKey, activeSection])
@@ -624,23 +667,20 @@ function useDiscoveryPage({
   }, [activeSection, user])
 
   const { preview, startPreview, stopPreview } = useSongPreview(selectedSongPlaying)
-  const { selectRelativeSong, selectSong, startWeeklyDiscovery } = useSongSelection({
+  const { selectSong, startWeeklyDiscovery } = useSongSelection({
     autoSpotlightBlockedRef,
     discoveryLoadingTimerRef,
     onSongSelect,
-    playbackSongs,
-    selectedSongId,
     setDiscoveryLoading,
     setDiscoveryMix,
     setPlayerAnimationNonce,
     setPlayerFadeInNonce,
     setSelectedSongContext,
     setSelectedSongPlaying,
+    setPlaybackOwner,
     songs,
     stopPreview,
   })
-  useMiniPlayerCommandListener({ playbackSongs, selectRelativeSong, selectSong })
-
   const publishMiniPlayerSnapshot = useCallback((playbackState) => {
     playbackStateRef.current = playbackState
     publishPlaybackState({
@@ -713,10 +753,104 @@ function useDiscoveryPage({
       .catch(() => {})
   }
 
-  function playExternalSong(song) {
+  function playExternalSong(song, { contextSongs = null, preserveDiscoveryMix = false } = {}) {
+    if (contextSongs) setDiscoveryMix(contextSongs)
+    else if (!preserveDiscoveryMix) setDiscoveryMix([])
     setYoutubeVisited(true)
     setYoutubePlaybackRequest((current) => ({ nonce: (current?.nonce ?? 0) + 1, song }))
   }
+
+  function playContextSong(song, contextSongs = playbackSongs) {
+    if (!song) return false
+    if (song.source === 'youtube') {
+      playExternalSong(song, { contextSongs })
+      return true
+    }
+
+    selectSong(song.id, {
+      animatePlayer: false,
+      contextSong: song,
+      contextSongs,
+    })
+    return true
+  }
+
+  function advancePlaybackFrom(currentSong, offset) {
+    const nextSong = getRelativePlaybackSong(playbackSongs, currentSong, offset)
+    return playContextSong(nextSong, playbackSongs)
+  }
+
+  useMiniPlayerCommandListener({
+    onNext: () => advancePlaybackFrom(selectedSong, 1),
+    onPrevious: () => advancePlaybackFrom(selectedSong, -1),
+    onSelect: (songId) => playContextSong(
+      playbackSongs.find((song) => song.id === songId) ?? null,
+      playbackSongs,
+    ),
+  })
+
+  function toggleSongFavorite(songId, liked, song) {
+    if (song?.source === 'youtube') {
+      youtubeSongFavorites.toggleFavorite(songId, liked, song)
+      return
+    }
+    onToggleFavorite?.(songId, liked)
+  }
+
+  function renderDownloadAction(song) {
+    if (song.source !== 'youtube') return null
+    const job = downloads.downloads.jobs[song.id]
+    const downloaded = downloads.downloadedIds.has(song.id)
+    const busy = job?.status === 'downloading'
+    const Icon = busy ? LoaderCircle : downloaded ? Trash2 : Download
+    const label = downloaded ? `Eliminar descarga de ${song.title}` : `Descargar ${song.title}`
+    return (
+      <button
+        className="collection-detail__track-action"
+        type="button"
+        aria-label={label}
+        title={label}
+        disabled={busy || (!downloads.online && !downloaded)}
+        onClick={() => downloaded ? downloads.deleteDownload(song.id) : downloads.downloadSong(song)}
+      >
+        <Icon className={busy ? 'yt-spin' : undefined} size={16} strokeWidth={1.8} aria-hidden="true" />
+      </button>
+    )
+  }
+
+  function updateYoutubePlaybackState(nextState) {
+    setYoutubePlaybackState(nextState)
+    setYoutubePlayerVisible(Boolean(nextState.currentSong))
+    setPlaybackOwner((owner) => {
+      if (!nextState.currentSong) return owner === 'youtube' ? null : owner
+      return owner ?? 'youtube'
+    })
+  }
+
+  const nextLocalSongAfterGlobal = playbackOwner === 'youtube' && youtubePlaybackState.currentSong
+    ? getRelativePlaybackSong(
+      playbackSongs,
+      { ...youtubePlaybackState.currentSong, source: 'youtube' },
+      1,
+    )
+    : null
+  const nextLocalAudioUrl = nextLocalSongAfterGlobal?.source === 'youtube'
+    ? null
+    : nextLocalSongAfterGlobal?.audioUrl
+
+  useEffect(() => {
+    if (!nextLocalAudioUrl) return undefined
+
+    const audio = new Audio()
+    audio.crossOrigin = 'anonymous'
+    audio.preload = 'auto'
+    audio.src = nextLocalAudioUrl
+    audio.load()
+    return () => {
+      audio.removeAttribute('src')
+      audio.load()
+    }
+  }, [nextLocalAudioUrl])
 
   const {
     deletePlaylist, openCreatePlaylist, openEditPlaylist, playlistEditor, savePlaylist,
@@ -733,10 +867,9 @@ function useDiscoveryPage({
     setPlaylistPickerSong,
   })
 
-  const playerVisible = Boolean(
-    (selectedSong && !spotlightArtist && !youtubePlayerVisible)
-    || youtubePlayerVisible,
-  )
+  const localPlayerVisible = playbackOwner === 'local' && selectedSong && !spotlightArtist
+  const globalPlayerVisible = playbackOwner === 'youtube' && youtubePlayerVisible
+  const playerVisible = Boolean(localPlayerVisible || globalPlayerVisible)
 
   function renderPage() {
     return (
@@ -747,7 +880,7 @@ function useDiscoveryPage({
         mobileContextTitle={mobileContextTitle}
         mobileMenuOpen={mobileMenuOpen}
         onArtistSpotlightOpen={openLatestArtistSpotlight}
-        onHome={() => navigateTo('home')}
+        onHome={() => navigateTo(DEFAULT_SECTION)}
         onLogout={onLogout}
         onMobileMenuClose={() => setMobileMenuOpen(false)}
         onMobileMenuToggle={() => setMobileMenuOpen((open) => !open)}
@@ -809,7 +942,7 @@ function useDiscoveryPage({
                 <SongList
                   hasMore={catalogHasMore}
                   key={normalizedQuery}
-                  likedSongIds={likedSongIds}
+                  likedSongIds={combinedLikedSongIds}
                   loadingMore={catalogLoadingMore}
                   onAddToPlaylist={setPlaylistPickerSong}
                   onAlbumSelect={(albumId) => navigateToAlbum(`album-${albumId}`)}
@@ -819,7 +952,7 @@ function useDiscoveryPage({
                   onPreviewStart={startPreview}
                   onPreviewStop={stopPreview}
                   onSongSelect={selectSong}
-                  onToggleFavorite={onToggleFavorite}
+                  onToggleFavorite={toggleSongFavorite}
                   preview={preview}
                   selectedSongId={selectedSongId}
                   selectedSongPlaying={selectedSongPlaying}
@@ -858,16 +991,18 @@ function useDiscoveryPage({
                 artistItems={artistItems}
                 likedAlbumIds={likedAlbumIds}
                 likedArtistIds={likedArtistIds}
-                likedSongIds={likedSongIds}
+                likedSongIds={combinedLikedSongIds}
+                externalFavoriteSongs={externalFavoriteSongs}
                 newReleaseSongs={newReleaseSongs}
                 onAddToPlaylist={setPlaylistPickerSong}
                 onAlbumSelect={navigateToAlbum}
                 onArtistSelect={navigateToArtist}
                 onPlaybackToggle={() => setPlaybackToggleNonce((nonce) => nonce + 1)}
+                onExternalSongSelect={playExternalSong}
                 onPreviewStart={startPreview}
                 onPreviewStop={stopPreview}
                 onSongSelect={selectSong}
-                onToggleFavorite={onToggleFavorite}
+                onToggleFavorite={toggleSongFavorite}
                 preview={preview}
                 recentSongs={recentSongs}
                 searchKey={normalizedQuery}
@@ -882,14 +1017,14 @@ function useDiscoveryPage({
               <AlbumView
                 album={activeAlbum}
                 likedAlbumIds={likedAlbumIds}
-                likedSongIds={likedSongIds}
+                likedSongIds={combinedLikedSongIds}
                 onAddToPlaylist={setPlaylistPickerSong}
                 onBack={() => navigateBack('albums')}
                 onArtistSelect={navigateToArtist}
                 onPlaybackToggle={() => setPlaybackToggleNonce((nonce) => nonce + 1)}
                 onSongSelect={selectSong}
                 onToggleAlbumFavorite={onToggleAlbumFavorite}
-                onToggleFavorite={onToggleFavorite}
+                onToggleFavorite={toggleSongFavorite}
                 selectedSongId={selectedSongId}
                 selectedSongAlbumId={selectedSong?.albumId}
                 selectedSongPlaying={selectedSongPlaying}
@@ -905,14 +1040,14 @@ function useDiscoveryPage({
               <ArtistView
                 artist={activeArtist}
                 likedArtistIds={likedArtistIds}
-                likedSongIds={likedSongIds}
+                likedSongIds={combinedLikedSongIds}
                 onAddToPlaylist={setPlaylistPickerSong}
                 onAlbumSelect={(albumId) => navigateToAlbum(`album-${albumId}`)}
                 onBack={() => navigateBack('artists')}
                 onPlaybackToggle={() => setPlaybackToggleNonce((nonce) => nonce + 1)}
                 onSongSelect={selectSong}
                 onToggleArtistFavorite={onToggleArtistFavorite}
-                onToggleFavorite={onToggleFavorite}
+                onToggleFavorite={toggleSongFavorite}
                 selectedSongId={selectedSongId}
                 selectedSongPlaying={selectedSongPlaying}
                 songs={songs}
@@ -937,7 +1072,7 @@ function useDiscoveryPage({
 
             {activeSection === 'playlist' && activePlaylist && (
               <PlaylistView
-                likedSongIds={likedSongIds}
+                likedSongIds={combinedLikedSongIds}
                 onAddToPlaylist={setPlaylistPickerSong}
                 onAlbumSelect={(albumId) => navigateToAlbum(`album-${albumId}`)}
                 onArtistSelect={navigateToArtist}
@@ -945,14 +1080,20 @@ function useDiscoveryPage({
                 onDelete={deletePlaylist}
                 onEdit={openEditPlaylist}
                 onExternalSongSelect={playExternalSong}
+                onExternalPlaybackToggle={() => setYoutubePlaybackToggleNonce((nonce) => nonce + 1)}
+                onDownloadCollection={activePlaylistSongs.some((song) => song.source === 'youtube')
+                  ? () => downloads.downloadMany(activePlaylistSongs.filter((song) => song.source === 'youtube'))
+                  : null}
                 onPlaybackToggle={() => setPlaybackToggleNonce((nonce) => nonce + 1)}
                 onReorderPlaylist={onReorderPlaylist}
                 onSongSelect={selectSong}
-                onToggleFavorite={onToggleFavorite}
+                onToggleFavorite={toggleSongFavorite}
                 onTogglePinned={togglePlaylistPinned}
                 playlist={activePlaylist}
-                selectedSongId={selectedSongId}
-                selectedSongPlaying={selectedSongPlaying}
+                selectedSongId={playbackOwner === 'youtube' ? youtubePlaybackState.currentSong?.id : selectedSongId}
+                selectedSongPlaying={playbackOwner === 'youtube' ? youtubePlaybackState.isPlaying : selectedSongPlaying}
+                selectedSongSource={playbackOwner === 'youtube' ? 'youtube' : 'local'}
+                renderTrackActions={renderDownloadAction}
                 songs={songs}
               />
             )}
@@ -962,12 +1103,21 @@ function useDiscoveryPage({
             )}
 
             {activeSection === 'downloads' && (
-              <section className="library-view" aria-labelledby="downloads-title">
-                <div className="collection-heading">
-                  <h1 id="downloads-title">Descargas</h1>
-                </div>
-                <div className="collection-empty">Aún no tienes música descargada.</div>
-              </section>
+              <div className="route-page">
+                <SongList
+                  emptyMessage="Aún no tienes música descargada. Descarga canciones desde YouTube Music."
+                  likedSongIds={combinedLikedSongIds}
+                  onAddToPlaylist={setPlaylistPickerSong}
+                  onExternalSongSelect={playExternalSong}
+                  onPlaybackToggle={() => setYoutubePlaybackToggleNonce((nonce) => nonce + 1)}
+                  onToggleFavorite={toggleSongFavorite}
+                  renderSongActions={renderDownloadAction}
+                  selectedSongId={playbackOwner === 'youtube' ? youtubePlaybackState.currentSong?.id : null}
+                  selectedSongPlaying={playbackOwner === 'youtube' && youtubePlaybackState.isPlaying}
+                  songs={downloadedSongs}
+                  title="Descargas"
+                />
+              </div>
             )}
 
             {activeSection === 'radio' && (
@@ -982,19 +1132,42 @@ function useDiscoveryPage({
           </div>
         </main>
       )}
-        {youtubeVisited && (
+        {youtubeMounted && (
           <div className="youtube-section" hidden={activeSection !== 'youtube'}>
-            <Suspense fallback={<div className="collection-empty" role="status">Cargando Mysic global…</div>}>
+            <Suspense fallback={<div className="collection-empty" role="status">Cargando YouTube Music…</div>}>
               <YoutubeView
                 active={activeSection === 'youtube'}
+                downloads={downloads}
+                favoriteStoragePrefix={youtubeFavoriteStoragePrefix}
+                likedSongIds={youtubeSongFavorites.ids}
                 onAddToPlaylist={setPlaylistPickerSong}
+                onPlaybackOwnerClaim={({ preserveContext = false } = {}) => {
+                  if (!preserveContext) setDiscoveryMix([])
+                  setYoutubePlayerVisible(true)
+                  setPlaybackOwner('youtube')
+                }}
+                onPlaybackStateChange={updateYoutubePlaybackState}
                 onPlayerCollapseToggle={() => setPlayerCollapsed((collapsed) => !collapsed)}
-                onPlayerVisibilityChange={setYoutubePlayerVisible}
+                onQueueEnd={() => advancePlaybackFrom(
+                  youtubePlaybackState.currentSong
+                    ? { ...youtubePlaybackState.currentSong, source: 'youtube' }
+                    : null,
+                  1,
+                )}
+                onQueueStart={() => advancePlaybackFrom(
+                  youtubePlaybackState.currentSong
+                    ? { ...youtubePlaybackState.currentSong, source: 'youtube' }
+                    : null,
+                  -1,
+                )}
                 onSearchNavigate={() => navigateTo('youtube')}
+                onToggleSongFavorite={youtubeSongFavorites.toggleFavorite}
+                playbackToggleNonce={youtubePlaybackToggleNonce}
                 playerCollapsed={playerCollapsed}
                 playbackRequest={youtubePlaybackRequest}
                 searchRequest={youtubeSearchRequest}
                 stopNonce={youtubeStopNonce}
+                suppressed={playbackOwner !== 'youtube'}
               />
             </Suspense>
           </div>
@@ -1006,7 +1179,7 @@ function useDiscoveryPage({
           <NewArtistSpotlight
             artist={spotlightArtist}
             artistLiked={likedArtistIds?.has(spotlightArtist.artistId)}
-            likedSongIds={likedSongIds}
+            likedSongIds={combinedLikedSongIds}
             onAddToPlaylist={setPlaylistPickerSong}
             onAlbumSelect={(albumId) => navigateToAlbum(`album-${albumId}`)}
             onArtistSelect={navigateToArtist}
@@ -1015,7 +1188,7 @@ function useDiscoveryPage({
             onPreviewStart={startPreview}
             onPreviewStop={stopPreview}
             onSongSelect={selectSong}
-            onToggleFavorite={onToggleFavorite}
+            onToggleFavorite={toggleSongFavorite}
             onToggleArtistFavorite={onToggleArtistFavorite}
             preview={preview}
             selectedSongId={selectedSongId}
@@ -1035,7 +1208,7 @@ function useDiscoveryPage({
           isLoading={discoveryLoading}
           onAnalyserChange={setPlayerAnalyser}
           onClose={() => selectSong(null)}
-          onNext={() => selectRelativeSong(1)}
+          onNext={() => advancePlaybackFrom(selectedSong, 1)}
           onOpenMiniPlayer={() => {
             claimMiniPlayer('mysic')
             publishMiniPlayerSnapshot(playbackStateRef.current)
@@ -1051,18 +1224,14 @@ function useDiscoveryPage({
             }
           }}
           onPlaybackStateChange={publishMiniPlayerSnapshot}
-          onPrevious={() => selectRelativeSong(-1)}
-          onQueueSelect={(songId) => selectSong(songId, {
-            animatePlayer: false,
-            contextSong: playbackSongs.find((song) => song.id === songId) ?? null,
-            contextSongs: playbackSongs,
-          })}
-          liked={likedSongIds?.has(selectedSong.id)}
-          onToggleFavorite={(liked) => onToggleFavorite?.(selectedSong.id, liked)}
+          onPrevious={() => advancePlaybackFrom(selectedSong, -1)}
+          onQueueSelect={(song) => playContextSong(song, playbackSongs)}
+          liked={combinedLikedSongIds.has(selectedSong.id)}
+          onToggleFavorite={(liked) => toggleSongFavorite(selectedSong.id, liked, selectedSong)}
           onToggleCollapsed={() => setPlayerCollapsed((collapsed) => !collapsed)}
           playbackToggleNonce={playbackToggleNonce}
           queue={playbackQueue}
-          suppressed={Boolean(spotlightArtist) || youtubePlayerVisible}
+          suppressed={Boolean(spotlightArtist) || playbackOwner !== 'local'}
           track={selectedSong}
           />
         </Suspense>
@@ -1091,7 +1260,9 @@ function useDiscoveryPage({
           }}
           onClose={() => setPlaylistPickerSong(null)}
           onCreate={() => openCreatePlaylist(playlistPickerSong)}
-          playing={selectedSongPlaying && selectedSongId === playlistPickerSong.id}
+          playing={playbackOwner === 'youtube'
+            ? youtubePlaybackState.isPlaying && youtubePlaybackState.currentSong?.id === playlistPickerSong.id
+            : selectedSongPlaying && selectedSongId === playlistPickerSong.id}
           playlists={resolvedPlaylists}
           song={playlistPickerSong}
         />

@@ -22,6 +22,7 @@ export function SongRow({
   onAlbumSelect,
   onArtistSelect,
   onPlaybackToggle,
+  onExternalSongSelect,
   onPreviewStart,
   onPreviewStop,
   onSongSelect,
@@ -38,12 +39,13 @@ export function SongRow({
   const selected = isSelected ?? false
   const liked = isLiked ?? likedSongIds?.has(song.id)
   const previewStatus = preview?.itemId === song.id ? preview.status : null
-  const indicatorStatus = previewStatus ?? (selected && selectedSongPlaying ? 'playing' : null)
+  const indicatorStatus = previewStatus ?? (selected ? selectedSongPlaying ? 'playing' : 'paused' : null)
   const showArtist = byline === 'artist-and-album'
 
   function selectSong() {
     if (previewStatus) onPreviewStop?.()
     if (selected) onPlaybackToggle?.()
+    else if (song.source === 'youtube' && onExternalSongSelect) onExternalSongSelect(song)
     else onSongSelect(song.id)
   }
 
@@ -52,7 +54,7 @@ export function SongRow({
       {showNumber && <span className="song-row__number" aria-hidden="true">{index + 1}</span>}
       <div className="song-row__main">
         <button className="song-row__artwork playback-hover" type="button" aria-label={selected && selectedSongPlaying ? `Pausar ${song.title}` : `Reproducir ${song.title}`} aria-pressed={selected && selectedSongPlaying} onClick={selectSong} onPointerEnter={() => { if (!selected) onPreviewStart?.(song) }} onPointerLeave={onPreviewStop}>
-          {song.artwork && <img src={song.artwork} alt="" loading="eager" decoding="async" />}
+          {song.artwork && <img src={song.artwork} alt="" loading={index < 4 ? 'eager' : 'lazy'} decoding="async" />}
           <span aria-hidden="true"><PreviewIndicator status={indicatorStatus} /></span>
         </button>
         <span className="song-row__copy">
@@ -65,7 +67,7 @@ export function SongRow({
       </div>
       <span className="song-row__meta">
         <span className="song-row__actions">
-          <HeartToggle className="heart-container--song-row" label={`Me gusta ${song.title}`} liked={liked} onToggle={(nextLiked) => onToggleFavorite?.(song.id, nextLiked)} removeLabel={`Quitar ${song.title} de favoritas`} size={16} />
+          <HeartToggle className="heart-container--song-row" label={`Me gusta ${song.title}`} liked={liked} onToggle={(nextLiked) => onToggleFavorite?.(song.id, nextLiked, song)} removeLabel={`Quitar ${song.title} de favoritas`} size={16} />
           <button className="song-row__action" type="button" aria-label={`Añadir ${song.title} a una playlist`} title="Añadir a playlist" onClick={(event) => { event.stopPropagation(); onAddToPlaylist?.(song) }}><ListPlus size={16} strokeWidth={1.8} aria-hidden="true" /></button>
           {renderSongActions?.(song)}
         </span>
@@ -86,6 +88,7 @@ function SongList({
   onArtistSelect,
   onLoadMore,
   onPlaybackToggle,
+  onExternalSongSelect,
   onPreviewStart,
   onPreviewStop,
   onSongSelect,
@@ -130,7 +133,7 @@ function SongList({
     if (pageCount <= 1) return
     const clampedPage = Math.max(0, Math.min(nextPage, pageCount - 1))
     if (clampedPage === currentPage) return
-    onPreviewStop()
+    onPreviewStop?.()
     setDirection(nextDirection)
     setPage(clampedPage)
   }
@@ -144,7 +147,7 @@ function SongList({
 
     const loaded = await onLoadMore()
     if (!loaded) return
-    onPreviewStop()
+    onPreviewStop?.()
     setDirection('next')
     setPage(currentPage + 1)
   }
@@ -170,6 +173,7 @@ function SongList({
                   onAlbumSelect={onAlbumSelect}
                   onArtistSelect={onArtistSelect}
                   onPlaybackToggle={onPlaybackToggle}
+                  onExternalSongSelect={onExternalSongSelect}
                   onPreviewStart={onPreviewStart}
                   onPreviewStop={onPreviewStop}
                   onSongSelect={onSongSelect}

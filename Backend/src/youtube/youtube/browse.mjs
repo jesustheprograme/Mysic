@@ -5,6 +5,7 @@ import { mapAlbumItem, mapArtistItem, mapSong, pickThumbnail, plainText } from '
 
 const albumCache = createAsyncTtlCache({ ttlMs: 6 * 60 * 60 * 1000, maxSize: config.requestCacheMax });
 const ALBUM_LOOKUP_CONCURRENCY = 4;
+const MAX_LIBRARY_PAGES = 20;
 
 function mapQueueSong(item) {
   return mapSong({
@@ -144,10 +145,105 @@ export async function getRadio(videoId, youtube = getYoutube()) {
 
 export async function getPlaylistQueue(playlistId, youtube = getYoutube()) {
   const playlist = await youtube.music.getPlaylist(playlistId);
+  const songs = new Map();
+  let page = playlist;
+
+  for (let pageNumber = 0; page && pageNumber < MAX_LIBRARY_PAGES; pageNumber += 1) {
+    for (const item of page.items || []) {
+      const song = mapBrowseItem(item);
+      if (song?.kind === 'song' && !songs.has(song.id)) songs.set(song.id, song);
+    }
+    if (!page.has_continuation) break;
+    try {
+      page = await page.getContinuation();
+    } catch (error) {
+      console.warn(`No se pudo ampliar la playlist ${playlistId}: ${error.message}`);
+      break;
+    }
+  }
+
   return {
+    id: playlistId,
     title: plainText(playlist.header?.title) || 'Playlist',
-    songs: (playlist.items || []).map(mapBrowseItem).filter((item) => item?.kind === 'song'),
+    description: plainText(playlist.header?.description ?? playlist.header?.subtitle),
+    thumbnail: pickThumbnail(playlist.header?.thumbnail ?? playlist.header?.thumbnails)
+      || [...songs.values()][0]?.thumbnail
+      || null,
+    songs: [...songs.values()],
   };
+}
+
+function itemCount(value) {
+  const digits = String(value || '').match(/\d[\d.,\s]*/)?.[0]?.replace(/[^\d]/g, '');
+  return Number(digits) || 0;
+}
+
+function libraryCards(page) {
+  return [
+    ...(page?.contents_memo?.get('MusicTwoRowItem') || []),
+    ...(page?.contents_memo?.get('MusicResponsiveListItem') || []),
+  ];
+}
+
+export async function collectLibraryPlaylists(youtube) {
+  const playlists = new Map();
+  let page = await youtube.actions.execute('/browse', {
+    browseId: 'FEmusic_liked_playlists',
+    client: 'YTMUSIC',
+    parse: true,
+  });
+
+  for (let pageNumber = 0; page && pageNumber < MAX_LIBRARY_PAGES; pageNumber += 1) {
+    for (const card of libraryCards(page)) {
+      const playlist = mapBrowseItem(card);
+      if (playlist?.kind !== 'playlist' || playlists.has(playlist.id)) continue;
+      playlists.set(playlist.id, {
+        id: playlist.id,
+        title: playlist.title,
+        description: playlist.subtitle || '',
+        itemCount: itemCount(card.item_count ?? card.song_count ?? playlist.subtitle),
+        thumbnail: playlist.thumbnail,
+      });
+    }
+
+    const continuation = page.contents_memo?.get('ContinuationItem')?.at(-1);
+    if (!continuation?.endpoint) break;
+    try {
+      page = await continuation.endpoint.call(youtube.actions, { client: 'YTMUSIC', parse: true });
+    } catch (error) {
+      console.warn(`No se pudo ampliar la biblioteca de playlists: ${error.message}`);
+      break;
+    }
+  }
+  return [...playlists.values()];
+}
+
+export async function collectLikedSongs(youtube) {
+  const songs = new Map();
+  let page = await youtube.music.getPlaylist('LM');
+
+  for (let pageNumber = 0; page && pageNumber < MAX_LIBRARY_PAGES; pageNumber += 1) {
+    for (const item of page.items || []) {
+      const song = mapBrowseItem(item);
+      if (song?.kind === 'song' && !songs.has(song.id)) songs.set(song.id, song);
+    }
+    if (!page.has_continuation) break;
+    try {
+      page = await page.getContinuation();
+    } catch (error) {
+      console.warn(`No se pudieron ampliar las canciones con Me gusta: ${error.message}`);
+      break;
+    }
+  }
+  return [...songs.values()];
+}
+
+export async function getSessionLibrary(youtube) {
+  const [playlists, likedSongs] = await Promise.all([
+    collectLibraryPlaylists(youtube),
+    collectLikedSongs(youtube),
+  ]);
+  return { playlists, likedSongs };
 }
 
 export async function getRecommendations(videoId, youtube = getYoutube()) {

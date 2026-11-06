@@ -1,4 +1,5 @@
 import { isTauri } from '@tauri-apps/api/core'
+import { ApiError, createHttpClient } from './httpClient.js'
 
 const isTauriRuntime = isTauri() || Boolean(window.__TAURI_INTERNALS__)
 const desktopApiUrl = import.meta.env.VITE_DESKTOP_API_URL?.trim()
@@ -8,39 +9,10 @@ const defaultApiUrl = isTauriRuntime
   : import.meta.env.DEV ? `http://${window.location.hostname}:4000/api` : '/api'
 export const API_URL = (import.meta.env.VITE_API_URL || defaultApiUrl).replace(/\/$/, '')
 
-export class ApiError extends Error {
-  constructor(message, status) {
-    super(message)
-    this.name = 'ApiError'
-    this.status = status
-  }
-}
+export { ApiError }
 
-async function request(path, options = {}) {
-  let response
-  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
-
-  try {
-    response = await fetch(`${API_URL}${path}`, {
-      credentials: 'include',
-      headers: {
-        ...(!isFormData && { 'Content-Type': 'application/json' }),
-        ...options.headers,
-      },
-      ...options,
-    })
-  } catch {
-    throw new ApiError('No se pudo conectar con el servidor de Mysic.', 0)
-  }
-
-  const data = response.status === 204 ? null : await response.json().catch(() => null)
-
-  if (!response.ok) {
-    throw new ApiError(data?.message || data?.detail || 'No se pudo completar la solicitud.', response.status)
-  }
-
-  return data
-}
+// Timeout, deduplicación de GET, reintento y cabeceras: ver httpClient.js.
+const { request } = createHttpClient({ baseUrl: API_URL })
 
 export const authApi = {
   getSession: () => request('/auth/me'),

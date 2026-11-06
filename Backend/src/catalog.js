@@ -8,6 +8,17 @@ const { getArtistSpotlightViewsCollection } = require('./database')
 const { proxyNavidromeAudio } = require('./navidrome')
 const { createAudioDeliveryUrl } = require('./object-storage')
 const { prisma } = require('./prisma')
+const { createTtlCache } = require('./ttl-cache')
+
+// Lecturas del catálogo: los scripts de sincronización (music:*:apply) escriben directo en la base,
+// así que las cachés son cortas para que un cambio se vea en pocos minutos.
+const CATALOG_CACHE_CONTROL = 'public, max-age=60, stale-while-revalidate=120'
+const mediaAssetCache = createTtlCache({ ttlMs: 60 * 1000, maxSize: 1000 })
+const spotlightArtistCache = createTtlCache({ ttlMs: 60 * 1000, maxSize: 1 })
+
+function markCacheable(res) {
+  res.setHeader('Cache-Control', CATALOG_CACHE_CONTROL)
+}
 
 const catalogImageDirectory = path.join(__dirname, '..', 'storage', 'catalog-images')
 
@@ -174,7 +185,8 @@ function createCatalogRouter(config) {
     if (!user) return
     const includeViewed = req.query.includeViewed === 'true'
 
-    const artist = await prisma.artist.findFirst({
+    // La consulta pesada es idéntica para todos; solo "viewed" depende del usuario.
+    const artist = await spotlightArtistCache.getOrLoad('latest', () => prisma.artist.findFirst({
       where: {
         songs: { some: {} },
         albums: { some: {} },
@@ -190,7 +202,7 @@ function createCatalogRouter(config) {
         albums: { include: { album: { include: { coverImage: true } } } },
       },
       orderBy: { createdAt: 'desc' },
-    })
+    }))
 
     if (!artist) return res.json({ artist: null })
 
@@ -251,6 +263,7 @@ function createCatalogRouter(config) {
     const catalogSongs = songs
       .map((song) => mapSong(song))
 
+    markCacheable(res)
     res.json({
       songs: catalogSongs,
       pagination: {
@@ -266,6 +279,7 @@ function createCatalogRouter(config) {
   router.get('/songs/:id', asyncRoute(async (req, res) => {
     const song = await prisma.song.findUnique({ where: { id: req.params.id }, include: songRelations })
     if (!song) return res.status(404).json({ message: 'Canción no encontrada.' })
+    markCacheable(res)
     return res.json({ song: mapSong(song) })
   }))
 
@@ -274,6 +288,7 @@ function createCatalogRouter(config) {
       include: { image: true, profileImages: { orderBy: { position: 'asc' } }, _count: { select: { songs: true, albums: true } } },
       orderBy: { name: 'asc' },
     })
+    markCacheable(res)
     res.json({
       artists: artists.map((artist) => ({
         id: artist.id,
@@ -299,6 +314,7 @@ function createCatalogRouter(config) {
     })
     if (!artist) return res.status(404).json({ message: 'Artista no encontrado.' })
 
+    markCacheable(res)
     return res.json({ artist: mapArtist(artist) })
   }))
 
@@ -311,6 +327,7 @@ function createCatalogRouter(config) {
       },
       orderBy: { title: 'asc' },
     })
+    markCacheable(res)
     res.json({
       albums: albums.map((album) => ({
         id: album.id,
@@ -340,6 +357,7 @@ function createCatalogRouter(config) {
     })
     if (!album) return res.status(404).json({ message: 'Álbum no encontrado.' })
 
+    markCacheable(res)
     return res.json({
       album: {
         id: album.id,
@@ -384,7 +402,11 @@ function createCatalogRouter(config) {
   }))
 
   router.get('/media/:id/stream', asyncRoute(async (req, res) => {
-    const asset = await prisma.mediaAsset.findUnique({ where: { id: req.params.id } })
+    // Cada salto (seek) del reproductor repite esta petición; la fila casi nunca cambia.
+    const asset = await mediaAssetCache.getOrLoad(
+      req.params.id,
+      () => prisma.mediaAsset.findUnique({ where: { id: req.params.id } }),
+    )
     if (!asset || asset.type !== 'audio') return res.status(404).json({ message: 'Audio no encontrado.' })
 
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')

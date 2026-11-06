@@ -145,6 +145,53 @@ function normalizeSapisid(cookie) {
   return secureSapisid ? `${cookie}; SAPISID=${secureSapisid}` : cookie;
 }
 
+function normalizeAccountIndex(value) {
+  const accountIndex = Number(value ?? 0);
+  if (!Number.isSafeInteger(accountIndex) || accountIndex < 0 || accountIndex > 99) {
+    throw new Error('El selector de cuenta de YouTube Music no es válido.');
+  }
+  return accountIndex;
+}
+
+function normalizeOnBehalfOfUser(value) {
+  if (value == null || value === '') return undefined;
+  if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{1,256}$/.test(value)) {
+    throw new Error('El canal seleccionado de YouTube Music no es válido.');
+  }
+  return value;
+}
+
+export function normalizeBrowserAuth(browserAuth) {
+  if (!browserAuth || typeof browserAuth.cookie !== 'string' || !browserAuth.cookie.trim()) {
+    throw new Error('YouTube Music no devolvió una sesión válida.');
+  }
+  if (Buffer.byteLength(browserAuth.cookie, 'utf8') > MAX_BROWSER_AUTH_LENGTH) {
+    throw new Error('La sesión de YouTube Music es demasiado grande.');
+  }
+  if (/[\u0000-\u001F\u007F]/.test(browserAuth.cookie)) {
+    throw new Error('La sesión de YouTube Music contiene caracteres no válidos.');
+  }
+
+  const cookies = new Map();
+  for (const part of browserAuth.cookie.split(';')) {
+    const separator = part.indexOf('=');
+    if (separator <= 0) continue;
+    const name = part.slice(0, separator).trim();
+    const value = part.slice(separator + 1).trim();
+    if (!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(name) || !value) continue;
+    cookies.set(name, value);
+  }
+  const cookie = normalizeSapisid([...cookies].map(([name, value]) => `${name}=${value}`).join('; '));
+  if (!/(?:^|;\s*)SAPISID=[^;]+/i.test(cookie)) {
+    throw new Error('YouTube Music no devolvió una sesión válida.');
+  }
+  return {
+    cookie,
+    accountIndex: normalizeAccountIndex(browserAuth.accountIndex),
+    onBehalfOfUser: normalizeOnBehalfOfUser(browserAuth.onBehalfOfUser),
+  };
+}
+
 export function parseBrowserAuth(requestText) {
   if (typeof requestText !== 'string' || !requestText.trim()) {
     throw new Error('Pega la solicitud copiada desde YouTube Music.');
@@ -152,14 +199,16 @@ export function parseBrowserAuth(requestText) {
   if (Buffer.byteLength(requestText, 'utf8') > MAX_BROWSER_AUTH_LENGTH) {
     throw new Error('La solicitud copiada es demasiado grande.');
   }
-  const cookie = normalizeSapisid(findHeader(requestText, 'cookie') || findCurlCookie(requestText));
-  if (!/(?:^|;\s*)SAPISID=/i.test(cookie)) {
-    throw new Error('La solicitud no contiene una sesión válida de YouTube Music.');
-  }
+  const cookie = findHeader(requestText, 'cookie') || findCurlCookie(requestText);
   const rawAccountIndex = findHeader(requestText, 'x-goog-authuser');
   const accountIndex = /^\d+$/.test(rawAccountIndex) ? Number(rawAccountIndex) : 0;
   const onBehalfOfUser = findHeader(requestText, 'x-goog-pageid') || undefined;
-  return { cookie, accountIndex, onBehalfOfUser };
+  try {
+    return normalizeBrowserAuth({ cookie, accountIndex, onBehalfOfUser });
+  } catch (error) {
+    if (/demasiado grande/.test(error.message)) throw error;
+    throw new Error('La solicitud no contiene una sesión válida de YouTube Music.');
+  }
 }
 
 async function createBrowserClient(browserAuth) {
@@ -170,7 +219,13 @@ async function createBrowserClient(browserAuth) {
   });
 }
 
-async function verifyMusicPersonalization(client) {
+export async function verifyMusicPersonalization(client) {
+  // YouTube.js considera iniciada cualquier sesión que tenga una cookie. Consultar
+  // la cuenta evita aceptar como válida una cookie inventada, vencida o revocada.
+  const accounts = await client.account.getInfo(true);
+  if (!Array.isArray(accounts) || !accounts.length) {
+    throw new Error('YouTube no reconoció una cuenta activa para esta sesión.');
+  }
   const home = await client.music.getHomeFeed();
   if (!home?.sections?.length) throw new Error('YouTube Music no devolvió recomendaciones para esta sesión.');
   return home;
@@ -244,8 +299,7 @@ export async function getAccountStatus(user) {
     : { connected: false, personalized: false, youtubeConnected: false, status: 'disconnected', method: 'anonymous' };
 }
 
-export async function connectBrowserSession(user, requestText) {
-  const browserAuth = parseBrowserAuth(requestText);
+async function connectValidatedBrowserSession(user, browserAuth) {
   let client;
   try {
     client = await createBrowserClient(browserAuth);
@@ -256,6 +310,14 @@ export async function connectBrowserSession(user, requestText) {
   await saveBrowserAuth(user, browserAuth);
   cacheUserClient(userKey(user), client);
   return { connected: true, personalized: true, status: 'connected', method: 'browser-session' };
+}
+
+export async function connectBrowserSession(user, requestText) {
+  return connectValidatedBrowserSession(user, parseBrowserAuth(requestText));
+}
+
+export async function connectCapturedBrowserSession(user, browserAuth) {
+  return connectValidatedBrowserSession(user, normalizeBrowserAuth(browserAuth));
 }
 
 export function validateVerificationUrl(value) {
