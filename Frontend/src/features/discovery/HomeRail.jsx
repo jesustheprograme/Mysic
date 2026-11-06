@@ -16,6 +16,7 @@ function HomeRail({
   onPreviewStop,
   onSelect,
   preview,
+  renderMenu,
   selectedId,
   selectedItemPlaying,
   title,
@@ -89,6 +90,7 @@ function HomeRail({
                   )}
                 </span>
               </button>
+              {renderMenu?.(item)}
               <div className="home-shelf-card__meta">
                 <button className="home-shelf-card__title" type="button" onClick={selectItem}>{item.title}</button>
                 {item.artistId && onArtistSelect

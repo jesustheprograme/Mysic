@@ -13,6 +13,9 @@ import { api } from './lib/api.js'
 import MusicSearchPanel from './MusicSearchPanel.jsx'
 import YoutubeCatalogContent from './YoutubeCatalogContent.jsx'
 import { setAccountMenu } from './accountMenuBridge.js'
+import { shuffled } from './queueOps.js'
+import { showToast } from './toast.js'
+import ToastHost from './ToastHost.jsx'
 
 function getScrollTargets(workspace) {
   const content = workspace?.closest('.music-app__content')
@@ -225,6 +228,21 @@ function YoutubeView({
     }
   }
 
+  // Cola: sin nada sonando, "a continuación" y "a la cola" empiezan a reproducir; con algo sonando
+  // se insertan sin reiniciar la canción actual (player.enqueue).
+  function enqueueSongs(songs, options) {
+    if (!songs.length) return
+    if (!player.currentSong) {
+      playFrom(songs, 0)
+      return
+    }
+    player.enqueue(songs, options)
+    showToast(options?.next ? 'Se reproducirá a continuación' : 'Añadida a la cola')
+  }
+  function playShuffledSongs(songs) {
+    if (songs.length) playFrom(shuffled(songs), 0)
+  }
+
   function startRadio(song) {
     void loadQueue(`radio:${song.id}`, (signal) => api.radio(song.id, signal))
   }
@@ -409,6 +427,7 @@ function YoutubeView({
   }, [accountBusy, accountConnected, accountKnown, accountMenuActions, officialLibraryBusy])
 
   const controller = {
+    downloadedIds: downloads.downloadedIds, enqueueSongs, playShuffled: playShuffledSongs, startRadio, toggleDownload,
     account, accountBusy, accountError, accountHelpOpen, actionError, browse, changeTab, connectDesktopSession, connectMusicSession, desktopSessionAvailable, disconnectAccount, downloads, goBack, likedAlbumIds,
     likedArtistIds, likedSongIds, onAddToPlaylist, openAlbum, openArtist, openArtistSongs, openPlaylist, player, playSongs,
     renderSongActions, searchType: browse.searchType, selectSearchEntity, setAccountHelpOpen, startAccountLink,
@@ -435,6 +454,7 @@ function YoutubeView({
 
   return (
     <div className="youtube-catalog">
+      <ToastHost />
       <main className="music-app__main">
         <div className="music-workspace" key={workspaceKey} ref={workspaceRef}>
           <YoutubeCatalogContent controller={controller} />

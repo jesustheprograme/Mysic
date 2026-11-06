@@ -1,6 +1,6 @@
-import { Disc3, ListMusic, MoreHorizontal, Play, RotateCcw, UserRound, UsersRound } from 'lucide-react'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Disc3, ListMusic, Play, RotateCcw, UserRound, UsersRound } from 'lucide-react'
 import HeartToggle from '../../components/HeartToggle.jsx'
+import { SongMenu } from './ItemMenus.jsx'
 import { adaptSong } from './lib/adapters.js'
 import './shelf-layouts.css'
 
@@ -48,7 +48,7 @@ export function TileShelf({ items, onSelect, selectedId, title }) {
 
 const SONGS_PER_COLUMN = 4
 
-function SongRow({ index, likedSongIds, numbered, onAddToPlaylist, onOpenAlbum, onOpenArtist, onPlay, onToggleFavorite, selected, song }) {
+function SongRow({ ctx, index, numbered, onPlay, selected, song }) {
   const adapted = adaptSong(song)
   return (
     <li className={`sl-song${selected ? ' sl-song--active' : ''}`}>
@@ -61,17 +61,8 @@ function SongRow({ index, likedSongIds, numbered, onAddToPlaylist, onOpenAlbum, 
         </span>
       </button>
       <span className="sl-song__actions">
-        <HeartToggle className="heart-container--song-row" label={`Me gusta ${song.title}`} liked={likedSongIds.has(song.id)} onToggle={(liked) => onToggleFavorite(song.id, liked, adapted)} removeLabel={`Quitar ${song.title} de favoritas`} size={16} />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="sl-song__more" type="button" aria-label={`Más opciones de ${song.title}`}><MoreHorizontal size={16} aria-hidden="true" /></button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-44" collisionPadding={8} sideOffset={4}>
-            <DropdownMenuItem onSelect={() => onAddToPlaylist(adapted)}>Añadir a playlist</DropdownMenuItem>
-            {song.artistId && <DropdownMenuItem onSelect={() => onOpenArtist(song.artistId)}>Ir al artista</DropdownMenuItem>}
-            {song.albumId && <DropdownMenuItem onSelect={() => onOpenAlbum(song.albumId)}>Ir al álbum</DropdownMenuItem>}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <HeartToggle className="heart-container--song-row" label={`Me gusta ${song.title}`} liked={ctx.likedSongIds.has(song.id)} onToggle={(liked) => ctx.toggleSongFavorite(song.id, liked, adapted)} removeLabel={`Quitar ${song.title} de favoritas`} size={16} />
+        <SongMenu ctx={ctx} song={song} />
       </span>
     </li>
   )
@@ -82,7 +73,7 @@ function SongRow({ index, likedSongIds, numbered, onAddToPlaylist, onOpenAlbum, 
  * Con 8 o más se numeran y usan tres columnas; con menos, son filas simples de dos por columna.
  */
 export function SongShelf({ controller, items, title }) {
-  const { likedSongIds, onAddToPlaylist, openAlbum, openArtist, player, playSongs, toggleSongFavorite } = controller
+  const { player, playSongs } = controller
   const id = slug(title)
   const numbered = items.length >= SONGS_PER_COLUMN * 2
   const rows = numbered ? SONGS_PER_COLUMN : 2
@@ -98,15 +89,11 @@ export function SongShelf({ controller, items, title }) {
       <ol className="sl-songs" style={{ '--sl-rows': rows }}>
         {visible.map((song, index) => (
           <SongRow
+            ctx={controller}
             index={index}
             key={song.id}
-            likedSongIds={likedSongIds}
             numbered={numbered}
-            onAddToPlaylist={onAddToPlaylist}
-            onOpenAlbum={openAlbum}
-            onOpenArtist={openArtist}
             onPlay={() => playSongs(items, song.id)}
-            onToggleFavorite={toggleSongFavorite}
             selected={player.currentSong?.id === song.id}
             song={song}
           />

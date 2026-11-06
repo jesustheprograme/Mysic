@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { localAudioUrl } from '../lib/api.js';
 import { readStorage, writeStorage } from '../lib/storage.js';
+// MYSIC-LOCAL: lógica pura de la cola, fuera de este archivo generado (ver MYSIC-LOCAL más abajo).
+import { insertIntoQueue } from '../queueOps.js';
 
 export const PLAY_EVENT = 'yotubei:play';
 export const PAUSE_EVENT = 'yotubei:pause';
@@ -78,6 +80,15 @@ export function usePlayer({ isDownloaded, enabled = true, onQueueEnd, onQueueSta
     setDuration(list[index].durationSeconds || 0);
     setIsBuffering(true);
   }, []);
+
+  // MYSIC-LOCAL: añadido a mano (no existe en Yotubei). Si se regenera este archivo hay que volver a
+  // aplicarlo o llevarlo al repositorio de origen. Inserta canciones en la cola sin reiniciar la actual.
+  const enqueue = useCallback((songs, options) => {
+    const result = insertIntoQueue(queue, currentIndex, songs, options);
+    if (result.queue === queue) return;
+    setQueue(result.queue);
+    setCurrentIndex(result.index);
+  }, [queue, currentIndex]);
 
   const playShuffled = useCallback((list) => {
     if (!list?.length) return;
@@ -340,7 +351,7 @@ export function usePlayer({ isDownloaded, enabled = true, onQueueEnd, onQueueSta
     hasNext: currentIndex < queue.length - 1,
     isPlaying, isBuffering, playerError, currentTime, progressMax,
     progressPct: progressMax ? (currentTime / progressMax) * 100 : 0,
-    volume, setVolume, playFrom, playShuffled, togglePlay, playNext, playPrev, closePlayer,
+    volume, setVolume, playFrom, playShuffled, enqueue, togglePlay, playNext, playPrev, closePlayer,
     handleSeek, commitSeek,
   };
 }

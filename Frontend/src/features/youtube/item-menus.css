@@ -1,0 +1,78 @@
+/* Menús contextuales de canciones y tarjetas (estilo limusic: panel oscuro, filas de 40px, acento en la primera). */
+.ym-menu {
+  width: 270px;
+  padding: 6px;
+  border: 1px solid oklch(1 0 0 / 0.1);
+  border-radius: 14px;
+  background: #15101c;
+  box-shadow: 0 16px 40px rgb(0 0 0 / 0.55);
+  color: #eceaf1;
+}
+
+.ym-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 9px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.ym-item svg { color: #b9b4c4; }
+.ym-item:focus, .ym-item[data-highlighted] { background: oklch(1 0 0 / 0.08); color: #fff; }
+.ym-item:focus svg, .ym-item[data-highlighted] svg { color: #fff; }
+
+.ym-item--accent, .ym-item--accent svg { color: var(--m-accent, #ff6542); }
+.ym-item--accent:focus, .ym-item--accent[data-highlighted] { background: color-mix(in srgb, var(--m-accent, #ff6542) 14%, transparent); color: var(--m-accent, #ff6542); }
+.ym-item--accent:focus svg, .ym-item--accent[data-highlighted] svg { color: var(--m-accent, #ff6542); }
+.ym-item--danger, .ym-item--danger svg { color: #ff8a7a; }
+.ym-item[data-disabled] { opacity: 0.45; }
+
+.ym-separator { height: 1px; margin: 5px 6px; background: oklch(1 0 0 / 0.08); }
+
+/* Botón "…" sobre la portada de una tarjeta: aparece al apuntar o al enfocar la tarjeta. */
+.home-shelf-card { position: relative; }
+
+.home-shelf-card__menu {
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: rgb(0 0 0 / 0.62);
+  opacity: 0;
+}
+
+.home-shelf-card:hover .home-shelf-card__menu,
+.home-shelf-card:focus-within .home-shelf-card__menu,
+.home-shelf-card__menu[data-state='open'] { opacity: 1; }
+.home-shelf-card__menu:hover { background: rgb(0 0 0 / 0.85); }
+
+@media (hover: none) { .home-shelf-card__menu { opacity: 1; } }
+
+/* Aviso breve */
+.mysic-toast-region {
+  position: fixed;
+  z-index: 120;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.mysic-toast {
+  padding: 10px 18px;
+  border: 1px solid oklch(1 0 0 / 0.12);
+  border-radius: 999px;
+  background: #15101c;
+  color: #fff;
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.5);
+}

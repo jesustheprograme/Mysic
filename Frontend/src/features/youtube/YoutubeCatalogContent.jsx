@@ -6,6 +6,7 @@ import CollectionDetailView from '../collections/CollectionDetailView.jsx'
 import CatalogSearchControls from '../discovery/CatalogSearchControls.jsx'
 import HomeRail from '../discovery/HomeRail.jsx'
 import CommunityShelf from './CommunityShelf.jsx'
+import { CardMenu } from './ItemMenus.jsx'
 import { applyHomeLayout, CARD_SIZES, chooseShelfLayout, DEFAULT_LAYOUT } from './homeLayout.js'
 import { SectionIcon, SongShelf, TileShelf } from './ShelfLayouts.jsx'
 import { prefetchHandlers } from './prefetchDetail.js'
@@ -253,6 +254,10 @@ function BrowseShelves({ controller, shelves }) {
         onDetailSelect={openAlbum}
         onPlaybackToggle={player.togglePlay}
         onSelect={(id) => selectItem(shelf, id)}
+        renderMenu={(item) => {
+          const entry = shelf.items.find((candidate) => candidate.id === item.id)
+          return entry ? <CardMenu ctx={controller} entry={entry} title={item.title} /> : null
+        }}
         selectedId={player.currentSong?.id}
         selectedItemPlaying={player.isPlaying}
         title={title}
