@@ -1,96 +1,23 @@
-import { ChevronRight, Clock3, Search, Trash2, X } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 import { useEffect, useEffectEvent, useId, useRef, useState } from 'react'
-import { api, imageUrl } from './lib/api.js'
+import { api } from './lib/api.js'
+import SearchPopover from './SearchPopover.jsx'
+import { buildSearchModel } from './searchModel.js'
 
-const TYPE_LABELS = {
-  album: 'Álbum',
-  artist: 'Artista',
-  song: 'Canción',
-}
+const SUGGEST_DEBOUNCE_MS = 180
+// La búsqueda completa es más pesada para YouTube que las sugerencias: se pide con menos prisa.
+const SEARCH_DEBOUNCE_MS = 320
 
-const ENTITY_ORDER = ['song', 'artist', 'album']
-const SECTION_LABELS = {
-  album: 'Álbumes',
-  artist: 'Artistas',
-  song: 'Canciones',
-}
+const normalizeKey = (text) => text.trim().toLocaleLowerCase()
 
-function buildSearchModel(suggestions, history, hasQuery) {
-  if (!hasQuery) {
-    const rows = history.map((title) => ({ kind: 'history', title }))
-    return { entityGroups: [], featured: null, rows }
-  }
-
-  const featured = suggestions.entities[0] ?? null
-  const entityGroups = ENTITY_ORDER.map((kind) => ({
-    kind,
-    rows: suggestions.entities.slice(1).filter((entity) => entity.kind === kind),
-  })).filter((group) => group.rows.length)
-  const rows = [...(featured ? [featured] : []), ...entityGroups.flatMap((group) => group.rows)]
-  return { entityGroups, featured, rows }
-}
-
-function SearchOption({ active, featured, index, listboxId, onChoose, onHistoryRemove, row }) {
-  return (
-    <div className={`yt-music-search__option${featured ? ' yt-music-search__option--featured' : ''}${active ? ' yt-music-search__option--active' : ''}`}>
-      <button
-        type="button"
-        className="yt-music-search__choice"
-        id={`${listboxId}-${index}`}
-        role="option"
-        aria-selected={active}
-        onClick={() => onChoose(row)}
-      >
-        {row.thumbnail ? (
-          <img loading="lazy" decoding="async" src={imageUrl(row.thumbnail)} alt="" />
-        ) : row.kind === 'history' ? (
-          <Clock3 size={19} aria-hidden="true" />
-        ) : (
-          <Search size={19} aria-hidden="true" />
-        )}
-        <span>
-          {featured && <small>{TYPE_LABELS[row.kind] ?? row.kind}</small>}
-          <strong>{row.title}</strong>
-          {row.subtitle && !featured && <small>{TYPE_LABELS[row.kind] ?? row.kind} · {row.subtitle}</small>}
-          {row.subtitle && featured && <small>{row.subtitle}</small>}
-        </span>
-        {featured && <ChevronRight size={19} aria-hidden="true" />}
-      </button>
-      {row.kind === 'history' && (
-        <button type="button" className="yt-music-search__remove" aria-label={`Eliminar ${row.title} del historial`} onClick={() => onHistoryRemove(row.title)}>
-          <Trash2 size={17} aria-hidden="true" />
-        </button>
-      )}
-    </div>
-  )
-}
-
-function SearchPopover({ activeIndex, entityGroups, featured, hasQuery, listboxId, onChoose, onHistoryRemove, open, queryLength, rows }) {
-  return (
-    <div className="yt-music-search__popover" id={listboxId} role="listbox" aria-label="Sugerencias de búsqueda" inert={!open}>
-      {!hasQuery && rows.length > 0 && <p className="yt-music-search__eyebrow">Búsquedas recientes</p>}
-      {!hasQuery && rows.map((row, index) => <SearchOption active={activeIndex === index} featured={false} index={index} key={`${row.kind}-${row.title}`} listboxId={listboxId} onChoose={onChoose} onHistoryRemove={onHistoryRemove} row={row} />)}
-      {hasQuery && featured && (
-        <section className="yt-music-search__section" aria-label="Resultado principal">
-          <p className="yt-music-search__eyebrow">Resultado principal</p>
-          <SearchOption active={activeIndex === 0} featured index={0} key={`${featured.kind}-${featured.id ?? featured.title}`} listboxId={listboxId} onChoose={onChoose} onHistoryRemove={onHistoryRemove} row={featured} />
-        </section>
-      )}
-      {hasQuery && entityGroups.map((group, groupIndex) => {
-        const firstIndex = (featured ? 1 : 0)
-          + entityGroups.slice(0, groupIndex).reduce((total, item) => total + item.rows.length, 0)
-        return (
-          <section className="yt-music-search__section" aria-label={SECTION_LABELS[group.kind]} key={group.kind}>
-            <p className="yt-music-search__eyebrow">{SECTION_LABELS[group.kind]}</p>
-            {group.rows.map((row, index) => <SearchOption active={activeIndex === firstIndex + index} featured={false} index={firstIndex + index} key={`${row.kind}-${row.id ?? row.title}`} listboxId={listboxId} onChoose={onChoose} onHistoryRemove={onHistoryRemove} row={row} />)}
-          </section>
-        )
-      })}
-      {open && !rows.length && (
-        <p className="yt-music-search__empty">{queryLength < 2 ? 'Escribe para buscar en YouTube Music.' : 'No hay sugerencias todavía.'}</p>
-      )}
-    </div>
-  )
+/**
+ * ¿El resultado completo guardado sirve para la consulta actual? Mientras se teclea, la consulta
+ * crece o se acorta sobre la anterior; seguir mostrando el resultado previo evita que el panel
+ * cambie de forma (completo → sugerencias → completo) con cada pulsación.
+ */
+function isRelevantSearch(storedKey, currentKey) {
+  if (!storedKey || !currentKey) return false
+  return storedKey === currentKey || currentKey.startsWith(storedKey) || storedKey.startsWith(currentKey)
 }
 
 export default function MusicSearchPanel({
@@ -106,11 +33,13 @@ export default function MusicSearchPanel({
 }) {
   const [open, setOpen] = useState(false)
   const [suggestions, setSuggestions] = useState({ texts: [], entities: [] })
+  const [searchResult, setSearchResult] = useState({ key: '', data: null })
   const [activeIndex, setActiveIndex] = useState(-1)
   const rootRef = useRef(null)
   const inputRef = useRef(null)
   const suggestionsCacheRef = useRef(new Map())
   const listboxId = useId()
+
   const loadSuggestions = useEffectEvent((searchQuery, signal) => {
     const cacheKey = searchQuery.toLocaleLowerCase()
     const cached = suggestionsCacheRef.current.get(cacheKey)
@@ -134,6 +63,14 @@ export default function MusicSearchPanel({
       })
   })
 
+  const loadFullSearch = useEffectEvent((searchQuery, signal) => {
+    api.search(searchQuery, 'all', signal)
+      .then((data) => setSearchResult({ key: normalizeKey(searchQuery), data }))
+      .catch(() => {
+        // Sin resultado completo el panel sigue funcionando con las sugerencias.
+      })
+  })
+
   useEffect(() => {
     if (focusOnMount) inputRef.current?.focus()
   }, [focusOnMount])
@@ -146,7 +83,19 @@ export default function MusicSearchPanel({
     const controller = new AbortController()
     const timer = setTimeout(() => {
       loadSuggestions(query.trim(), controller.signal)
-    }, 180)
+    }, SUGGEST_DEBOUNCE_MS)
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
+  }, [open, query])
+
+  useEffect(() => {
+    if (!open || query.trim().length < 2) return undefined
+    const controller = new AbortController()
+    const timer = setTimeout(() => {
+      loadFullSearch(query.trim(), controller.signal)
+    }, SEARCH_DEBOUNCE_MS)
     return () => {
       clearTimeout(timer)
       controller.abort()
@@ -165,7 +114,9 @@ export default function MusicSearchPanel({
   }, [])
 
   const hasQuery = Boolean(query.trim())
-  const { entityGroups, featured, rows } = buildSearchModel(suggestions, history, hasQuery)
+  const currentKey = normalizeKey(query)
+  const search = isRelevantSearch(searchResult.key, currentKey) ? searchResult.data : null
+  const { featured, rows, sections } = buildSearchModel({ hasQuery, history, search, suggestions })
 
   function choose(row) {
     setActiveIndex(-1)
@@ -182,6 +133,14 @@ export default function MusicSearchPanel({
       onQueryChange(row.title)
       onSubmit(row.title)
     }
+  }
+
+  function viewAll() {
+    if (!query.trim()) return
+    setActiveIndex(-1)
+    setOpen(false)
+    inputRef.current?.blur()
+    onSubmit(query)
   }
 
   function handleKeyDown(event) {
@@ -212,7 +171,7 @@ export default function MusicSearchPanel({
   return (
     <div className={`yt-music-search${open ? ' yt-music-search--open' : ''}`} ref={rootRef}>
       <form
-        className="yt-music-search__bar"
+        className="sx-bar"
         role="search"
         onSubmit={(event) => {
           event.preventDefault()
@@ -222,7 +181,7 @@ export default function MusicSearchPanel({
           inputRef.current?.blur()
         }}
       >
-        <Search size={21} strokeWidth={1.8} aria-hidden="true" />
+        <Search size={20} strokeWidth={1.8} aria-hidden="true" />
         <input
           ref={inputRef}
           type="search"
@@ -244,16 +203,33 @@ export default function MusicSearchPanel({
           onKeyDown={handleKeyDown}
         />
         {query && (
-          <button type="button" aria-label="Limpiar búsqueda" onClick={() => {
-            onQueryChange('')
-            inputRef.current?.focus()
-          }}>
+          <button
+            type="button"
+            className="sx-clear"
+            aria-label="Limpiar búsqueda"
+            onClick={() => {
+              onQueryChange('')
+              inputRef.current?.focus()
+            }}
+          >
             <X size={19} aria-hidden="true" />
           </button>
         )}
       </form>
 
-      <SearchPopover activeIndex={activeIndex} entityGroups={entityGroups} featured={featured} hasQuery={hasQuery} listboxId={listboxId} onChoose={choose} onHistoryRemove={removeHistory} open={open} queryLength={query.trim().length} rows={rows} />
+      <SearchPopover
+        activeIndex={activeIndex}
+        featured={featured}
+        hasQuery={hasQuery}
+        listboxId={listboxId}
+        onChoose={choose}
+        onHistoryRemove={removeHistory}
+        onViewAll={viewAll}
+        open={open}
+        queryLength={query.trim().length}
+        rows={rows}
+        sections={sections}
+      />
     </div>
   )
 }
