@@ -1,4 +1,4 @@
-/* Solo esta hoja usa Noto Sans JP (.collection-detail__creator); viaja con el chunk de la
+/* Solo esta hoja usa Noto Sans JP (como respaldo de kanji/kana en .collection-detail__creator); viaja con el chunk de la
    interfaz principal en lugar de sumar sus 124 @font-face al CSS de arranque. */
 @import "@fontsource-variable/noto-sans-jp";
 
@@ -1003,7 +1003,8 @@
 
 .collection-detail__creator,
 .collection-detail__identity {
-  font-family: 'Noto Sans JP Variable', 'Yu Gothic UI', Meiryo, 'Microsoft YaHei UI', sans-serif;
+  /* La letra de toda la app es Geist. Geist no trae kanji ni kana: solo esos caracteres caen a Noto Sans JP. */
+  font-family: 'Geist Variable', 'Noto Sans JP Variable', 'Yu Gothic UI', Meiryo, 'Microsoft YaHei UI', ui-sans-serif, system-ui, sans-serif;
 }
 
 .collection-detail__identity h1 {
