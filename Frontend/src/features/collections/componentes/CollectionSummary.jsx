@@ -44,7 +44,7 @@ function SavedButton({ collection, collectionIsSaved, onToggleCollectionFavorite
     : (collectionIsSaved ? 'En la biblioteca' : 'Añadir a la biblioteca')
   const Icon = collectionIsSaved ? BookmarkCheck : Bookmark
   return (
-    <button className={`collection-detail__pill collection-detail__pill--outline${collectionIsSaved ? ' collection-detail__pill--saved' : ''}`} type="button" aria-pressed={collectionIsSaved} aria-label={`${label}: ${collection.title}`} onClick={() => toggle(!collectionIsSaved)}>
+    <button className={`collection-detail__pill collection-detail__pill--outline${collectionIsSaved ? ' collection-detail__pill--saved' : ''}`} type="button" aria-pressed={collectionIsSaved} aria-label={`${label}: ${collection.title}`} title={label} onClick={() => toggle(!collectionIsSaved)}>
       <Icon size={17} strokeWidth={1.9} aria-hidden="true" />
       <span>{label}</span>
     </button>
@@ -60,7 +60,7 @@ function CollectionControls({ canDownload, collection, collectionIsPlaying, coll
         <PlaybackIcon size={18} fill="currentColor" strokeWidth={1.8} aria-hidden="true" />
         <span>{playbackLabel}</span>
       </button>
-      <button className="collection-detail__pill collection-detail__pill--outline" type="button" disabled={!hasSongs} onClick={onShuffle}>
+      <button className="collection-detail__pill collection-detail__pill--outline" type="button" disabled={!hasSongs} aria-label="Reproducción aleatoria" title="Aleatorio" onClick={onShuffle}>
         <Shuffle size={17} strokeWidth={1.9} aria-hidden="true" />
         <span>Aleatorio</span>
       </button>

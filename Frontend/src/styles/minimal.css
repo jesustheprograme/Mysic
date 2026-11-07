@@ -608,35 +608,68 @@
     height: 100%;
     margin: 0;
     padding: 22px 28px 0;
-    grid-template-columns: 44px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
-    gap: 22px 14px;
+    gap: 20px;
     background: transparent;
   }
 
+  /* La flecha de volver va dentro del banner, arriba a la izquierda. */
   .music-app .collection-detail__back {
-    position: static;
+    position: absolute;
+    top: 44px;
+    left: 46px;
+    z-index: 4;
+  }
+
+  /* Imagen del banner: la portada ampliada, desenfocada y oscurecida, y la capa de color del reproductor. */
+  .music-app .collection-detail__ambient { display: none; }
+
+
+  .music-app .collection-detail__summary {
+    position: relative;
+    isolation: isolate;
     grid-column: 1;
     grid-row: 1;
     align-self: start;
-    margin-top: 2px;
-  }
-
-  .music-app .collection-detail__summary {
-    grid-column: 2;
-    grid-row: 1;
-    align-self: start;
+    overflow: hidden;
     display: grid;
     justify-items: start;
-    grid-template-columns: 148px minmax(0, 1fr);
-    grid-template-areas: 'art identity' 'controls controls';
-    column-gap: 24px;
-    row-gap: 18px;
+    align-content: center;
+    grid-template-columns: 136px minmax(0, 1fr);
+    grid-template-areas: 'art identity' 'art controls';
+    column-gap: 26px;
+    row-gap: 14px;
+    min-height: 220px;
+    padding: 28px 28px 28px 96px;
+    border: 1px solid var(--m-line);
+    border-radius: 18px;
+    background: rgb(5 6 6 / 0.6);
+  }
+
+  .music-app .collection-detail__summary::before {
+    content: '';
+    position: absolute;
+    z-index: -2;
+    inset: -40px;
+    background: var(--collection-artwork) right center / cover no-repeat;
+    filter: blur(24px) saturate(1.15) brightness(0.85);
+  }
+
+  .music-app .collection-detail__summary::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    background:
+      linear-gradient(90deg, rgb(5 6 6 / 0.94) 0%, rgb(5 6 6 / 0.7) 38%, rgb(5 6 6 / 0.18) 100%),
+      linear-gradient(0deg, color-mix(in srgb, var(--ambient-accent) 20%, transparent), transparent 70%);
   }
 
   .music-app .collection-detail__artwork {
     grid-area: art;
-    width: 148px;
+    align-self: center;
+    width: 136px;
     max-width: none;
     border-radius: 12px;
     box-shadow: 0 0 0 1px var(--m-line), 0 16px 36px rgb(0 0 0 / 0.4);
@@ -661,7 +694,7 @@
   .music-app .collection-detail__identity h1 {
     max-width: none;
     margin: 0;
-    font-size: clamp(30px, 3.3vw, 46px);
+    font-size: clamp(26px, 2.7vw, 38px);
     font-weight: 800;
     letter-spacing: -0.02em;
     line-height: 1.08;
@@ -695,7 +728,17 @@
     margin: 0;
   }
 
-  .music-app .collection-detail__description { grid-column: 1 / -1; max-width: 640px; text-align: left; }
+  .music-app .collection-detail__description { grid-column: 2; max-width: 640px; margin: 0; text-align: left; }
+
+  /* Aleatorio y biblioteca son botones redondos con icono (el texto queda como nombre accesible). */
+  .music-app .collection-detail__pill--outline {
+    width: 42px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .music-app .collection-detail__pill--outline span { display: none; }
+  .music-app .collection-detail__control { border: 1px solid var(--m-line-strong); background: rgb(0 0 0 / 0.2); }
 
   .music-app .collection-detail__pill {
     display: inline-flex;
