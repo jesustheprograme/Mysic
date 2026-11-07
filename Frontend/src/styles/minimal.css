@@ -754,8 +754,11 @@
 
   .music-app .collection-detail__pill:disabled { opacity: 0.45; pointer-events: none; }
 
-  .music-app .collection-detail__pill--primary { color: #fff; background: var(--m-accent); }
-  .music-app .collection-detail__pill--primary:hover { background: color-mix(in srgb, var(--m-accent) 85%, white); }
+  /* Los botones toman el color dominante de la portada del álbum o playlist (--collection-accent); sin él, el acento de la marca. */
+  .music-app .collection-detail { --btn-accent: var(--collection-accent, var(--m-accent)); }
+
+  .music-app .collection-detail__pill--primary { color: #fff; background: var(--btn-accent); }
+  .music-app .collection-detail__pill--primary:hover { background: color-mix(in srgb, var(--btn-accent) 85%, white); }
 
   .music-app .collection-detail__pill--outline {
     border: 1px solid var(--m-line-strong);
@@ -766,9 +769,9 @@
   .music-app .collection-detail__pill--outline:hover { background: oklch(1 0 0 / 0.08); }
 
   .music-app .collection-detail__pill--saved {
-    border-color: color-mix(in srgb, var(--m-accent) 65%, transparent);
-    color: var(--m-accent);
-    background: color-mix(in srgb, var(--m-accent) 9%, transparent);
+    border-color: color-mix(in srgb, var(--btn-accent) 65%, transparent);
+    color: var(--btn-accent);
+    background: color-mix(in srgb, var(--btn-accent) 9%, transparent);
   }
 
   .music-app .collection-detail__search {
@@ -788,7 +791,7 @@
     background: rgb(0 0 0 / 0.28);
   }
 
-  .music-app .collection-detail__search:focus-within { border-color: color-mix(in srgb, var(--m-accent) 70%, transparent); }
+  .music-app .collection-detail__search:focus-within { border-color: color-mix(in srgb, var(--btn-accent) 70%, transparent); }
 
   .music-app .collection-detail__search input {
     width: 100%;

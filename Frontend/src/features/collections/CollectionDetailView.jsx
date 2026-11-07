@@ -2,6 +2,7 @@ import { ArrowDown, ArrowLeft, ArrowUp, Search } from 'lucide-react'
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { groupTracksByDisc } from '../../lib/tracks.js'
+import { useArtworkAccent } from '../adaptive-theme/useArtworkAccent.js'
 import { shuffled } from '../youtube/queueOps.js'
 import { filterSongs } from './collectionSearch.js'
 import CollectionSummary from './componentes/CollectionSummary.jsx'
@@ -113,7 +114,10 @@ function CollectionDetailView({
     ...collection,
     onArtistSelect: collection.artistId && onArtistSelect ? () => onArtistSelect(collection.artistId) : null,
   }
-  const pageStyle = collection.artwork ? { '--collection-artwork': `url("${collection.artwork}")` } : undefined
+  const artworkAccent = useArtworkAccent(collection.artwork)
+  const pageStyle = collection.artwork
+    ? { '--collection-artwork': `url("${collection.artwork}")`, ...(artworkAccent ? { '--collection-accent': artworkAccent } : {}) }
+    : undefined
 
   return (
     <section className={`collection-detail${showsTrackArtwork ? ' collection-detail--playlist' : ''}`} style={pageStyle} aria-labelledby="collection-detail-title">
