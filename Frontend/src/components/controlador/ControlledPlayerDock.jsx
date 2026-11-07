@@ -2,6 +2,7 @@ import { ListMusic, X } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import ControlledWaveform from '../reproductor/ControlledWaveform.jsx'
 import { useArtworkAccent } from '../../features/adaptive-theme/useArtworkAccent.js'
+import useAmbientAccent from '../../features/adaptive-theme/useAmbientAccent.js'
 import LyricsSection from '../../features/lyrics/LyricsSection.jsx'
 import HeartToggle from '../HeartToggle.jsx'
 import {
@@ -41,6 +42,7 @@ function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = fal
   const artwork = playerArtworkUrl(track.artwork)
   const displayedTrack = artwork === track.artwork ? track : { ...track, artwork }
   const accent = useArtworkAccent(artwork)
+  useAmbientAccent(accent)
   const playerStyle = {
     '--mobile-player-progress': `${progress}%`,
     ...(accent ? { '--player-accent': accent } : {}),

@@ -1,7 +1,7 @@
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { restrictToFirstScrollableAncestor, restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { ListPlus } from 'lucide-react'
+import { Clock3, ListPlus } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import useWindowedRows, { findScrollParent } from '../hooks/useWindowedRows.js'
 import { shouldWindow } from '../hooks/windowMath.js'
@@ -10,7 +10,7 @@ import FilaCancionOrdenable from './FilaCancionOrdenable.jsx'
 const dragModifiers = [restrictToFirstScrollableAncestor, restrictToVerticalAxis]
 
 export default function CollectionTrackList({
-  activeTrackRef, albumTrackNumbers, likedSongIds, metricsRef, onAddToPlaylist, onAlbumSelect, onArtistSelect,
+  activeTrackRef, albumTrackNumbers, emptyState, likedSongIds, metricsRef, onAddToPlaylist, onAlbumSelect, onArtistSelect,
   onMoveSong, onPlaybackToggle, onSongSelect, onToggleFavorite, renderTrackActions, selectedSongAlbumId,
   selectedSongId, selectedSongPlaying, selectedSongSource, showsDiscHeadings, showsTrackArtwork, songs, trackGroups, tracksRef,
 }) {
@@ -94,8 +94,18 @@ export default function CollectionTrackList({
       </SortableContext>
     </DndContext>
   ) : (
-    <div className="collection-detail__empty"><ListPlus size={25} strokeWidth={1.6} aria-hidden="true" /><strong>Todavía no hay canciones</strong><span>Añade canciones para comenzar esta selección.</span></div>
+    <div className="collection-detail__empty"><ListPlus size={25} strokeWidth={1.6} aria-hidden="true" /><strong>{emptyState?.title ?? 'Todavía no hay canciones'}</strong><span>{emptyState?.text ?? 'Añade canciones para comenzar esta selección.'}</span></div>
   )
 
-  return <div className="collection-detail__tracks" ref={tracksRef}>{content}</div>
+  // Cabecera de la tabla (solo álbumes: las filas de playlist tienen otras columnas y pueden ser arrastrables).
+  const tableHead = !showsTrackArtwork && !onMoveSong && songs.length > 0 && (
+    <div className="collection-detail__table-head" aria-hidden="true">
+      <span>#</span>
+      <span>Título</span>
+      <span />
+      <Clock3 size={15} strokeWidth={1.8} />
+    </div>
+  )
+
+  return <div className="collection-detail__tracks" ref={tracksRef}>{tableHead}{content}</div>
 }

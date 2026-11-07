@@ -1,5 +1,4 @@
-import { Download, MoreHorizontal, Pause, Pencil, Pin, PinOff, Play, Share2, Trash2 } from 'lucide-react'
-import HeartToggle from '../../../components/HeartToggle.jsx'
+import { Bookmark, BookmarkCheck, Download, MoreHorizontal, Pause, Pencil, Pin, PinOff, Play, Share2, Shuffle, Trash2 } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../../components/ui/dropdown-menu.jsx'
 
 function formatCollectionLength(seconds) {
@@ -17,40 +16,62 @@ function CollectionCreator({ collection }) {
   return <button className="collection-detail__creator collection-detail__creator--link" type="button" aria-label={`Abrir artista ${collection.artist}`} onClick={collection.onArtistSelect}>{content}</button>
 }
 
+// Cabecera como la de limusic: etiqueta de tipo y año, título grande y una línea con el artista,
+// el número de canciones y la duración.
 function CollectionIdentity({ collection, showsTrackArtwork, songCount, totalSeconds }) {
   const length = formatCollectionLength(totalSeconds)
+  const kind = showsTrackArtwork ? collection.kind : `${collection.kind}${collection.year ? ` · ${collection.year}` : ''}`
   return (
     <div className="collection-detail__identity">
+      <span className="collection-detail__kind">{kind}</span>
       <h1 id="collection-detail-title">{collection.title}</h1>
       {!showsTrackArtwork && collection.description && <p>{collection.description}</p>}
-      {showsTrackArtwork
-        ? <span>{collection.kind} · {songCount} canciones · {length}</span>
-        : <><span>{collection.kind}{collection.year ? ` · ${collection.year}` : ''}</span><span>{songCount} canciones · {length}</span></>}
+      <div className="collection-detail__meta">
+        <CollectionCreator collection={collection} />
+        <span className="collection-detail__count">{songCount} canciones · {length}</span>
+      </div>
     </div>
   )
 }
 
-function SavedToggle({ collection, collectionIsSaved, onToggleCollectionFavorite, onTogglePinned }) {
-  if (onTogglePinned) return <HeartToggle className={`collection-detail__control${collectionIsSaved ? ' collection-detail__control--active' : ''}`} label={`Guardar ${collection.title}`} liked={collectionIsSaved} onToggle={onTogglePinned} removeLabel={`Quitar ${collection.title} de tu biblioteca`} size={20} />
-  if (onToggleCollectionFavorite) return <HeartToggle className={`collection-detail__control${collectionIsSaved ? ' collection-detail__control--active' : ''}`} label={`Añadir ${collection.title} a álbumes favoritos`} liked={collectionIsSaved} onToggle={onToggleCollectionFavorite} removeLabel={`Quitar ${collection.title} de álbumes favoritos`} size={20} />
-  return null
+// "Añadir a la biblioteca" (álbumes) o "Fijar" (playlists propias): un único botón con texto.
+function SavedButton({ collection, collectionIsSaved, onToggleCollectionFavorite, onTogglePinned }) {
+  const toggle = onTogglePinned ?? onToggleCollectionFavorite
+  if (!toggle) return null
+  const pinned = Boolean(onTogglePinned)
+  const label = pinned
+    ? (collectionIsSaved ? 'Fijada' : 'Fijar')
+    : (collectionIsSaved ? 'En la biblioteca' : 'Añadir a la biblioteca')
+  const Icon = collectionIsSaved ? BookmarkCheck : Bookmark
+  return (
+    <button className={`collection-detail__pill collection-detail__pill--outline${collectionIsSaved ? ' collection-detail__pill--saved' : ''}`} type="button" aria-pressed={collectionIsSaved} aria-label={`${label}: ${collection.title}`} onClick={() => toggle(!collectionIsSaved)}>
+      <Icon size={17} strokeWidth={1.9} aria-hidden="true" />
+      <span>{label}</span>
+    </button>
+  )
 }
 
-function CollectionControls({ canDownload, collection, collectionIsPlaying, collectionIsSaved, hasSongs, onDelete, onDownloadCollection, onEdit, onShare, onToggleCollectionFavorite, onTogglePinned, onTogglePlayback }) {
+function CollectionControls({ canDownload, collection, collectionIsPlaying, collectionIsSaved, hasSongs, onDelete, onDownloadCollection, onEdit, onShare, onShuffle, onToggleCollectionFavorite, onTogglePinned, onTogglePlayback }) {
   const playbackLabel = collectionIsPlaying ? 'Pausar' : 'Reproducir'
   const PlaybackIcon = collectionIsPlaying ? Pause : Play
   return (
     <div className="collection-detail__controls">
-      <button className="collection-detail__control" type="button" disabled={!canDownload} aria-label={`Descargar ${collection.title}`} title="Descargar" onClick={onDownloadCollection}><Download size={22} strokeWidth={1.8} aria-hidden="true" /></button>
-      <SavedToggle collection={collection} collectionIsSaved={collectionIsSaved} onToggleCollectionFavorite={onToggleCollectionFavorite} onTogglePinned={onTogglePinned} />
-      <button className="collection-detail__play" type="button" disabled={!hasSongs} aria-label={`${playbackLabel} ${collection.title}`} title={playbackLabel} onClick={onTogglePlayback}><PlaybackIcon size={31} fill="currentColor" strokeWidth={1.8} aria-hidden="true" /></button>
-      <button className="collection-detail__control" type="button" aria-label={`Compartir ${collection.title}`} title="Compartir" onClick={onShare}><Share2 size={22} strokeWidth={1.8} aria-hidden="true" /></button>
+      <button className="collection-detail__pill collection-detail__pill--primary" type="button" disabled={!hasSongs} aria-label={`${playbackLabel} ${collection.title}`} onClick={onTogglePlayback}>
+        <PlaybackIcon size={18} fill="currentColor" strokeWidth={1.8} aria-hidden="true" />
+        <span>{playbackLabel}</span>
+      </button>
+      <button className="collection-detail__pill collection-detail__pill--outline" type="button" disabled={!hasSongs} onClick={onShuffle}>
+        <Shuffle size={17} strokeWidth={1.9} aria-hidden="true" />
+        <span>Aleatorio</span>
+      </button>
+      <SavedButton collection={collection} collectionIsSaved={collectionIsSaved} onToggleCollectionFavorite={onToggleCollectionFavorite} onTogglePinned={onTogglePinned} />
       <DropdownMenu>
-        <DropdownMenuTrigger asChild><button className="collection-detail__control" type="button" aria-label={`Más opciones de ${collection.title}`} title="Más opciones"><MoreHorizontal size={23} strokeWidth={1.9} aria-hidden="true" /></button></DropdownMenuTrigger>
-        <DropdownMenuContent className="collection-detail__menu min-w-52" align="end" collisionPadding={12} sideOffset={7}>
+        <DropdownMenuTrigger asChild><button className="collection-detail__control" type="button" aria-label={`Más opciones de ${collection.title}`} title="Más opciones"><MoreHorizontal size={20} strokeWidth={1.9} aria-hidden="true" /></button></DropdownMenuTrigger>
+        <DropdownMenuContent className="collection-detail__menu min-w-52" align="start" collisionPadding={12} sideOffset={7}>
+          <DropdownMenuItem className="collection-detail__menu-item" disabled={!canDownload} onSelect={onDownloadCollection}><Download aria-hidden="true" /><span>Descargar</span></DropdownMenuItem>
+          <DropdownMenuItem className="collection-detail__menu-item" onSelect={onShare}><Share2 aria-hidden="true" /><span>Compartir</span></DropdownMenuItem>
           {onEdit && <DropdownMenuItem className="collection-detail__menu-item" onSelect={onEdit}><Pencil aria-hidden="true" /><span>Cambiar nombre o portada</span></DropdownMenuItem>}
           {onTogglePinned && <DropdownMenuItem className="collection-detail__menu-item" onSelect={onTogglePinned}>{collection.pinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}<span>{collection.pinned ? 'Desfijar playlist' : 'Fijar playlist'}</span></DropdownMenuItem>}
-          <DropdownMenuItem className="collection-detail__menu-item" onSelect={onShare}><Share2 aria-hidden="true" /><span>Compartir</span></DropdownMenuItem>
           {onDelete && <DropdownMenuItem className="collection-detail__menu-item collection-detail__menu-item--danger" onSelect={onDelete}><Trash2 aria-hidden="true" /><span>Eliminar playlist</span></DropdownMenuItem>}
         </DropdownMenuContent>
       </DropdownMenu>
@@ -60,19 +81,18 @@ function CollectionControls({ canDownload, collection, collectionIsPlaying, coll
 
 export default function CollectionSummary({
   canDownload, collection, collectionIsPlaying, collectionIsSaved, onDelete, onDownloadCollection, onEdit,
-  onShare, onToggleCollectionFavorite, onTogglePinned, onTogglePlayback, showsTrackArtwork, songs,
+  onShare, onShuffle, onToggleCollectionFavorite, onTogglePinned, onTogglePlayback, showsTrackArtwork, songs,
 }) {
   const totalSeconds = songs.reduce((total, song) => total + song.durationSeconds, 0)
 
   return (
-    <aside className="collection-detail__summary">
-      <CollectionCreator collection={collection} />
+    <header className="collection-detail__summary">
       {collection.artwork
         ? <img className="collection-detail__artwork" src={collection.artwork} alt="" />
         : <div className="collection-detail__artwork collection-detail__artwork--empty" aria-hidden="true" />}
       <CollectionIdentity collection={collection} showsTrackArtwork={showsTrackArtwork} songCount={songs.length} totalSeconds={totalSeconds} />
-      <CollectionControls canDownload={canDownload} collection={collection} collectionIsPlaying={collectionIsPlaying} collectionIsSaved={collectionIsSaved} hasSongs={songs.length > 0} onDelete={onDelete} onDownloadCollection={onDownloadCollection} onEdit={onEdit} onShare={onShare} onToggleCollectionFavorite={onToggleCollectionFavorite} onTogglePinned={onTogglePinned} onTogglePlayback={onTogglePlayback} />
+      <CollectionControls canDownload={canDownload} collection={collection} collectionIsPlaying={collectionIsPlaying} collectionIsSaved={collectionIsSaved} hasSongs={songs.length > 0} onDelete={onDelete} onDownloadCollection={onDownloadCollection} onEdit={onEdit} onShare={onShare} onShuffle={onShuffle} onToggleCollectionFavorite={onToggleCollectionFavorite} onTogglePinned={onTogglePinned} onTogglePlayback={onTogglePlayback} />
       {showsTrackArtwork && collection.description && <p className="collection-detail__description">{collection.description}</p>}
-    </aside>
+    </header>
   )
 }

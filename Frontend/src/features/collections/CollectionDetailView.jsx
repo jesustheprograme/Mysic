@@ -1,6 +1,9 @@
-import { ArrowDown, ArrowLeft, ArrowUp } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowUp, Search } from 'lucide-react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { groupTracksByDisc } from '../../lib/tracks.js'
+import { shuffled } from '../youtube/queueOps.js'
+import { filterSongs } from './collectionSearch.js'
 import CollectionSummary from './componentes/CollectionSummary.jsx'
 import CollectionTrackList from './componentes/CollectionTrackList.jsx'
 import useActiveTrackArrow from './hooks/useActiveTrackArrow.js'
@@ -18,6 +21,7 @@ function CollectionDetailView({
   onEdit,
   onMoveSong,
   onPlaybackToggle,
+  onShuffle,
   onSongSelect,
   onToggleFavorite,
   onToggleCollectionFavorite,
@@ -30,6 +34,11 @@ function CollectionDetailView({
   songs,
 }) {
   const showsTrackArtwork = collection.kind === 'Playlist'
+  // La búsqueda solo filtra la vista; no se ofrece en playlists reordenables porque arrastrar sobre una lista filtrada movería canciones equivocadas.
+  const [query, setQuery] = useState('')
+  const searchable = !onMoveSong && songs.length > 1
+  const searching = searchable && query.trim().length > 0
+  const visibleSongs = searching ? filterSongs(songs, query) : songs
   const selectedSongBelongsToCollection = songs.some((song) => (
     song.id === selectedSongId
       && (!selectedSongSource || selectedSongSource === (song.source === 'youtube' ? 'youtube' : 'local'))
@@ -38,7 +47,8 @@ function CollectionDetailView({
   const collectionIsPlaying = selectedSongBelongsToCollection && selectedSongPlaying
   const collectionIsSaved = onTogglePinned ? Boolean(collection.pinned) : collectionFavorite
   const trackGroups = collection.kind === 'Álbum' ? groupTracksByDisc(songs) : [{ discNumber: 1, tracks: songs }]
-  const showsDiscHeadings = collection.kind === 'Álbum' && trackGroups.length > 1
+  const showsDiscHeadings = collection.kind === 'Álbum' && trackGroups.length > 1 && !searching
+  const shownGroups = searching ? [{ discNumber: 1, tracks: visibleSongs }] : trackGroups
   const albumTrackNumbers = new Map(
     trackGroups.flatMap((group) => group.tracks).map((song, index) => [song.id, index + 1]),
   )
@@ -61,6 +71,17 @@ function CollectionDetailView({
       return
     }
     onSongSelect(songs[0].id, { contextSong: songs[0], contextSongs: songs })
+  }
+
+  // Aleatorio: la pantalla puede dar su propio mezclado (YouTube); si no, se manda la lista ya mezclada como contexto.
+  function shuffleCollection() {
+    if (!songs.length) return
+    if (onShuffle) {
+      onShuffle()
+      return
+    }
+    const order = shuffled(songs)
+    onSongSelect(order[0].id, { contextSong: order[0], contextSongs: order })
   }
 
   function downloadCollection() {
@@ -107,12 +128,20 @@ function CollectionDetailView({
         onDownloadCollection={onDownloadCollection ?? downloadCollection}
         onEdit={onEdit}
         onShare={shareCollection}
+        onShuffle={shuffleCollection}
         onToggleCollectionFavorite={onToggleCollectionFavorite}
         onTogglePinned={onTogglePinned}
         onTogglePlayback={toggleCollectionPlayback}
         showsTrackArtwork={showsTrackArtwork}
         songs={songs}
       />
+      {searchable && (
+        <label className="collection-detail__search">
+          <Search size={17} strokeWidth={1.9} aria-hidden="true" />
+          <span className="sr-only">Buscar en {collection.kind === 'Álbum' ? 'este álbum' : 'esta playlist'}</span>
+          <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Buscar en ${collection.kind === 'Álbum' ? 'este álbum' : 'esta playlist'}`} autoComplete="off" />
+        </label>
+      )}
       <CollectionTrackList
         activeTrackRef={activeTrack.activeTrackRef}
         albumTrackNumbers={albumTrackNumbers}
@@ -131,9 +160,10 @@ function CollectionDetailView({
         selectedSongPlaying={selectedSongPlaying}
         selectedSongSource={selectedSongSource}
         showsDiscHeadings={showsDiscHeadings}
+        emptyState={searching ? { title: 'Sin resultados', text: `Ninguna canción coincide con «${query.trim()}».` } : undefined}
         showsTrackArtwork={showsTrackArtwork}
-        songs={songs}
-        trackGroups={trackGroups}
+        songs={visibleSongs}
+        trackGroups={shownGroups}
         tracksRef={activeTrack.tracksRef}
       />
       {selectedSong && createPortal(

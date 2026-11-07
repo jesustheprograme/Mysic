@@ -1,5 +1,6 @@
 import { ListMusic, X } from 'lucide-react'
 import { useArtworkAccent } from '../../features/adaptive-theme/useArtworkAccent.js'
+import useAmbientAccent from '../../features/adaptive-theme/useAmbientAccent.js'
 import LyricsSection from '../../features/lyrics/LyricsSection.jsx'
 import HeartToggle from '../HeartToggle.jsx'
 import {
@@ -21,6 +22,7 @@ function AudioPlayerDock(props) {
   } = props
   const player = useAudioPlayerDock(props)
   const accent = useArtworkAccent(track.artwork)
+  useAmbientAccent(accent)
   const dockStyle = accent ? { ...player.playerStyle, '--player-accent': accent } : player.playerStyle
 
   return (
