@@ -54,7 +54,7 @@ const searchRailKind = (variant) => () => (variant === 'artist' ? 'artist' : 'al
 
 function SearchRail({ emptyMessage, items, onSelect, title, variant }) {
   if (!items) return null
-  return <HomeRail emptyMessage={emptyMessage} items={items} onSelect={onSelect} title={title} variant={variant} {...intentProps(searchRailKind(variant))} />
+  return <HomeRail fitColumns emptyMessage={emptyMessage} items={items} onSelect={onSelect} title={title} variant={variant} {...intentProps(searchRailKind(variant))} />
 }
 
 function getGroupedResults(results) {
@@ -246,6 +246,7 @@ function BrowseShelves({ controller, shelves }) {
     }
     return (
       <HomeRail
+        fitColumns
         icon={<SectionIcon kind={kind} />}
         items={shelf.items.map(adaptBrowseItem)}
         key={key}
@@ -277,7 +278,7 @@ function LandingView({ controller }) {
   const closePanel = useCallback(() => setEditing(false), [])
 
   return (
-    <div className="home-page yt-landing" style={{ '--shelf-card': CARD_SIZES[layout.cardSize].css }}>
+    <div className="home-page yt-landing" style={{ '--shelf-card': CARD_SIZES[layout.cardSize].css, '--shelf-card-min': `${CARD_SIZES[layout.cardSize].min}px` }}>
       <CatalogNavigation controller={controller} onEditHome={isHome ? () => setEditing((open) => !open) : undefined} editingHome={editing} />
       {browse.error && <div className="collection-empty" role="alert">{browse.error}</div>}
       {browse.loading && <div className="yt-feed-skeleton" role="status" aria-label="Cargando recomendaciones"><i /><i /><i /></div>}

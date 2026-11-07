@@ -1,6 +1,6 @@
 [package]
 name = "mysic"
-version = "0.1.27"
+version = "0.1.28"
 description = "Mysic desktop music player"
 authors = ["Mysic"]
 edition = "2021"

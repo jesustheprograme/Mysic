@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Disc3, ListMusic, Play, RotateCcw, UserRound, UsersRound } from 'lucide-react'
 import HeartToggle from '../../components/HeartToggle.jsx'
 import { SongMenu } from './ItemMenus.jsx'
@@ -21,16 +22,25 @@ export function ShelfHeading({ action, id, kind, title }) {
   )
 }
 
+/** Botón de la cabecera que despliega la sección entera y la vuelve a plegar. */
+function SeeAllButton({ expanded, onToggle }) {
+  return <button className="sl-see-all" type="button" aria-expanded={expanded} onClick={onToggle}>{expanded ? 'Ver menos' : 'Ver todo'}</button>
+}
+
 const slug = (title) => `shelf-${title.toLocaleLowerCase().replace(/[^a-z0-9áéíóúñ]+/gi, '-')}`
 
 /** Atajos compactos (miniatura + título + subtítulo), tres por fila: "Volver a escuchar". */
+const TILES_COLLAPSED = 6
+
 export function TileShelf({ items, onSelect, selectedId, title }) {
   const id = slug(title)
+  const [expanded, setExpanded] = useState(false)
+  const canExpand = items.length > TILES_COLLAPSED
   return (
     <section className="sl-shelf" aria-labelledby={id}>
-      <ShelfHeading id={id} kind="tiles" title={title} />
+      <ShelfHeading action={canExpand ? <SeeAllButton expanded={expanded} onToggle={() => setExpanded((open) => !open)} /> : undefined} id={id} kind="tiles" title={title} />
       <ul className="sl-tiles">
-        {items.slice(0, 6).map((item) => (
+        {(expanded ? items : items.slice(0, TILES_COLLAPSED)).map((item) => (
           <li key={item.id}>
             <button className={`sl-tile${selectedId === item.id ? ' sl-tile--active' : ''}`} type="button" onClick={() => onSelect(item)}>
               {item.artwork ? <img src={item.artwork} alt="" width="48" height="48" loading="lazy" decoding="async" /> : <i aria-hidden="true" />}
@@ -75,9 +85,13 @@ function SongRow({ ctx, index, numbered, onPlay, selected, song }) {
 export function SongShelf({ controller, items, title }) {
   const { player, playSongs } = controller
   const id = slug(title)
+  const [expanded, setExpanded] = useState(false)
   const numbered = items.length >= SONGS_PER_COLUMN * 2
-  const rows = numbered ? SONGS_PER_COLUMN : 2
-  const visible = items.slice(0, rows * 3)
+  const collapsedRows = numbered ? SONGS_PER_COLUMN : 2
+  const canExpand = items.length > collapsedRows * 3
+  // Desplegada, las filas crecen para que todas las canciones sigan en tres columnas.
+  const rows = expanded ? Math.ceil(items.length / 3) : collapsedRows
+  const visible = expanded ? items : items.slice(0, collapsedRows * 3)
   const playAll = (
     <button className="sl-play-all" type="button" onClick={() => playSongs(items, items[0].id)}>
       <Play size={14} aria-hidden="true" /> Reproducir todo
@@ -85,7 +99,7 @@ export function SongShelf({ controller, items, title }) {
   )
   return (
     <section className="sl-shelf" aria-labelledby={id}>
-      <ShelfHeading action={numbered ? playAll : undefined} id={id} kind="songs" title={title} />
+      <ShelfHeading action={(numbered || canExpand) ? <span className="sl-heading__actions">{numbered && playAll}{canExpand && <SeeAllButton expanded={expanded} onToggle={() => setExpanded((open) => !open)} />}</span> : undefined} id={id} kind="songs" title={title} />
       <ol className="sl-songs" style={{ '--sl-rows': rows }}>
         {visible.map((song, index) => (
           <SongRow

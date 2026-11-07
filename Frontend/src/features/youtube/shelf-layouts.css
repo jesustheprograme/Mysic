@@ -31,6 +31,11 @@
 
 .sl-play-all:hover { background: color-mix(in srgb, var(--m-accent, #ff6542) 20%, transparent); }
 
+.sl-heading__actions { display: inline-flex; align-items: center; gap: 14px; }
+
+.sl-see-all { color: var(--m-text-dim, #98a19d); font-size: 12px; font-weight: 500; }
+.sl-see-all:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+
 /* Atajos: tres por fila */
 .sl-tiles {
   display: grid;

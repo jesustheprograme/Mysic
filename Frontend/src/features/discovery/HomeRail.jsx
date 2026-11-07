@@ -1,9 +1,11 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import PreviewIndicator from '../../components/PreviewIndicator.jsx'
+import useRailColumns, { RAIL_GAP } from './railColumns.js'
 
 function HomeRail({
   emptyMessage = 'Todavía no hay elementos.',
+  fitColumns = false,
   headingAction,
   icon,
   items,
@@ -24,29 +26,43 @@ function HomeRail({
   variant = 'default',
 }) {
   const railRef = useRef(null)
+  const [expanded, setExpanded] = useState(false)
+  // Con `fitColumns` las tarjetas se reparten el ancho exacto (sin un trozo de la siguiente asomando)
+  // y "Ver todo" despliega la sección entera en una cuadrícula.
+  const measuredColumns = useRailColumns(railRef)
+  const columns = fitColumns ? measuredColumns : 0
+  const overflowing = !fitColumns || columns === 0 || items.length > columns
 
-  function scrollRail(offset) {
-    railRef.current?.scrollBy({ left: offset, behavior: 'smooth' })
+  // Una página de tarjetas por clic: queda alineada con el borde izquierdo.
+  function scrollRail(direction) {
+    const rail = railRef.current
+    if (rail) rail.scrollBy({ left: direction * (rail.clientWidth + RAIL_GAP), behavior: 'smooth' })
   }
 
   return (
     <section className={`home-shelf${variant === 'artist' ? ' home-shelf--artists' : ''}`} aria-labelledby={`${title.toLocaleLowerCase().replaceAll(' ', '-')}-title`}>
       <div className="home-shelf__heading">
         <h2 id={`${title.toLocaleLowerCase().replaceAll(' ', '-')}-title`}>{icon}{title}</h2>
-        {headingAction ?? (items.length > 0 && (
+        {headingAction ?? (items.length > 0 && overflowing && (
           <div className="home-shelf__actions">
-            <span>Ver todo</span>
-            <button type="button" aria-label={`Anterior: ${title}`} title="Anterior" onClick={() => scrollRail(-520)}>
-              <ChevronLeft size={16} strokeWidth={1.7} aria-hidden="true" />
-            </button>
-            <button type="button" aria-label={`Siguiente: ${title}`} title="Siguiente" onClick={() => scrollRail(520)}>
-              <ChevronRight size={16} strokeWidth={1.7} aria-hidden="true" />
-            </button>
+            {fitColumns
+              ? <button className="home-shelf__see-all" type="button" aria-expanded={expanded} onClick={() => setExpanded((open) => !open)}>{expanded ? 'Ver menos' : 'Ver todo'}</button>
+              : <span>Ver todo</span>}
+            {!expanded && (
+              <>
+                <button type="button" aria-label={`Anterior: ${title}`} title="Anterior" onClick={() => scrollRail(-1)}>
+                  <ChevronLeft size={16} strokeWidth={1.7} aria-hidden="true" />
+                </button>
+                <button type="button" aria-label={`Siguiente: ${title}`} title="Siguiente" onClick={() => scrollRail(1)}>
+                  <ChevronRight size={16} strokeWidth={1.7} aria-hidden="true" />
+                </button>
+              </>
+            )}
           </div>
         ))}
       </div>
 
-      {items.length > 0 ? <div className="home-shelf__rail" ref={railRef}>
+      {items.length > 0 ? <div className={`home-shelf__rail${expanded ? ' home-shelf__rail--grid' : ''}`} data-rail-cols={columns || undefined} ref={railRef} style={columns ? { '--rail-cols': columns } : undefined}>
         {items.map((item, index) => {
           const previewStatus = preview?.itemId === item.id ? preview.status : null
           const isSelected = selectedId === item.id

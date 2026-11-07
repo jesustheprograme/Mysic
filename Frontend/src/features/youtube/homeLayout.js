@@ -5,9 +5,9 @@ import { translateShelfTitle } from './shelfTitles.js'
 
 /** Anchos de tarjeta: el "medio" es el tamaño actual; el pequeño cabe ~1/5 más y el grande ~1/4 menos. */
 export const CARD_SIZES = {
-  small: { label: 'Pequeño', css: 'clamp(104px, 7.4vw, 124px)' },
-  medium: { label: 'Mediano', css: 'clamp(124px, 9vw, 148px)' },
-  large: { label: 'Grande', css: 'clamp(152px, 11.5vw, 184px)' },
+  small: { label: 'Pequeño', min: 112, css: 'clamp(104px, 7.4vw, 124px)' },
+  medium: { label: 'Mediano', min: 136, css: 'clamp(124px, 9vw, 148px)' },
+  large: { label: 'Grande', min: 168, css: 'clamp(152px, 11.5vw, 184px)' },
 }
 
 export const DEFAULT_LAYOUT = Object.freeze({ cardSize: 'medium', hidden: [], order: [] })
