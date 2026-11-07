@@ -640,20 +640,21 @@
     grid-template-areas: 'art identity' 'art controls';
     column-gap: 26px;
     row-gap: 14px;
-    min-height: 220px;
-    padding: 28px 28px 28px 96px;
-    border: 1px solid var(--m-line);
-    border-radius: 18px;
-    background: rgb(5 6 6 / 0.6);
+    /* Sin tarjeta: el encabezado ocupa todo el ancho, hasta los bordes y el borde superior, y se funde con la página. */
+    min-height: 300px;
+    margin: -22px -28px 0;
+    padding: 58px 28px 40px 96px;
   }
 
   .music-app .collection-detail__summary::before {
     content: '';
     position: absolute;
     z-index: -2;
-    inset: -40px;
+    inset: -60px;
     background: var(--collection-artwork) right center / cover no-repeat;
-    filter: blur(24px) saturate(1.15) brightness(0.85);
+    filter: blur(42px) saturate(1.2) brightness(0.8);
+    /* Se desvanece hacia abajo: no hay borde inferior, la imagen se disuelve en el fondo. */
+    mask-image: linear-gradient(to bottom, #000 0%, #000 50%, transparent 100%);
   }
 
   .music-app .collection-detail__summary::after {
@@ -662,8 +663,8 @@
     z-index: -1;
     inset: 0;
     background:
-      linear-gradient(90deg, rgb(5 6 6 / 0.94) 0%, rgb(5 6 6 / 0.7) 38%, rgb(5 6 6 / 0.18) 100%),
-      linear-gradient(0deg, color-mix(in srgb, var(--ambient-accent) 20%, transparent), transparent 70%);
+      linear-gradient(90deg, rgb(5 6 6 / 0.78) 0%, rgb(5 6 6 / 0.45) 42%, rgb(5 6 6 / 0.08) 100%),
+      linear-gradient(0deg, rgb(5 6 6 / 0.55) 0%, transparent 55%);
   }
 
   .music-app .collection-detail__artwork {
@@ -731,12 +732,15 @@
   .music-app .collection-detail__description { grid-column: 2; max-width: 640px; margin: 0; text-align: left; }
 
   /* Aleatorio y biblioteca son botones redondos con icono (el texto queda como nombre accesible). */
-  .music-app .collection-detail__pill--outline {
+  /* Mayor especificidad que la regla base de las pastillas: sin esto el relleno lateral dejaba el icono sin sitio y no se veía. */
+  .music-app .collection-detail__controls .collection-detail__pill--outline {
     width: 42px;
+    min-width: 42px;
     padding: 0;
     justify-content: center;
   }
 
+  .music-app .collection-detail__controls .collection-detail__pill--outline svg { flex: none; }
   .music-app .collection-detail__pill--outline span { display: none; }
   .music-app .collection-detail__control { border: 1px solid var(--m-line-strong); background: rgb(0 0 0 / 0.2); }
 
