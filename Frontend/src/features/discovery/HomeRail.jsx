@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRef, useState } from 'react'
 import PreviewIndicator from '../../components/PreviewIndicator.jsx'
-import useRailColumns, { RAIL_GAP } from './railColumns.js'
+import useRailColumns, { EXPANDED_EXTRA_ROWS, RAIL_GAP } from './railColumns.js'
 
 function HomeRail({
   emptyMessage = 'Todavía no hay elementos.',
@@ -32,6 +32,8 @@ function HomeRail({
   const measuredColumns = useRailColumns(railRef)
   const columns = fitColumns ? measuredColumns : 0
   const overflowing = !fitColumns || columns === 0 || items.length > columns
+  // Desplegada, la sección suma como mucho 3 filas más a la que ya se ve, no toda la lista.
+  const shown = fitColumns && expanded && columns ? items.slice(0, columns * (1 + EXPANDED_EXTRA_ROWS)) : items
 
   // Una página de tarjetas por clic: queda alineada con el borde izquierdo.
   function scrollRail(direction) {
@@ -63,7 +65,7 @@ function HomeRail({
       </div>
 
       {items.length > 0 ? <div className={`home-shelf__rail${expanded ? ' home-shelf__rail--grid' : ''}`} data-rail-cols={columns || undefined} ref={railRef} style={columns ? { '--rail-cols': columns } : undefined}>
-        {items.map((item, index) => {
+        {shown.map((item, index) => {
           const previewStatus = preview?.itemId === item.id ? preview.status : null
           const isSelected = selectedId === item.id
           const indicatorStatus = previewStatus ?? (isSelected ? selectedItemPlaying ? 'playing' : 'paused' : null)

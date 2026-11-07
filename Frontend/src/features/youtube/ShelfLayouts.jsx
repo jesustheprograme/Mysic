@@ -29,9 +29,12 @@ function SeeAllButton({ expanded, onToggle }) {
 
 const slug = (title) => `shelf-${title.toLocaleLowerCase().replace(/[^a-z0-9áéíóúñ]+/gi, '-')}`
 
-/** Atajos compactos (miniatura + título + subtítulo), tres por fila: "Volver a escuchar". */
 const TILES_COLLAPSED = 6
+const TILES_PER_ROW = 3
+// "Ver todo" suma 3 filas a lo que ya se ve, no toda la lista.
+const EXPANDED_EXTRA_ROWS = 3
 
+/** Atajos compactos (miniatura + título + subtítulo), tres por fila: "Volver a escuchar". */
 export function TileShelf({ items, onSelect, selectedId, title }) {
   const id = slug(title)
   const [expanded, setExpanded] = useState(false)
@@ -40,7 +43,7 @@ export function TileShelf({ items, onSelect, selectedId, title }) {
     <section className="sl-shelf" aria-labelledby={id}>
       <ShelfHeading action={canExpand ? <SeeAllButton expanded={expanded} onToggle={() => setExpanded((open) => !open)} /> : undefined} id={id} kind="tiles" title={title} />
       <ul className="sl-tiles">
-        {(expanded ? items : items.slice(0, TILES_COLLAPSED)).map((item) => (
+        {items.slice(0, expanded ? TILES_COLLAPSED + TILES_PER_ROW * EXPANDED_EXTRA_ROWS : TILES_COLLAPSED).map((item) => (
           <li key={item.id}>
             <button className={`sl-tile${selectedId === item.id ? ' sl-tile--active' : ''}`} type="button" onClick={() => onSelect(item)}>
               {item.artwork ? <img src={item.artwork} alt="" width="48" height="48" loading="lazy" decoding="async" /> : <i aria-hidden="true" />}
@@ -89,9 +92,9 @@ export function SongShelf({ controller, items, title }) {
   const numbered = items.length >= SONGS_PER_COLUMN * 2
   const collapsedRows = numbered ? SONGS_PER_COLUMN : 2
   const canExpand = items.length > collapsedRows * 3
-  // Desplegada, las filas crecen para que todas las canciones sigan en tres columnas.
-  const rows = expanded ? Math.ceil(items.length / 3) : collapsedRows
-  const visible = expanded ? items : items.slice(0, collapsedRows * 3)
+  // Desplegada suma 3 filas por columna; las canciones siguen en tres columnas.
+  const rows = expanded ? Math.min(Math.ceil(items.length / 3), collapsedRows + EXPANDED_EXTRA_ROWS) : collapsedRows
+  const visible = items.slice(0, rows * 3)
   const playAll = (
     <button className="sl-play-all" type="button" onClick={() => playSongs(items, items[0].id)}>
       <Play size={14} aria-hidden="true" /> Reproducir todo

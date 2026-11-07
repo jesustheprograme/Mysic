@@ -417,13 +417,31 @@
   scroll-snap-type: none;
 }
 
-.music-app .home-shelf__see-all {
+/* "Ver todo" es solo texto: se anulan el círculo y el borde que .home-shelf__actions da a sus botones. */
+.music-app .home-shelf__actions .home-shelf__see-all {
+  width: auto;
+  height: auto;
+  display: inline;
+  margin-right: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
   color: var(--m-text-dim);
   font-size: 12px;
   font-weight: 500;
 }
 
-.music-app .home-shelf__see-all:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+.music-app .home-shelf__actions .home-shelf__see-all:hover {
+  color: #fff;
+  background: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* El reproductor se pliega y se despliega al instante: animar las columnas de la rejilla obligaba a
+   recalcular todo el inicio (decenas de portadas y textos) en cada fotograma durante 280 ms. */
+.music-app { transition: none; }
 
 .music-app .yt-hub__tabs-row {
   display: flex;
