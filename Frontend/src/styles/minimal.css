@@ -311,26 +311,25 @@
 
   .music-app .app-header--desktop-shell .app-header__leading {
     position: absolute;
-    top: 14px;
-    left: 14px;
-    width: calc(var(--sidebar-width, 220px) - 28px);
+    top: 17px;
+    left: calc(var(--sidebar-width, 220px) - 14px - 34px);
+    width: 34px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
   }
 
-  .music-app .app-header--desktop-shell .app-header__identity { order: 1; }
-  .music-app .app-header--desktop-shell .app-header__toggle { order: 2; width: 34px; height: 34px; }
-  .music-app .app-header--desktop-shell .app-header__brand { width: 92px; min-height: 32px; }
-  .music-app .app-header--desktop-shell .app-header__logo { width: 92px; height: 30px; }
+  /* Sin logo: Inicio ya está en el sidebar. El botón de plegar va a la derecha del buscador. */
+  .music-app .app-header--desktop-shell .app-header__toggle { width: 34px; height: 34px; }
+  .music-app .app-header--desktop-shell .app-header__identity,
   .music-app .app-header--desktop-shell .app-header__context-title,
   .music-app .app-header--desktop-shell .app-header__actions { display: none; }
 
   .music-app .app-header--desktop-shell .music-search {
     position: absolute;
-    top: 58px;
+    top: 17px;
     left: 14px;
-    width: calc(var(--sidebar-width, 220px) - 28px);
+    width: calc(var(--sidebar-width, 220px) - 28px - 42px);
     margin: 0;
     transform: none;
   }
@@ -353,7 +352,7 @@
 
   .music-app .app-header--desktop-shell .yt-music-search--open .sx-popover { transform: none; }
 
-  .music-app:has(> .app-header--desktop-shell) .app-sidebar { padding-top: 108px; }
+  .music-app:has(> .app-header--desktop-shell) .app-sidebar { padding-top: 70px; }
 
   /* Sidebar plegado: solo el botón de plegar; el buscador sigue en Ctrl+K. */
   .music-app--sidebar-collapsed .app-header--desktop-shell .app-header__leading {
@@ -366,6 +365,27 @@
   .music-app--sidebar-collapsed .app-header--desktop-shell .music-search { display: none; }
 
   .music-app--sidebar-collapsed:has(> .app-header--desktop-shell) .app-sidebar { padding-top: 64px; }
+}
+
+/* ==========================================================================
+ * Límites del contenido (escritorio): mismo margen a izquierda y derecha (24px; antes 36px a un
+ * lado) y un desvanecido oscuro en el borde derecho, junto al reproductor (plegado o desplegado),
+ * para que las filas no se corten en seco contra él.
+ * ========================================================================== */
+@media (min-width: 761px) {
+  .music-app .music-app__main { padding-right: 24px; padding-left: 24px; }
+
+  .music-app--player-open::after {
+    content: '';
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+    align-self: stretch;
+    z-index: 6;
+    width: 56px;
+    pointer-events: none;
+    background: linear-gradient(to left, rgb(5 6 6 / 0.9), rgb(5 6 6 / 0));
+  }
 }
 
 /* ==========================================================================
