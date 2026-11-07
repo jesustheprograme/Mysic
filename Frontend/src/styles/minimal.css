@@ -597,34 +597,42 @@
 .music-app .music-workspace { background: transparent; }
 
 /* ==========================================================================
- * Álbum y playlist (escritorio), como limusic: cabecera arriba (portada, tipo y año, título,
- * artista y duración), botones con texto debajo y la tabla de canciones ocupando el resto con su
- * propio scroll. El buscador va arriba a la derecha.
+ * Álbum y playlist (escritorio). Encabezado a todo el ancho, sin tarjeta, al estilo de YouTube Music:
+ * la portada ampliada y muy desenfocada de fondo, que se disuelve en la página hacia abajo; portada
+ * y datos alineados con el borde de la tabla; botones con el color de la portada (más vivo y con
+ * luminosidad acotada para que el texto blanco se lea). La tabla ocupa el resto con su propio scroll.
  * ========================================================================== */
 @media (min-width: 761px) {
   .music-app .music-app__main:has(.collection-detail) { padding: 0; }
 
   .music-app .collection-detail {
+    --btn-accent: var(--collection-accent, var(--m-accent));
     height: 100%;
     margin: 0;
-    padding: 22px 28px 0;
+    padding: 0 28px;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
-    gap: 20px;
+    gap: 0;
     background: transparent;
   }
 
-  /* La flecha de volver va dentro del banner, arriba a la izquierda. */
-  .music-app .collection-detail__back {
-    position: absolute;
-    top: 44px;
-    left: 46px;
-    z-index: 4;
+  @supports (color: oklch(from red l c h)) {
+    .music-app .collection-detail {
+      --btn-accent: oklch(from var(--collection-accent, var(--m-accent)) clamp(0.5, l, 0.62) calc(c * 1.3) h);
+    }
   }
 
-  /* Imagen del banner: la portada ampliada, desenfocada y oscurecida, y la capa de color del reproductor. */
   .music-app .collection-detail__ambient { display: none; }
 
+  .music-app .collection-detail__back {
+    position: absolute;
+    top: 20px;
+    left: 28px;
+    z-index: 4;
+    width: 36px;
+    height: 36px;
+    background: rgb(0 0 0 / 0.28);
+  }
 
   .music-app .collection-detail__summary {
     position: relative;
@@ -635,15 +643,14 @@
     overflow: hidden;
     display: grid;
     justify-items: start;
-    align-content: center;
-    grid-template-columns: 136px minmax(0, 1fr);
+    align-content: end;
+    grid-template-columns: 176px minmax(0, 1fr);
     grid-template-areas: 'art identity' 'art controls';
-    column-gap: 26px;
-    row-gap: 14px;
-    /* Sin tarjeta: el encabezado ocupa todo el ancho, hasta los bordes y el borde superior, y se funde con la página. */
-    min-height: 300px;
-    margin: -22px -28px 0;
-    padding: 58px 28px 40px 96px;
+    column-gap: 28px;
+    row-gap: 16px;
+    min-height: 340px;
+    margin: 0 -28px 8px;
+    padding: 84px 28px 32px;
   }
 
   .music-app .collection-detail__summary::before {
@@ -651,10 +658,10 @@
     position: absolute;
     z-index: -2;
     inset: -60px;
-    background: var(--collection-artwork) right center / cover no-repeat;
-    filter: blur(42px) saturate(1.2) brightness(0.8);
-    /* Se desvanece hacia abajo: no hay borde inferior, la imagen se disuelve en el fondo. */
-    mask-image: linear-gradient(to bottom, #000 0%, #000 50%, transparent 100%);
+    background: var(--collection-artwork) center 25% / cover no-repeat;
+    filter: blur(40px) saturate(1.5) brightness(0.62) contrast(1.05);
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 30%, rgb(0 0 0 / 0.55) 65%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 30%, rgb(0 0 0 / 0.55) 65%, transparent 100%);
   }
 
   .music-app .collection-detail__summary::after {
@@ -663,17 +670,17 @@
     z-index: -1;
     inset: 0;
     background:
-      linear-gradient(90deg, rgb(5 6 6 / 0.78) 0%, rgb(5 6 6 / 0.45) 42%, rgb(5 6 6 / 0.08) 100%),
-      linear-gradient(0deg, rgb(5 6 6 / 0.55) 0%, transparent 55%);
+      linear-gradient(90deg, rgb(5 6 6 / 0.72) 0%, rgb(5 6 6 / 0.35) 45%, rgb(5 6 6 / 0) 100%),
+      linear-gradient(180deg, transparent 45%, rgb(5 6 6 / 0.75) 100%);
   }
 
   .music-app .collection-detail__artwork {
     grid-area: art;
-    align-self: center;
-    width: 136px;
+    align-self: end;
+    width: 176px;
     max-width: none;
-    border-radius: 12px;
-    box-shadow: 0 0 0 1px var(--m-line), 0 16px 36px rgb(0 0 0 / 0.4);
+    border-radius: 14px;
+    box-shadow: 0 0 0 1px oklch(1 0 0 / 0.1), 0 24px 48px rgb(0 0 0 / 0.5);
   }
 
   .music-app .collection-detail__identity {
@@ -685,7 +692,7 @@
   }
 
   .music-app .collection-detail__kind {
-    color: var(--m-text-dim);
+    color: oklch(1 0 0 / 0.72);
     font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.08em;
@@ -695,15 +702,15 @@
   .music-app .collection-detail__identity h1 {
     max-width: none;
     margin: 0;
-    font-size: clamp(26px, 2.7vw, 38px);
+    font-size: clamp(30px, 3.2vw, 48px);
     font-weight: 800;
-    letter-spacing: -0.02em;
-    line-height: 1.08;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
   }
 
   .music-app .collection-detail__identity p {
     max-width: 640px;
-    color: var(--m-text-dim);
+    color: oklch(1 0 0 / 0.72);
     font-size: 13px;
   }
 
@@ -718,7 +725,7 @@
   .music-app .collection-detail__creator { padding: 0; gap: 8px; font-size: 15px; font-weight: 600; }
   .music-app .collection-detail__creator img { width: 26px; height: 26px; }
 
-  .music-app .collection-detail__count { color: var(--m-text-dim); font-size: 14px; }
+  .music-app .collection-detail__count { color: oklch(1 0 0 / 0.72); font-size: 14px; }
   .music-app .collection-detail__count::before { content: '•'; margin-right: 10px; }
 
   .music-app .collection-detail__controls {
@@ -731,25 +738,12 @@
 
   .music-app .collection-detail__description { grid-column: 2; max-width: 640px; margin: 0; text-align: left; }
 
-  /* Aleatorio y biblioteca son botones redondos con icono (el texto queda como nombre accesible). */
-  /* Mayor especificidad que la regla base de las pastillas: sin esto el relleno lateral dejaba el icono sin sitio y no se veía. */
-  .music-app .collection-detail__controls .collection-detail__pill--outline {
-    width: 42px;
-    min-width: 42px;
-    padding: 0;
-    justify-content: center;
-  }
-
-  .music-app .collection-detail__controls .collection-detail__pill--outline svg { flex: none; }
-  .music-app .collection-detail__pill--outline span { display: none; }
-  .music-app .collection-detail__control { border: 1px solid var(--m-line-strong); background: rgb(0 0 0 / 0.2); }
-
   .music-app .collection-detail__pill {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    min-height: 42px;
-    padding: 0 22px;
+    min-height: 44px;
+    padding: 0 24px;
     border-radius: 999px;
     font-size: 14px;
     font-weight: 600;
@@ -758,44 +752,60 @@
 
   .music-app .collection-detail__pill:disabled { opacity: 0.45; pointer-events: none; }
 
-  /* Los botones toman el color dominante de la portada del álbum o playlist (--collection-accent); sin él, el acento de la marca. */
-  .music-app .collection-detail { --btn-accent: var(--collection-accent, var(--m-accent)); }
-
   .music-app .collection-detail__pill--primary { color: #fff; background: var(--btn-accent); }
-  .music-app .collection-detail__pill--primary:hover { background: color-mix(in srgb, var(--btn-accent) 85%, white); }
+  .music-app .collection-detail__pill--primary:hover { background: color-mix(in srgb, var(--btn-accent) 86%, white); }
 
   .music-app .collection-detail__pill--outline {
-    border: 1px solid var(--m-line-strong);
-    color: #eceff0;
-    background: rgb(0 0 0 / 0.2);
+    border: 1px solid oklch(1 0 0 / 0.22);
+    color: #f1f3f0;
+    background: rgb(0 0 0 / 0.25);
   }
 
-  .music-app .collection-detail__pill--outline:hover { background: oklch(1 0 0 / 0.08); }
+  .music-app .collection-detail__pill--outline:hover { background: oklch(1 0 0 / 0.12); }
+
+  /* Aleatorio y biblioteca son círculos con icono (el texto queda como nombre accesible). Mayor
+     especificidad que la regla base: sin ella el relleno lateral dejaba el icono sin sitio. */
+  .music-app .collection-detail__controls .collection-detail__pill--outline {
+    width: 44px;
+    min-width: 44px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .music-app .collection-detail__controls .collection-detail__pill--outline svg { flex: none; }
+  .music-app .collection-detail__pill--outline span { display: none; }
+
+  .music-app .collection-detail__control {
+    width: 44px;
+    height: 44px;
+    border: 1px solid oklch(1 0 0 / 0.22);
+    background: rgb(0 0 0 / 0.25);
+  }
 
   .music-app .collection-detail__pill--saved {
-    border-color: color-mix(in srgb, var(--btn-accent) 65%, transparent);
-    color: var(--btn-accent);
-    background: color-mix(in srgb, var(--btn-accent) 9%, transparent);
+    border-color: color-mix(in srgb, var(--btn-accent) 70%, transparent);
+    color: color-mix(in srgb, var(--btn-accent) 60%, white);
+    background: color-mix(in srgb, var(--btn-accent) 22%, transparent);
   }
 
   .music-app .collection-detail__search {
     position: absolute;
     z-index: 5;
-    top: 24px;
+    top: 20px;
     right: 28px;
-    width: min(340px, 32%);
-    height: 40px;
+    width: min(320px, 30%);
+    height: 38px;
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 0 16px;
-    border: 1px solid var(--m-line-strong);
+    border: 1px solid oklch(1 0 0 / 0.16);
     border-radius: 999px;
-    color: var(--m-text-dim);
-    background: rgb(0 0 0 / 0.28);
+    color: oklch(1 0 0 / 0.7);
+    background: rgb(0 0 0 / 0.3);
   }
 
-  .music-app .collection-detail__search:focus-within { border-color: color-mix(in srgb, var(--btn-accent) 70%, transparent); }
+  .music-app .collection-detail__search:focus-within { border-color: color-mix(in srgb, var(--btn-accent) 75%, transparent); }
 
   .music-app .collection-detail__search input {
     width: 100%;
@@ -808,28 +818,34 @@
     font-size: 14px;
   }
 
-  .music-app .collection-detail__tracks { grid-column: 1 / -1; grid-row: 2; padding: 0 8px 54px 0; }
+  /* Tabla: filas de 58px con una línea muy fina entre ellas; la cabecera no es sticky ni lleva fondo. */
+  .music-app .collection-detail__tracks { grid-column: 1 / -1; grid-row: 2; padding: 0 0 54px; }
 
   .music-app .collection-detail__table-head {
-    position: sticky;
-    top: 0;
-    z-index: 2;
     display: grid;
     grid-template-columns: 42px minmax(0, 1fr) 70px 46px;
     align-items: center;
     gap: 10px;
-    margin-bottom: 4px;
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--m-line);
+    padding: 12px;
+    border-bottom: 1px solid oklch(1 0 0 / 0.1);
     color: var(--m-text-dim);
-    background: color-mix(in srgb, #050606 82%, transparent);
     font-size: 13px;
   }
 
   .music-app .collection-detail__table-head > :first-child { text-align: center; }
   .music-app .collection-detail__table-head > svg { justify-self: end; }
-}
 
+  .music-app .collection-detail__track-list { gap: 0; }
+
+  .music-app .collection-detail__track {
+    min-height: 58px;
+    padding: 4px 12px;
+    box-shadow: inset 0 -1px 0 oklch(1 0 0 / 0.06);
+  }
+
+  .music-app .collection-detail__track-main strong,
+  .music-app .collection-detail__track-title { font-size: 15px; font-weight: 600; }
+}
 /* YouTube Music sin cuenta vinculada: solo un botón, centrado en el área de contenido. */
 .music-app .yt-connect {
   min-height: min(68vh, 560px);
