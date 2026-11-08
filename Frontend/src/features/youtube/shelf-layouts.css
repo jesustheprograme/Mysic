@@ -134,7 +134,12 @@
 .sl-song__link:not(:disabled) { cursor: pointer; }
 .sl-song__link:not(:disabled):hover, .sl-song__link:not(:disabled):focus-visible { color: #fff; text-decoration: underline; text-underline-offset: 2px; }
 .sl-song__link:disabled { cursor: default; }
-.sl-song__text small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Artista y álbum en una línea flexible: cada uno recorta su propio texto con "…" (como botones en línea,
+   el navegador ocultaba el álbum entero si no cabía). El álbum cede espacio antes que el artista. */
+.sl-song__text small { display: flex; align-items: baseline; min-width: 0; overflow: hidden; white-space: nowrap; }
+.sl-song__text small > span { flex: none; white-space: pre; }
+.sl-song__link { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sl-song__link + span + .sl-song__link { flex-shrink: 3; }
 
 .sl-song__main img, .sl-song__main .sl-song__cover > i, .sl-song__main > i {
   flex: none;
