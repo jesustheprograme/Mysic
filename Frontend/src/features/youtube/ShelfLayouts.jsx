@@ -66,13 +66,18 @@ function SongRow({ ctx, onPlay, selected, song }) {
   const liked = ctx.likedSongIds.has(song.id)
   return (
     <li className={`sl-song${selected ? ' sl-song--active' : ''}${liked ? ' sl-song--liked' : ''}`}>
-      <button className="sl-song__main" type="button" onClick={onPlay}>
-        {song.thumbnail ? <img src={song.thumbnail} alt="" width="44" height="44" loading="lazy" decoding="async" /> : <i aria-hidden="true" />}
+      <div className="sl-song__main">
+        <button className="sl-song__cover" type="button" aria-label={`Reproducir ${song.title}`} onClick={onPlay}>
+          {song.thumbnail ? <img src={song.thumbnail} alt="" width="44" height="44" loading="lazy" decoding="async" /> : <i aria-hidden="true" />}
+        </button>
         <span className="sl-song__text">
-          <strong>{song.title}</strong>
-          <small>{song.artist}</small>
+          <strong><button type="button" title={song.title} onClick={onPlay}>{song.title}</button></strong>
+          <small>
+            <button className="sl-song__link" type="button" disabled={!song.artistId} onClick={() => ctx.openArtist(song.artistId)}>{song.artist}</button>
+            {song.albumId && song.album && <><span aria-hidden="true"> · </span><button className="sl-song__link" type="button" title={song.album} onClick={() => ctx.openAlbum(song.albumId)}>{song.album}</button></>}
+          </small>
         </span>
-      </button>
+      </div>
       <span className="sl-song__actions">
         <HeartToggle className="heart-container--song-row" label={`Me gusta ${song.title}`} liked={liked} onToggle={(liked) => ctx.toggleSongFavorite(song.id, liked, adapted)} removeLabel={`Quitar ${song.title} de favoritas`} size={16} />
         <SongMenu ctx={ctx} song={song} />

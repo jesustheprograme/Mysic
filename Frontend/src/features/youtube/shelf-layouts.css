@@ -115,7 +115,28 @@
   text-align: left;
 }
 
-.sl-song__main img, .sl-song__main > i {
+.sl-song__cover { flex: none; padding: 0; border-radius: 6px; line-height: 0; }
+
+/* Título, artista y álbum son botones (enlaces): heredan la tipografía de su línea. */
+.sl-song__text strong button,
+.sl-song__link {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.sl-song__text strong button { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sl-song__link:not(:disabled) { cursor: pointer; }
+.sl-song__link:not(:disabled):hover, .sl-song__link:not(:disabled):focus-visible { color: #fff; text-decoration: underline; text-underline-offset: 2px; }
+.sl-song__link:disabled { cursor: default; }
+.sl-song__text small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sl-song__main img, .sl-song__main .sl-song__cover > i, .sl-song__main > i {
   flex: none;
   width: 44px;
   height: 44px;

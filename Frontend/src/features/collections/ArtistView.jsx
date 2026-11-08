@@ -52,18 +52,25 @@ function toRailItem(release) {
 
 // Fila de canción con el mismo aspecto que las del inicio (.sl-song): miniatura, título y álbum;
 // el corazón solo aparece al pasar el cursor (o si ya es favorita).
-function ArtistSongRow({ likedSongIds, onAddToPlaylist, onPlay, onToggleFavorite, renderSongActions, selected, song }) {
+function ArtistSongRow({ likedSongIds, onAddToPlaylist, onAlbumSelect, onPlay, onToggleFavorite, renderSongActions, selected, song }) {
   const liked = Boolean(likedSongIds?.has(song.id))
+  const albumId = song.albumId ?? song.album?.id ?? song.albumMemberships?.[0]?.id
   const albumTitle = song.albumTitle ?? song.album?.title ?? song.albumMemberships?.[0]?.title
   return (
     <li className={`sl-song${selected ? ' sl-song--active' : ''}${liked ? ' sl-song--liked' : ''}`}>
-      <button className="sl-song__main" type="button" onClick={onPlay}>
-        {song.artwork ? <img src={song.artwork} alt="" width="44" height="44" loading="lazy" decoding="async" /> : <i aria-hidden="true" />}
+      <div className="sl-song__main">
+        <button className="sl-song__cover" type="button" aria-label={`Reproducir ${song.title}`} onClick={onPlay}>
+          {song.artwork ? <img src={song.artwork} alt="" width="44" height="44" loading="lazy" decoding="async" /> : <i aria-hidden="true" />}
+        </button>
         <span className="sl-song__text">
-          <strong>{song.title}</strong>
-          {albumTitle && <small>{albumTitle}</small>}
+          <strong><button type="button" title={song.title} onClick={onPlay}>{song.title}</button></strong>
+          {albumTitle && (
+            <small>
+              <button className="sl-song__link" type="button" title={albumTitle} disabled={!albumId} onClick={() => onAlbumSelect?.(albumId)}>{albumTitle}</button>
+            </small>
+          )}
         </span>
-      </button>
+      </div>
       <span className="sl-song__actions">
         <HeartToggle className="heart-container--song-row" label={`Me gusta ${song.title}`} liked={liked} onToggle={(next) => onToggleFavorite?.(song.id, next, song)} removeLabel={`Quitar ${song.title} de favoritas`} size={16} />
         {onAddToPlaylist && <button className="sl-song__more" type="button" aria-label={`Añadir ${song.title} a una playlist`} title="Añadir a playlist" onClick={() => onAddToPlaylist(song)}><ListPlus size={16} strokeWidth={1.8} aria-hidden="true" /></button>}
@@ -245,6 +252,7 @@ function ArtistView({
                   key={song.id}
                   likedSongIds={likedSongIds}
                   onAddToPlaylist={onAddToPlaylist}
+                  onAlbumSelect={onAlbumSelect}
                   onPlay={() => playSong(song)}
                   onToggleFavorite={onToggleFavorite}
                   renderSongActions={renderSongActions}
