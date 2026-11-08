@@ -1,4 +1,4 @@
-import { Check, Compass, Copy, Download, ExternalLink, Heart, Headphones, LayoutGrid, Library, Link2, Link2Off, ListMusic, LoaderCircle, Play, Sparkles, UserRound, WifiOff } from 'lucide-react'
+import { Check, Copy, ExternalLink, Heart, LayoutGrid, Library, Link2, Link2Off, ListMusic, LoaderCircle, Play, UserRound, WifiOff } from 'lucide-react'
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import ArtistSongsView from '../collections/ArtistSongsView.jsx'
 import ArtistView from '../collections/ArtistView.jsx'
@@ -187,20 +187,18 @@ function getCatalogHeading(kind, personalized) {
   return 'Mysic global'
 }
 
-function CatalogTabs({ browse, downloads, player, showDownloads, showingDownloads }) {
+// Sin pastillas de Inicio/Explorar/Recomendado/Descargas: solo queda el indicador de la biblioteca.
+function CatalogTabs({ browse }) {
+  if (!(browse.view.data && browse.view.kind === 'official-library')) return null
   return (
     <nav className="yt-hub__navigation" aria-label="Navegación de YouTube Music">
-      <button className={browse.view.kind === 'home' ? 'is-active' : ''} type="button" onClick={browse.showHome}><Headphones size={16} aria-hidden="true" /> Inicio</button>
-      <button className={browse.view.kind === 'explore' ? 'is-active' : ''} type="button" onClick={browse.showExplore}><Compass size={16} aria-hidden="true" /> Explorar</button>
-      {player.currentSong && <button className={browse.view.kind === 'recommendations' ? 'is-active' : ''} type="button" onClick={() => browse.showRecommendations(player.currentSong.id)}><Sparkles size={16} aria-hidden="true" /> Recomendado</button>}
-      <button className={showingDownloads ? 'is-active' : ''} type="button" onClick={showDownloads}><Download size={16} aria-hidden="true" /> Descargas{downloads.downloads.items.length ? ` (${downloads.downloads.items.length})` : ''}</button>
-      {browse.view.data && browse.view.kind === 'official-library' && <button className="is-active" type="button"><Library size={16} aria-hidden="true" /> Biblioteca</button>}
+      <button className="is-active" type="button"><Library size={16} aria-hidden="true" /> Biblioteca</button>
     </nav>
   )
 }
 
 function CatalogNavigation({ controller, editingHome = false, onEditHome }) {
-  const { account, accountError, actionError, browse, changeTab, downloads, player, searchType, showDownloads } = controller
+  const { account, accountError, actionError, browse, changeTab, downloads, searchType, showDownloads } = controller
   const showingDownloads = browse.view.kind === 'downloads'
   const heading = getCatalogHeading(browse.view.kind, account?.personalized)
 
@@ -210,7 +208,7 @@ function CatalogNavigation({ controller, editingHome = false, onEditHome }) {
       {accountError && <div className="collection-empty" role="alert">{accountError}</div>}
       <div className="yt-hub__tabs-row">
         {onEditHome && <button className="yt-edit-home" type="button" aria-label="Editar inicio" aria-expanded={editingHome} title="Editar inicio" onClick={onEditHome}><LayoutGrid size={16} aria-hidden="true" /></button>}
-        <CatalogTabs browse={browse} downloads={downloads} player={player} showDownloads={showDownloads} showingDownloads={showingDownloads} />
+        <CatalogTabs browse={browse} />
       </div>
       {actionError && <div className="collection-empty" role="alert">{actionError}</div>}
       {(browse.view.kind === 'search' || showingDownloads) && (
