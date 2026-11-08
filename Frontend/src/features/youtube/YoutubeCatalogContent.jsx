@@ -381,11 +381,14 @@ function OfficialLibraryView({ controller }) {
   )
 }
 
+// La foto del artista llena todo el panel: se pide a mayor resolución (los hosts de Google aceptan el tamaño en la URL).
+const enlargeArtistImage = (url) => (typeof url === 'string' ? url.replace(/=w\d+-h\d+/, '=w1080-h1080').replace(/=s\d+/, '=s1080') : url)
+
 function ArtistDetail({ controller }) {
   const { browse, likedArtistIds, likedSongIds, onAddToPlaylist, openAlbum, openArtistSongs, player, playSongs, renderSongActions, toggleArtistFavorite, toggleSongFavorite } = controller
   const sourceSongs = browse.view.data.topSongs
   const artistDefaults = { artist: browse.view.data.name, artistId: browse.view.data.id }
-  return <ArtistView artist={{ artistId: browse.view.data.id, artwork: browse.view.data.thumbnail, images: browse.view.data.images?.map((image) => image.url ?? image).filter(Boolean), title: browse.view.data.name }} likedArtistIds={likedArtistIds} likedSongIds={likedSongIds} onAddToPlaylist={onAddToPlaylist} onAlbumSelect={openAlbum} onBack={controller.goBack} onPlaybackToggle={player.togglePlay} onReleasePlay={(release) => openAlbum(release.id)} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleArtistFavorite={toggleArtistFavorite} onToggleFavorite={toggleSongFavorite} onViewAllSongs={() => openArtistSongs(browse.view.data.id)} releases={adaptReleases(browse.view.data.shelves)} renderSongActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} songs={sourceSongs.map((song, index) => adaptSong(song, index, artistDefaults))} />
+  return <ArtistView artist={{ artistId: browse.view.data.id, artwork: enlargeArtistImage(browse.view.data.thumbnail), images: browse.view.data.images?.map((image) => enlargeArtistImage(image.url ?? image)).filter(Boolean), title: browse.view.data.name }} likedArtistIds={likedArtistIds} likedSongIds={likedSongIds} onAddToPlaylist={onAddToPlaylist} onAlbumSelect={openAlbum} onBack={controller.goBack} onPlaybackToggle={player.togglePlay} onReleasePlay={(release) => openAlbum(release.id)} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleArtistFavorite={toggleArtistFavorite} onToggleFavorite={toggleSongFavorite} onViewAllSongs={() => openArtistSongs(browse.view.data.id)} releases={adaptReleases(browse.view.data.shelves)} renderSongActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} songs={sourceSongs.map((song, index) => adaptSong(song, index, artistDefaults))} />
 }
 
 function ArtistSongsDetail({ controller }) {

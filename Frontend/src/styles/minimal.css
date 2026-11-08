@@ -996,3 +996,19 @@
     background: none;
   }
 }
+
+/* Canciones del artista: columnas según el ancho (no tres fijas) y acciones extra solo al pasar el cursor,
+   para que el título tenga sitio incluso con el reproductor abierto. */
+@media (min-width: 821px) {
+  .music-app .artist-profile__content .sl-songs {
+    grid-auto-flow: row;
+    grid-template-rows: none;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+
+  .music-app .artist-profile__content .sl-song__cover img { width: 44px; height: 44px; }
+
+  .music-app .artist-profile__content .sl-song__actions > :not(.heart-container) { opacity: 0; transition: opacity 120ms ease; }
+  .music-app .artist-profile__content .sl-song:hover .sl-song__actions > *,
+  .music-app .artist-profile__content .sl-song:focus-within .sl-song__actions > * { opacity: 1; }
+}
