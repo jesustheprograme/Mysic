@@ -449,6 +449,10 @@
   gap: 10px;
 }
 
+/* Sin pastillas de navegación el encabezado es solo el botón de editar: contenido más arriba. */
+.music-app .home-page > .yt-hub { gap: 0; margin-bottom: 14px; }
+.music-app .home-page > .yt-hub .yt-edit-home { width: 30px; height: 30px; }
+
 .music-app .home-page .home-shelf__heading h2 {
   display: inline-flex;
   align-items: center;

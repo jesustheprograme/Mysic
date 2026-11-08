@@ -125,13 +125,11 @@
   background: #1a1f1e;
 }
 
-.sl-song__number {
-  flex: none;
-  width: 22px;
-  color: var(--m-text-dim, #98a19d);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  text-align: center;
+/* El corazón aparece al pasar el cursor (o con el foco); si la canción ya es favorita se queda visible. */
+@media (hover: hover) {
+  .sl-song:not(.sl-song--liked) .sl-song__actions .heart-container { opacity: 0; transition: opacity 120ms ease; }
+  .sl-song:hover .sl-song__actions .heart-container,
+  .sl-song:focus-within .sl-song__actions .heart-container { opacity: 1; }
 }
 
 .sl-song__actions { display: flex; align-items: center; gap: 2px; padding-right: 6px; }

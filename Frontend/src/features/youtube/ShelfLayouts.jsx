@@ -61,12 +61,12 @@ export function TileShelf({ items, onSelect, selectedId, title }) {
 
 const SONGS_PER_COLUMN = 4
 
-function SongRow({ ctx, index, numbered, onPlay, selected, song }) {
+function SongRow({ ctx, onPlay, selected, song }) {
   const adapted = adaptSong(song)
+  const liked = ctx.likedSongIds.has(song.id)
   return (
-    <li className={`sl-song${selected ? ' sl-song--active' : ''}`}>
+    <li className={`sl-song${selected ? ' sl-song--active' : ''}${liked ? ' sl-song--liked' : ''}`}>
       <button className="sl-song__main" type="button" onClick={onPlay}>
-        {numbered && <span className="sl-song__number">{index + 1}</span>}
         {song.thumbnail ? <img src={song.thumbnail} alt="" width="44" height="44" loading="lazy" decoding="async" /> : <i aria-hidden="true" />}
         <span className="sl-song__text">
           <strong>{song.title}</strong>
@@ -74,7 +74,7 @@ function SongRow({ ctx, index, numbered, onPlay, selected, song }) {
         </span>
       </button>
       <span className="sl-song__actions">
-        <HeartToggle className="heart-container--song-row" label={`Me gusta ${song.title}`} liked={ctx.likedSongIds.has(song.id)} onToggle={(liked) => ctx.toggleSongFavorite(song.id, liked, adapted)} removeLabel={`Quitar ${song.title} de favoritas`} size={16} />
+        <HeartToggle className="heart-container--song-row" label={`Me gusta ${song.title}`} liked={liked} onToggle={(liked) => ctx.toggleSongFavorite(song.id, liked, adapted)} removeLabel={`Quitar ${song.title} de favoritas`} size={16} />
         <SongMenu ctx={ctx} song={song} />
       </span>
     </li>
@@ -104,12 +104,10 @@ export function SongShelf({ controller, items, title }) {
     <section className="sl-shelf" aria-labelledby={id}>
       <ShelfHeading action={(numbered || canExpand) ? <span className="sl-heading__actions">{numbered && playAll}{canExpand && <SeeAllButton expanded={expanded} onToggle={() => setExpanded((open) => !open)} />}</span> : undefined} id={id} kind="songs" title={title} />
       <ol className="sl-songs" style={{ '--sl-rows': rows }}>
-        {visible.map((song, index) => (
+        {visible.map((song) => (
           <SongRow
             ctx={controller}
-            index={index}
             key={song.id}
-            numbered={numbered}
             onPlay={() => playSongs(items, song.id)}
             selected={player.currentSong?.id === song.id}
             song={song}
