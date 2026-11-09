@@ -406,14 +406,15 @@ function YoutubeView({
   // Trae los Me gusta (que pasan a favoritas) y las playlists de la cuenta vinculada. Con show:false solo
   // sincroniza los favoritos; con silent:true un fallo no abre el panel de ayuda. Devuelve si tuvo éxito.
   async function syncOfficialLibrary(options) {
-    const { show = true, silent = false } = options?.nativeEvent ? {} : options ?? {}
+    const { show = true, silent = false, fresh = false } = options?.nativeEvent ? {} : options ?? {}
     setOfficialLibraryBusy(true)
     if (!silent) setAccountError('')
     try {
-      const fetched = await api.sessionLibrary()
-      // El servidor entrega listas vacías (en vez de error) cuando YouTube falla: no pisar con eso una biblioteca que ya teníamos.
+      const fetched = await api.sessionLibrary({ fresh })
+      // Protección adicional: una respuesta completamente vacía nunca reemplaza la biblioteca persistida.
       const previous = libraryCacheRef.current ?? persistedCache.read(LIBRARY_CACHE_KEY)
-      const fetchedEmpty = !fetched.likedSongs?.length && !fetched.playlists?.length
+      const fetchedEmpty = ['likedSongs', 'playlists', 'albums', 'artists', 'subscriptions', 'uploads']
+        .every((field) => !fetched[field]?.length)
       const library = fetchedEmpty && previous ? previous : fetched
       rememberLibrary(library)
       onAddSongFavorites(library.likedSongs.map((song) => adaptSong(song)))

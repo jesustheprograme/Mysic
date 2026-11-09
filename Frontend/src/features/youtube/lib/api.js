@@ -169,7 +169,7 @@ export const api = {
   accountLinkStatus: (signal) => fetchJson('/link/status', signal),
   unlinkAccount: () => send('/link', 'DELETE'),
   officialLibrary: (accessToken) => send('/official/library', 'POST', { accessToken }),
-  sessionLibrary: (signal) => fetchJson('/library', signal),
+  sessionLibrary: ({ fresh = false, signal } = {}) => fetchJson(`/library${fresh ? '?fresh=1' : ''}`, signal),
   home: (signal) => fetchJson('/home', signal),
   explore: (signal) => fetchJson('/explore', signal),
   radio: (id, signal) => fetchJson(`/radio/${encodeURIComponent(id)}`, signal),

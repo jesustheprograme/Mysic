@@ -147,7 +147,7 @@ export default function LibraryView({ controller, data, renderSongs }) {
               <ArrowDownAZ size={15} strokeWidth={1.8} aria-hidden="true" /> A-Z
             </button>
           )}
-          <button className="artists-page__pill" type="button" disabled={officialLibraryBusy} onClick={() => syncOfficialLibrary()} title="Volver a traer tus Me gusta y playlists de YouTube Music">
+          <button className="artists-page__pill" type="button" disabled={officialLibraryBusy} onClick={() => syncOfficialLibrary({ fresh: true })} title="Volver a traer tus Me gusta y playlists de YouTube Music">
             <RefreshCw className={officialLibraryBusy ? 'yt-spin' : undefined} size={15} strokeWidth={1.8} aria-hidden="true" /> Sincronizar
           </button>
         </div>
