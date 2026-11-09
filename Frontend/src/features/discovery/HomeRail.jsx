@@ -24,6 +24,7 @@ function HomeRail({
   title,
   trailingContent,
   variant = 'default',
+  wrap = false,
 }) {
   const railRef = useRef(null)
   const [expanded, setExpanded] = useState(false)
@@ -43,7 +44,7 @@ function HomeRail({
 
   return (
     <section className={`home-shelf${variant === 'artist' ? ' home-shelf--artists' : ''}`} aria-labelledby={`${title.toLocaleLowerCase().replaceAll(' ', '-')}-title`}>
-      <div className="home-shelf__heading">
+      <div className="home-shelf__heading" hidden={wrap || undefined}>
         <h2 id={`${title.toLocaleLowerCase().replaceAll(' ', '-')}-title`}>{icon}{title}</h2>
         {headingAction ?? (items.length > 0 && overflowing && (
           <div className="home-shelf__actions">
@@ -64,7 +65,7 @@ function HomeRail({
         ))}
       </div>
 
-      {items.length > 0 ? <div className={`home-shelf__rail${expanded ? ' home-shelf__rail--grid' : ''}`} data-rail-cols={columns || undefined} ref={railRef} style={columns ? { '--rail-cols': columns } : undefined}>
+      {items.length > 0 ? <div className={`home-shelf__rail${expanded ? ' home-shelf__rail--grid' : ''}${wrap ? ' home-shelf__rail--wrap' : ''}`} data-rail-cols={columns || undefined} ref={railRef} style={columns ? { '--rail-cols': columns } : undefined}>
         {shown.map((item, index) => {
           const previewStatus = preview?.itemId === item.id ? preview.status : null
           const isSelected = selectedId === item.id

@@ -1015,3 +1015,13 @@
   .music-app .artist-profile__content .sl-song:hover .sl-song__actions > *,
   .music-app .artist-profile__content .sl-song:focus-within .sl-song__actions > * { opacity: 1; }
 }
+/* Cuadrícula completa de HomeRail (Biblioteca): tarjetas de tamaño fijo que saltan de fila, sin carrusel. */
+.music-app .home-page .home-shelf > .home-shelf__rail.home-shelf__rail--wrap {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(auto-fill, var(--shelf-card, 148px));
+  grid-auto-columns: auto;
+  justify-content: start;
+  row-gap: 24px;
+  overflow: visible;
+  scroll-snap-type: none;
+}

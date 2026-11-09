@@ -6,8 +6,7 @@ import CollectionDetailView from '../collections/CollectionDetailView.jsx'
 import CatalogSearchControls from '../discovery/CatalogSearchControls.jsx'
 import HomeRail from '../discovery/HomeRail.jsx'
 import CommunityShelf from './CommunityShelf.jsx'
-import LibraryGrid from './LibraryGrid.jsx'
-import { LIBRARY_TABS } from './libraryTabs.js'
+import LibraryView from './LibraryView.jsx'
 import { CardMenu } from './ItemMenus.jsx'
 import { applyHomeLayout, CARD_SIZES, chooseShelfLayout, DEFAULT_LAYOUT } from './homeLayout.js'
 import { SectionIcon, SongShelf, TileShelf } from './ShelfLayouts.jsx'
@@ -308,29 +307,12 @@ function DownloadsView({ controller }) {
 }
 
 function OfficialLibraryView({ controller }) {
-  const { browse, downloads } = controller
-  const data = browse.view.data
-  const [tab, setTab] = useState('all')
-
-  function openItem(item) {
-    if (item.kind === 'liked') setTab('songs')
-    else if (item.kind === 'playlist') controller.openPlaylist(item.id)
-    else if (item.kind === 'album') controller.openAlbum(item.id)
-    else if (item.kind === 'artist') controller.openArtist(item.id)
-  }
-
   return (
-    <div className="home-page lib-page">
-      <div className="lib-page__head"><h1>Biblioteca</h1></div>
-      <div className="lib-tabs" role="tablist" aria-label="Secciones de la biblioteca">
-        {LIBRARY_TABS.map((item) => (
-          <button type="button" role="tab" aria-selected={tab === item.id} key={item.id} onClick={() => setTab(item.id)}>{item.label}</button>
-        ))}
-      </div>
-      {tab === 'songs' && <SongResults controller={controller} sourceSongs={data.likedSongs} title="Canciones que te gustan" />}
-      {tab === 'downloads' && <SongResults controller={controller} sourceSongs={downloads.downloads.items} title="Descargas" />}
-      {tab !== 'songs' && tab !== 'downloads' && <LibraryGrid data={data} onOpen={openItem} tab={tab} />}
-    </div>
+    <LibraryView
+      controller={controller}
+      data={controller.browse.view.data}
+      renderSongs={(songs, title) => <SongResults controller={controller} sourceSongs={songs} title={title} />}
+    />
   )
 }
 

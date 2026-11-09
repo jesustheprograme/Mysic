@@ -1,0 +1,14 @@
+/* Biblioteca: cabecera con herramientas y selector de pestañas con contadores. */
+.lib-page { display: grid; gap: 18px; align-content: start; }
+.lib-page__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.lib-page__head h1 { margin: 0; color: #fff; font-size: clamp(26px, 3.4vw, 34px); font-weight: 750; letter-spacing: -0.02em; }
+.lib-page__tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.lib-page__tools .artists-page__search { min-width: min(260px, 100%); }
+.lib-page__bar { display: flex; }
+
+.lib-tabs { position: sticky; top: 0; z-index: 4; width: fit-content; max-width: 100%; display: flex; gap: 4px; padding: 4px; overflow-x: auto; border-radius: 999px; background: rgb(24 26 28 / 0.92); box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08); backdrop-filter: blur(10px); scrollbar-width: none; }
+.lib-tabs::-webkit-scrollbar { display: none; }
+.lib-tabs button { flex: none; min-height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 16px; border-radius: 999px; color: #aab2af; font-size: 13.5px; font-weight: 600; }
+.lib-tabs button:hover { color: #fff; }
+.lib-tabs button[aria-selected='true'] { color: #fff; background: rgb(255 255 255 / 0.13); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18); }
+.lib-tabs__count { min-width: 18px; padding: 1px 6px; border-radius: 999px; color: #c9d0cd; background: rgb(255 255 255 / 0.1); font-size: 11px; font-weight: 600; text-align: center; }
