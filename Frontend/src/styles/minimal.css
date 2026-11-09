@@ -375,7 +375,7 @@
 @media (min-width: 761px) {
   .music-app .music-app__main { padding-right: 24px; padding-left: 24px; }
 
-  .music-app--player-open::after {
+  .music-app::after {
     content: '';
     grid-column: 2;
     grid-row: 2;
