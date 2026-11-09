@@ -80,6 +80,7 @@ function YoutubeView({
   const refreshPersonalizedHome = useEffectEvent(() => showLibraryAfterLinking())
   const syncFavoritesFromAccount = useEffectEvent(() => syncOfficialLibrary({ show: false, silent: true }))
   const startupSyncedRef = useRef(false)
+  const libraryCacheRef = useRef(null)
   const reportPlaybackState = useEffectEvent(() => onPlaybackStateChange?.({
     currentSong: player.currentSong,
     isPlaying: player.isPlaying,
@@ -397,6 +398,7 @@ function YoutubeView({
     if (!silent) setAccountError('')
     try {
       const library = await api.sessionLibrary()
+      libraryCacheRef.current = library
       onAddSongFavorites(library.likedSongs.map((song) => adaptSong(song)))
       if (show) browse.showOfficialLibrary(library)
       if (show) setAccountHelpOpen(false)
@@ -421,9 +423,22 @@ function YoutubeView({
   // cuando se pidió, la petición queda en window.__mysicYoutubeNav y se aplica al montar.
   const applySidebarNavigation = useEffectEvent((view) => {
     if (view === 'explore') browse.showExplore()
-    else if (view === 'library') syncOfficialLibrary()
+    else if (view === 'library') openLibrary()
     else browse.showHome()
   })
+
+  // La biblioteca se abre al instante con lo último descargado (sin esperar a la red en cada clic) y se
+  // refresca por detrás para la próxima vez; "Sincronizar" fuerza la descarga y la muestra.
+  function openLibrary() {
+    if (browse.view.kind === 'official-library') return
+    const cached = libraryCacheRef.current
+    if (!cached) {
+      syncOfficialLibrary()
+      return
+    }
+    browse.showOfficialLibrary(cached)
+    syncOfficialLibrary({ show: false, silent: true })
+  }
   useEffect(() => {
     const pending = window.__mysicYoutubeNav
     if (pending) {

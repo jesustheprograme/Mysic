@@ -1,17 +1,53 @@
 import { ArrowDownAZ, Play, RefreshCw, Search } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import HomeRail from '../discovery/HomeRail.jsx'
 import { SectionIcon } from './ShelfLayouts.jsx'
 import { buildLibrary, LIBRARY_TABS, LIKED_ID, parseLibraryId } from './libraryModel.js'
 import './library-view.css'
 
+// Con bibliotecas de miles de elementos no se pintan todos a la vez: el resumen enseña unos pocos por tipo
+// y la cuadrícula completa va creciendo por tandas al acercarse al final.
+const OVERVIEW_LIMIT = 24
+const GRID_BATCH = 60
+
+// La pestaña activa sobrevive al desmontaje: al volver de un álbum o artista se reabre donde estabas.
+let lastTab = 'all'
+
+/** Cuadrícula que crece por tandas: solo hay en el DOM lo que ya se ha desplazado más lo siguiente. */
+function ProgressiveGrid({ items, onSelect, title, variant }) {
+  const [limit, setLimit] = useState(GRID_BATCH)
+  const sentinelRef = useRef(null)
+  const hasMore = limit < items.length
+
+  useEffect(() => {
+    const node = sentinelRef.current
+    if (!node || !hasMore) return undefined
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) setLimit((current) => current + GRID_BATCH)
+    }, { rootMargin: '900px' })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [hasMore, limit])
+
+  return (
+    <>
+      <HomeRail items={items.slice(0, limit)} onSelect={onSelect} title={title} variant={variant} wrap />
+      {hasMore && <div className="lib-page__sentinel" ref={sentinelRef} aria-hidden="true" />}
+    </>
+  )
+}
+
 /**
- * Biblioteca: reutiliza las tarjetas de HomeRail. "Todo" es un resumen con un carrusel por tipo; cada pestaña
- * muestra su sección completa en cuadrícula. Búsqueda, orden A-Z y sincronización están siempre a mano.
+ * Biblioteca: reutiliza las tarjetas de HomeRail. "Todo" es un resumen con un carrusel corto por tipo; cada
+ * pestaña muestra su sección completa en una cuadrícula progresiva. Búsqueda, orden A-Z y sincronización siempre a mano.
  */
 export default function LibraryView({ controller, data, renderSongs }) {
   const { downloads, officialLibraryBusy, openAlbum, openArtist, openPlaylist, playSongs, syncOfficialLibrary } = controller
-  const [tab, setTab] = useState('all')
+  const [tab, setTabState] = useState(lastTab)
+  const setTab = (next) => {
+    lastTab = next
+    setTabState(next)
+  }
   const [query, setQuery] = useState('')
   const [sortAZ, setSortAZ] = useState(false)
   const library = useMemo(() => buildLibrary(data, { query, sort: sortAZ ? 'az' : 'recent' }), [data, query, sortAZ])
@@ -45,8 +81,16 @@ export default function LibraryView({ controller, data, renderSongs }) {
 
   return (
     <div className="home-page lib-page">
-      <div className="lib-page__head">
-        <h1>Biblioteca</h1>
+      <h1 className="lib-page__title">Biblioteca</h1>
+
+      <div className="lib-page__row">
+        <div className="lib-tabs" role="tablist" aria-label="Secciones de la biblioteca">
+          {LIBRARY_TABS.map((item) => (
+            <button type="button" role="tab" aria-selected={tab === item.id} key={item.id} onClick={() => setTab(item.id)}>
+              {item.label}{counts[item.id] ? <span className="lib-tabs__count">{counts[item.id]}</span> : null}
+            </button>
+          ))}
+        </div>
         <div className="lib-page__tools">
           {searchable && (
             <label className="artists-page__search">
@@ -65,14 +109,6 @@ export default function LibraryView({ controller, data, renderSongs }) {
         </div>
       </div>
 
-      <div className="lib-tabs" role="tablist" aria-label="Secciones de la biblioteca">
-        {LIBRARY_TABS.map((item) => (
-          <button type="button" role="tab" aria-selected={tab === item.id} key={item.id} onClick={() => setTab(item.id)}>
-            {item.label}{counts[item.id] ? <span className="lib-tabs__count">{counts[item.id]}</span> : null}
-          </button>
-        ))}
-      </div>
-
       {tab === 'songs' && (
         <>
           {data.likedSongs.length > 0 && (
@@ -89,8 +125,20 @@ export default function LibraryView({ controller, data, renderSongs }) {
 
       {visibleSections.map((section) => (
         tab === 'all'
-          ? <HomeRail fitColumns icon={<SectionIcon kind={section.kind} />} items={section.items} key={section.key} onSelect={open} title={section.title} variant={section.variant} />
-          : <HomeRail items={section.items} key={section.key} onSelect={open} title={section.title} variant={section.variant} wrap />
+          ? (
+            <HomeRail
+              headingAction={section.items.length > OVERVIEW_LIMIT
+                ? <button className="home-shelf__see-all" type="button" onClick={() => setTab(section.key)}>Ver todo ({section.items.length})</button>
+                : undefined}
+              icon={<SectionIcon kind={section.kind} />}
+              items={section.items.slice(0, OVERVIEW_LIMIT)}
+              key={section.key}
+              onSelect={open}
+              title={section.title}
+              variant={section.variant}
+            />
+          )
+          : <ProgressiveGrid items={section.items} key={`${section.key}-${query}-${sortAZ}`} onSelect={open} title={section.title} variant={section.variant} />
       ))}
 
       {nothingFound && (

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildLibrary, LIKED_ID, parseLibraryId } from './libraryModel.js'
+import { buildLibrary, LIKED_ID, parseLibraryId, thumb } from './libraryModel.js'
 
 const likedSongs = [
   { id: 's1', thumbnail: 'a.jpg', album: 'Alba', albumId: 'MP1', artist: 'Ado', artistId: 'UC1' },
@@ -29,4 +29,10 @@ test('filtra por texto y ordena de la A a la Z', () => {
 test('parseLibraryId separa el tipo del id aunque este contenga dos puntos', () => {
   assert.deepEqual(parseLibraryId('pl:VL:abc'), { kind: 'pl', id: 'VL:abc' })
   assert.deepEqual(parseLibraryId(LIKED_ID), { kind: LIKED_ID, id: LIKED_ID })
+})
+test('thumb reescribe el tamaño de las imagenes de Google y respeta el resto', () => {
+  assert.equal(thumb('https://lh3.googleusercontent.com/x=w544-h544-l90-rj'), 'https://lh3.googleusercontent.com/x=w360-h360-l90-rj')
+  assert.equal(thumb('https://yt3.ggpht.com/y=s900-c-k'), 'https://yt3.ggpht.com/y=s360-c-k')
+  assert.equal(thumb('https://i.ytimg.com/vi/a/hq720.jpg'), 'https://i.ytimg.com/vi/a/hq720.jpg')
+  assert.equal(thumb(undefined), undefined)
 })
