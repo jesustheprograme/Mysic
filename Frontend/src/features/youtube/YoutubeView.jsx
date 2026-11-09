@@ -34,6 +34,7 @@ function YoutubeView({
   onQueueEnd,
   onQueueStart,
   onSearchNavigate,
+  onAddSongFavorites,
   onToggleSongFavorite,
   favoriteStoragePrefix = 'mysic:youtube',
   playbackToggleNonce = 0,
@@ -396,7 +397,7 @@ function YoutubeView({
     if (!silent) setAccountError('')
     try {
       const library = await api.sessionLibrary()
-      library.likedSongs.forEach((song) => onToggleSongFavorite(song.id, true, adaptSong(song)))
+      onAddSongFavorites(library.likedSongs.map((song) => adaptSong(song)))
       if (show) browse.showOfficialLibrary(library)
       if (show) setAccountHelpOpen(false)
       return true
@@ -462,7 +463,12 @@ function YoutubeView({
   useEffect(() => {
     if (!accountConnected || startupSyncedRef.current) return
     startupSyncedRef.current = true
-    syncFavoritesFromAccount()
+    // Unos segundos después de pintar, para no competir con la primera carga.
+    const timer = setTimeout(syncFavoritesFromAccount, 4000)
+    return () => {
+      clearTimeout(timer)
+      startupSyncedRef.current = false
+    }
   }, [accountConnected])
   useEffect(() => {
     setAccountMenu(accountKnown

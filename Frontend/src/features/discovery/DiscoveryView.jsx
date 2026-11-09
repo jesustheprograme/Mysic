@@ -1163,6 +1163,7 @@ function useDiscoveryPage({
                   -1,
                 )}
                 onSearchNavigate={() => navigateTo('youtube')}
+                onAddSongFavorites={youtubeSongFavorites.addFavorites}
                 onToggleSongFavorite={youtubeSongFavorites.toggleFavorite}
                 playbackToggleNonce={youtubePlaybackToggleNonce}
                 playerCollapsed={playerCollapsed}
