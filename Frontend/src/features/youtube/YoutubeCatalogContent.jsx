@@ -1,4 +1,4 @@
-import { Check, Copy, ExternalLink, Heart, LayoutGrid, Library, Link2, Link2Off, ListMusic, LoaderCircle, Play, UserRound, WifiOff } from 'lucide-react'
+import { Check, Copy, ExternalLink, LayoutGrid, Library, Link2, Link2Off, LoaderCircle, UserRound, WifiOff } from 'lucide-react'
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import ArtistSongsView from '../collections/ArtistSongsView.jsx'
 import ArtistView from '../collections/ArtistView.jsx'
@@ -6,6 +6,8 @@ import CollectionDetailView from '../collections/CollectionDetailView.jsx'
 import CatalogSearchControls from '../discovery/CatalogSearchControls.jsx'
 import HomeRail from '../discovery/HomeRail.jsx'
 import CommunityShelf from './CommunityShelf.jsx'
+import LibraryGrid from './LibraryGrid.jsx'
+import { LIBRARY_TABS } from './libraryTabs.js'
 import { CardMenu } from './ItemMenus.jsx'
 import { applyHomeLayout, CARD_SIZES, chooseShelfLayout, DEFAULT_LAYOUT } from './homeLayout.js'
 import { SectionIcon, SongShelf, TileShelf } from './ShelfLayouts.jsx'
@@ -305,78 +307,29 @@ function DownloadsView({ controller }) {
   return <div className="home-page"><CatalogNavigation controller={controller} /><ConnectivityNotice online={downloads.online} />{browse.error && <div className="collection-empty" role="alert">{browse.error}</div>}<SongResults controller={controller} sourceSongs={downloads.downloads.items} title="Descargas" /></div>
 }
 
-function LibraryArtwork({ artwork, fallback: Fallback }) {
-  return artwork
-    ? <img src={artwork} alt="" loading="eager" decoding="async" />
-    : <span aria-hidden="true"><Fallback size={22} strokeWidth={1.7} /></span>
-}
+function OfficialLibraryView({ controller }) {
+  const { browse, downloads } = controller
+  const data = browse.view.data
+  const [tab, setTab] = useState('all')
 
-function LibraryOverview({ controller, data }) {
-  const artwork = [
-    ...data.playlists.map((playlist) => playlist.thumbnail),
-    ...data.likedSongs.map((song) => song.thumbnail),
-  ].filter(Boolean).slice(0, 4)
-  const canPlayLikes = data.likedSongs.length > 0
+  function openItem(item) {
+    if (item.kind === 'liked') setTab('songs')
+    else if (item.kind === 'playlist') controller.openPlaylist(item.id)
+    else if (item.kind === 'album') controller.openAlbum(item.id)
+    else if (item.kind === 'artist') controller.openArtist(item.id)
+  }
 
   return (
-    <section className="yt-library-overview" aria-labelledby="yt-library-overview-title">
-      <div className="yt-library-overview__copy">
-        <span>COLECCIÓN PERSONAL</span>
-        <h2 id="yt-library-overview-title">Tu música, reunida</h2>
-        <p>{data.playlists.length} playlists y {data.likedSongs.length} canciones que te gustan, sincronizadas con YouTube Music.</p>
-        <button type="button" disabled={!canPlayLikes} onClick={() => controller.playSongs(data.likedSongs, data.likedSongs[0].id)}>
-          <Play size={15} fill="currentColor" aria-hidden="true" /> Reproducir Me gusta
-        </button>
-      </div>
-      <div className="yt-library-overview__mosaic" aria-hidden="true">
-        {artwork.map((image, index) => <img loading="lazy" decoding="async" src={image} alt="" key={`${image}-${index}`} />)}
-        {artwork.length === 0 && <span><Library size={34} strokeWidth={1.4} /></span>}
-      </div>
-    </section>
-  )
-}
-
-function LibraryShortcuts({ controller, data }) {
-  const playlists = data.playlists.slice(0, 3)
-  return (
-    <section className="yt-library-shortcuts" aria-labelledby="yt-library-shortcuts-title">
-      <div className="yt-library-section-heading">
-        <ListMusic size={18} aria-hidden="true" />
-        <h2 id="yt-library-shortcuts-title">Accesos directos</h2>
-      </div>
-      <div className="yt-library-shortcuts__grid">
-        <button type="button" disabled={!data.likedSongs.length} onClick={() => controller.playSongs(data.likedSongs, data.likedSongs[0].id)}>
-          <span className="yt-library-shortcuts__artwork yt-library-shortcuts__artwork--liked"><LibraryArtwork artwork={data.likedSongs[0]?.thumbnail} fallback={Heart} /></span>
-          <span><strong>Tus Me gusta</strong><small>{data.likedSongs.length} canciones</small></span>
-          <Play size={16} fill="currentColor" aria-hidden="true" />
-        </button>
-        {playlists.map((playlist) => (
-          <button type="button" key={playlist.id} onClick={() => controller.openPlaylist(playlist.id)}>
-            <span className="yt-library-shortcuts__artwork"><LibraryArtwork artwork={playlist.thumbnail} fallback={ListMusic} /></span>
-            <span><strong>{playlist.title}</strong><small>{playlist.itemCount} canciones</small></span>
-            <Play size={16} fill="currentColor" aria-hidden="true" />
-          </button>
+    <div className="home-page lib-page">
+      <div className="lib-page__head"><h1>Biblioteca</h1></div>
+      <div className="lib-tabs" role="tablist" aria-label="Secciones de la biblioteca">
+        {LIBRARY_TABS.map((item) => (
+          <button type="button" role="tab" aria-selected={tab === item.id} key={item.id} onClick={() => setTab(item.id)}>{item.label}</button>
         ))}
       </div>
-    </section>
-  )
-}
-
-function OfficialLibraryView({ controller }) {
-  const data = controller.browse.view.data
-  const playlists = data.playlists.map((playlist) => ({
-    artwork: playlist.thumbnail,
-    artist: `${playlist.itemCount} canciones`,
-    id: playlist.id,
-    title: playlist.title,
-  }))
-  return (
-    <div className="home-page yt-library">
-      <CatalogNavigation controller={controller} />
-      <LibraryOverview controller={controller} data={data} />
-      <LibraryShortcuts controller={controller} data={data} />
-      <HomeRail items={playlists} onSelect={controller.openPlaylist} title="Tus playlists de YouTube" />
-      <SongResults controller={controller} sourceSongs={data.likedSongs} title="Canciones que te gustan" />
+      {tab === 'songs' && <SongResults controller={controller} sourceSongs={data.likedSongs} title="Canciones que te gustan" />}
+      {tab === 'downloads' && <SongResults controller={controller} sourceSongs={downloads.downloads.items} title="Descargas" />}
+      {tab !== 'songs' && tab !== 'downloads' && <LibraryGrid data={data} onOpen={openItem} tab={tab} />}
     </div>
   )
 }

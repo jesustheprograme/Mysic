@@ -76,7 +76,9 @@ function YoutubeView({
   const playerUsesLocalAudio = player.isLocal
   const [playerAnalyser, setPlayerAnalyser] = useState(null)
   const openMiniPlayer = useGlobalMiniPlayer(player, browse)
-  const refreshPersonalizedHome = useEffectEvent(() => browse.showHome())
+  const refreshPersonalizedHome = useEffectEvent(() => showLibraryAfterLinking())
+  const syncFavoritesFromAccount = useEffectEvent(() => syncOfficialLibrary({ show: false, silent: true }))
+  const startupSyncedRef = useRef(false)
   const reportPlaybackState = useEffectEvent(() => onPlaybackStateChange?.({
     currentSong: player.currentSong,
     isPlaying: player.isPlaying,
@@ -346,7 +348,7 @@ function YoutubeView({
     try {
       const nextAccount = await api.connectMusicSession(requestText)
       setAccount(nextAccount)
-      browse.showHome()
+      await showLibraryAfterLinking()
       return true
     } catch (error) {
       setAccountError(error.message || 'No se pudo validar la sesión de YouTube Music.')
@@ -363,7 +365,7 @@ function YoutubeView({
       const session = await captureYoutubeMusicSession()
       const nextAccount = await api.connectCapturedSession(session)
       setAccount(nextAccount)
-      browse.showHome()
+      await showLibraryAfterLinking()
       return true
     } catch (error) {
       setAccountError(error.message || 'No se pudo validar la sesión de YouTube Music.')
@@ -386,20 +388,32 @@ function YoutubeView({
     }
   }
 
-  async function syncOfficialLibrary() {
+  // Trae los Me gusta (que pasan a favoritas) y las playlists de la cuenta vinculada. Con show:false solo
+  // sincroniza los favoritos; con silent:true un fallo no abre el panel de ayuda. Devuelve si tuvo éxito.
+  async function syncOfficialLibrary(options) {
+    const { show = true, silent = false } = options?.nativeEvent ? {} : options ?? {}
     setOfficialLibraryBusy(true)
-    setAccountError('')
+    if (!silent) setAccountError('')
     try {
       const library = await api.sessionLibrary()
       library.likedSongs.forEach((song) => onToggleSongFavorite(song.id, true, adaptSong(song)))
-      browse.showOfficialLibrary(library)
-      setAccountHelpOpen(false)
+      if (show) browse.showOfficialLibrary(library)
+      if (show) setAccountHelpOpen(false)
+      return true
     } catch (error) {
-      setAccountError(error.message || 'No se pudo sincronizar la biblioteca oficial de YouTube.')
-      setAccountHelpOpen(true)
+      if (!silent) {
+        setAccountError(error.message || 'No se pudo sincronizar la biblioteca oficial de YouTube.')
+        setAccountHelpOpen(true)
+      }
+      return false
     } finally {
       setOfficialLibraryBusy(false)
     }
+  }
+
+  // Tras vincular la cuenta se traen solos los Me gusta y las playlists y se abre la biblioteca.
+  async function showLibraryAfterLinking() {
+    if (!(await syncOfficialLibrary({ silent: true }))) browse.showHome()
   }
 
   // Navegación desde la barra lateral (Inicio / Explorar / Biblioteca). Si esta vista aún no estaba montada
@@ -444,6 +458,12 @@ function YoutubeView({
   }), [])
   const accountKnown = account !== null
   const accountConnected = Boolean(account?.connected)
+  // Con la cuenta ya vinculada, los Me gusta de YouTube Music se traen como favoritas al abrir la app.
+  useEffect(() => {
+    if (!accountConnected || startupSyncedRef.current) return
+    startupSyncedRef.current = true
+    syncFavoritesFromAccount()
+  }, [accountConnected])
   useEffect(() => {
     setAccountMenu(accountKnown
       ? { actions: accountMenuActions, busy: accountBusy, connected: accountConnected, syncBusy: officialLibraryBusy }
