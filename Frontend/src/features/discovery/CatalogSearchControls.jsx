@@ -7,11 +7,15 @@ const CATALOG_SEARCH_TABS = [
   { type: 'album', label: 'Álbumes' },
 ]
 
+// "Vídeos" es opcional: no todas las vistas que usan estos filtros saben mostrarlos.
+const VIDEO_TAB = { type: 'video', label: 'Vídeos' }
+
 export default function CatalogSearchControls({
   activeType,
   className = '',
   downloadsActive = false,
   downloadsLabel = 'Descargas',
+  includeVideos = false,
   label = 'Buscar canciones, artistas o álbumes',
   onDownloadsSelect,
   onSubmit,
@@ -24,7 +28,7 @@ export default function CatalogSearchControls({
   return (
     <div className={`catalog-search__controls${className ? ` ${className}` : ''}`}>
       <nav className="catalog-search__filters" aria-label="Tipo de contenido">
-        {CATALOG_SEARCH_TABS.map((tab) => (
+        {(includeVideos ? [...CATALOG_SEARCH_TABS.slice(0, 2), VIDEO_TAB, ...CATALOG_SEARCH_TABS.slice(2)] : CATALOG_SEARCH_TABS).map((tab) => (
           <button
             className={!downloadsActive && tab.type === activeType ? 'catalog-search__filter catalog-search__filter--active' : 'catalog-search__filter'}
             type="button"

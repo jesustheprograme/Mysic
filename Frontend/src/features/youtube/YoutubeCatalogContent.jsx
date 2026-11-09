@@ -62,19 +62,25 @@ function getGroupedResults(results) {
   if (results.type === 'all') return { songs: results.songs, artists: results.artists, albums: results.albums }
   return {
     songs: results.type === 'song' ? results.items : null,
+    videos: results.type === 'video' ? results.items : null,
     artists: results.type === 'artist' ? results.items : null,
     albums: results.type === 'album' ? results.items : null,
   }
 }
 
 function SearchResults({ controller }) {
-  const { browse, openAlbum, openArtist } = controller
-  if (!browse.results) return <div className="collection-empty">Busca canciones, artistas o álbumes para comenzar.</div>
+  const { browse, openAlbum, openArtist, searchType } = controller
+  if (!browse.results) return <div className="collection-empty">Busca canciones, vídeos, artistas o álbumes para comenzar.</div>
+  // Un servidor sin soporte de vídeos responde la pestaña "Vídeos" como si fuera de canciones: se avisa en vez de mezclarlas.
+  if (searchType === 'video' && browse.results.type !== 'video') {
+    return <div className="collection-empty" role="status">La búsqueda de vídeos aún no está disponible en el servidor.</div>
+  }
   const grouped = getGroupedResults(browse.results)
 
   return (
     <>
       {grouped.songs && <SongResults controller={controller} sourceSongs={grouped.songs} />}
+      {grouped.videos && <SongResults controller={controller} sourceSongs={grouped.videos} title="Vídeos" />}
       <SearchRail items={grouped.artists?.map(adaptArtist)} onSelect={openArtist} title="Artistas" variant="artist" emptyMessage={browse.results.pending?.includes('artist') ? 'Cargando artistas…' : 'No se encontraron artistas.'} />
       <SearchRail items={grouped.albums?.map(adaptAlbum)} onSelect={openAlbum} title="Álbumes" emptyMessage={browse.results.pending?.includes('album') ? 'Cargando álbumes…' : 'No se encontraron álbumes.'} />
     </>
@@ -213,7 +219,7 @@ function CatalogNavigation({ controller, editingHome = false, onEditHome }) {
       </div>
       {actionError && <div className="collection-empty" role="alert">{actionError}</div>}
       {(browse.view.kind === 'search' || showingDownloads) && (
-        <CatalogSearchControls activeType={searchType} downloadsActive={showingDownloads} downloadsLabel={`Descargas${downloads.downloads.items.length ? ` (${downloads.downloads.items.length})` : ''}`} onDownloadsSelect={showDownloads} onQueryChange={browse.setQuery} onSubmit={() => browse.runSearch(browse.query, searchType)} onTypeSelect={changeTab} query={browse.query} showField={false} showDownloads={false} />
+        <CatalogSearchControls activeType={searchType} includeVideos downloadsActive={showingDownloads} downloadsLabel={`Descargas${downloads.downloads.items.length ? ` (${downloads.downloads.items.length})` : ''}`} onDownloadsSelect={showDownloads} onQueryChange={browse.setQuery} onSubmit={() => browse.runSearch(browse.query, searchType)} onTypeSelect={changeTab} query={browse.query} showField={false} showDownloads={false} />
       )}
     </header>
   )
