@@ -394,14 +394,13 @@
  * ========================================================================== */
 .music-app .home-page .home-shelf > .home-shelf__rail {
   /* --shelf-card lo fija "Editar inicio" (Pequeño / Mediano / Grande). */
-  grid-auto-columns: var(--shelf-card, clamp(124px, 9vw, 148px));
+  grid-auto-columns: var(--shelf-card, 148px);
   gap: 18px;
 }
 
-/* Carrusel ajustado (fitColumns): N tarjetas enteras que reparten el ancho exacto, así no asoma un trozo
-   de la siguiente, y cada tarjeta se alinea al borde al desplazar. --rail-cols lo calcula useRailColumns. */
+/* Carrusel con tarjetas de tamaño FIJO (no se estiran al plegar o desplegar el reproductor); --rail-cols solo\n   dice cuántas caben, para la cuadrícula de "Ver todo". */
 .music-app .home-page .home-shelf > .home-shelf__rail[data-rail-cols] {
-  grid-auto-columns: calc((100% - (var(--rail-cols) - 1) * 18px) / var(--rail-cols));
+  grid-auto-columns: var(--shelf-card, 148px);
   scroll-snap-type: x proximity;
 }
 
@@ -410,8 +409,9 @@
 /* "Ver todo": la sección entera en una cuadrícula con el mismo número de columnas. */
 .music-app .home-page .home-shelf > .home-shelf__rail--grid[data-rail-cols] {
   grid-auto-flow: row;
-  grid-template-columns: repeat(var(--rail-cols), minmax(0, 1fr));
+  grid-template-columns: repeat(var(--rail-cols), var(--shelf-card, 148px));
   grid-auto-columns: auto;
+  justify-content: start;
   row-gap: 24px;
   overflow: visible;
   scroll-snap-type: none;

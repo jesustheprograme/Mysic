@@ -3,7 +3,7 @@ import { useLayoutEffect, useState } from 'react'
 export const RAIL_GAP = 18
 /** Filas que "Ver todo" suma a la fila visible del carrusel. */
 export const EXPANDED_EXTRA_ROWS = 3
-export const DEFAULT_CARD_MIN = 136
+export const DEFAULT_CARD_MIN = 148
 
 /**
  * Cuántas tarjetas caben ENTERAS en un carrusel de `width` px con tarjetas de al menos `min` px y
