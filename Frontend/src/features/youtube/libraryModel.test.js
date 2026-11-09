@@ -14,7 +14,7 @@ test('deduce álbumes y artistas únicos de las canciones que gustan', () => {
   const library = buildLibrary({ likedSongs, playlists })
   assert.deepEqual(library.albums.map((item) => item.id), ['al:MP1', 'al:MP2'])
   assert.deepEqual(library.artists.map((item) => [item.id, item.meta]), [['ar:UC1', '2 canciones'], ['ar:UC2', '1 canción']])
-  assert.equal(library.liked.meta, '4 canciones')
+  assert.equal(library.pinned.at(-1).meta, '4 canciones')
   assert.equal(library.playlists[0].meta, '1 canción')
 })
 
@@ -23,7 +23,7 @@ test('filtra por texto y ordena de la A a la Z', () => {
   const filtered = buildLibrary({ likedSongs, playlists }, { query: 'zet' })
   assert.deepEqual(filtered.artists.map((item) => item.title), ['Zeta'])
   assert.equal(filtered.playlists.length, 0)
-  assert.equal(filtered.liked, null)
+  assert.equal(filtered.pinned.length, 0)
 })
 
 test('parseLibraryId separa el tipo del id aunque este contenga dos puntos', () => {
@@ -35,4 +35,26 @@ test('thumb reescribe el tamaño de las imagenes de Google y respeta el resto', 
   assert.equal(thumb('https://yt3.ggpht.com/y=s900-c-k'), 'https://yt3.ggpht.com/y=s360-c-k')
   assert.equal(thumb('https://i.ytimg.com/vi/a/hq720.jpg'), 'https://i.ytimg.com/vi/a/hq720.jpg')
   assert.equal(thumb(undefined), undefined)
+})
+
+test('usa álbumes, artistas, suscripciones y subidos del servidor cuando existen', () => {
+  const library = buildLibrary({
+    likedSongs,
+    playlists: [{ id: 'LM', title: 'Liked Music' }],
+    albums: [{ id: 'MPREb_1', title: 'Real', artist: 'Ado', year: 2024 }, { id: 'MPREb_1', title: 'Duplicado' }],
+    artists: [{ id: 'UC9', name: 'Real Artist', subtitle: '1 M suscriptores' }],
+    subscriptions: [{ id: 'UC9', name: 'Real Artist' }, { id: 'UC8', name: 'Otro' }],
+    uploads: [{ id: 'MPREb_u', title: 'Mi disco', artist: 'Yo' }],
+  })
+  assert.deepEqual(library.albums.map((item) => [item.id, item.meta]), [['al:MPREb_1', 'Ado · 2024']])
+  assert.deepEqual(library.artists.map((item) => item.id), ['ar:UC9', 'ar:UC8'])
+  assert.equal(library.uploads[0].id, 'al:MPREb_u')
+  assert.equal(library.playlists.length, 0)
+})
+
+test('En repetición aparece primero solo si hay canciones', () => {
+  assert.equal(buildLibrary({ likedSongs, playlists }).pinned[0].id, 'liked')
+  const withRepeat = buildLibrary({ likedSongs, playlists }, { repeat: [likedSongs[0], likedSongs[1]] })
+  assert.deepEqual(withRepeat.pinned.map((item) => item.id), ['repeat', 'liked'])
+  assert.equal(withRepeat.pinned[0].meta, '2 canciones')
 })

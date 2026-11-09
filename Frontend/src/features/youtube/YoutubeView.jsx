@@ -9,7 +9,9 @@ import { preloadYoutubePlayer, usePlayer } from './hooks/usePlayer.js'
 import { useYoutubeFavorites } from './hooks/useYoutubeFavorites.js'
 import { adaptSong } from './lib/adapters.js'
 import { captureYoutubeMusicSession, desktopSessionAvailable } from './lib/desktopSession.js'
+import { persistedCache } from '../../lib/persistedCache.js'
 import { api } from './lib/api.js'
+import { compactLibrary, LIBRARY_CACHE_KEY } from './libraryCache.js'
 import MusicSearchPanel from './MusicSearchPanel.jsx'
 import YoutubeCatalogContent from './YoutubeCatalogContent.jsx'
 import { setAccountMenu } from './accountMenuBridge.js'
@@ -382,12 +384,23 @@ function YoutubeView({
     setAccountError('')
     try {
       setAccount(await api.unlinkAccount())
+      forgetLibrary()
       browse.showHome()
     } catch (error) {
       setAccountError(error.message || 'No se pudo desvincular la cuenta.')
     } finally {
       setAccountBusy(false)
     }
+  }
+
+  // Guarda la biblioteca en memoria y en disco (compacta): la próxima apertura, incluso tras reiniciar, es instantánea.
+  function rememberLibrary(library) {
+    libraryCacheRef.current = library
+    persistedCache.write(LIBRARY_CACHE_KEY, compactLibrary(library))
+  }
+  function forgetLibrary() {
+    libraryCacheRef.current = null
+    persistedCache.remove(LIBRARY_CACHE_KEY)
   }
 
   // Trae los Me gusta (que pasan a favoritas) y las playlists de la cuenta vinculada. Con show:false solo
@@ -398,7 +411,7 @@ function YoutubeView({
     if (!silent) setAccountError('')
     try {
       const library = await api.sessionLibrary()
-      libraryCacheRef.current = library
+      rememberLibrary(library)
       onAddSongFavorites(library.likedSongs.map((song) => adaptSong(song)))
       if (show) browse.showOfficialLibrary(library)
       if (show) setAccountHelpOpen(false)
@@ -431,7 +444,7 @@ function YoutubeView({
   // refresca por detrás para la próxima vez; "Sincronizar" fuerza la descarga y la muestra.
   function openLibrary() {
     if (browse.view.kind === 'official-library') return
-    const cached = libraryCacheRef.current
+    const cached = libraryCacheRef.current ?? persistedCache.read(LIBRARY_CACHE_KEY)
     if (!cached) {
       syncOfficialLibrary()
       return

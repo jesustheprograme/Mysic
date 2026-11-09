@@ -27,6 +27,7 @@ import useLocalDownloads from '../offline/useLocalDownloads.js'
 import { useDownloads } from '../youtube/hooks/useDownloads.js'
 import { useYoutubeFavorites } from '../youtube/hooks/useYoutubeFavorites.js'
 import { adaptSong } from '../youtube/lib/adapters.js'
+import { recordPlayInStorage } from '../youtube/playHistory.js'
 
 const MusicImportView = lazy(() => import('../music-import/MusicImportView.jsx'))
 const NewArtistSpotlight = lazy(() => import('./NewArtistSpotlight.jsx'))
@@ -442,6 +443,7 @@ function useDiscoveryPage({
     'mysic:youtube:favorite-songs',
   )
   const autoSpotlightBlockedRef = useRef(false)
+  const lastRecordedPlayRef = useRef(null)
   const playbackStateRef = useRef({ currentTime: 0, duration: 0, isPlaying: false, volume: 75 })
   const contentRef = useRef(null)
   const discoveryLoadingTimerRef = useRef(null)
@@ -817,6 +819,14 @@ function useDiscoveryPage({
   }
 
   function updateYoutubePlaybackState(nextState) {
+    // Historial local para "En repetición": una anotación por canción que empieza a sonar.
+    const playingSong = nextState.isPlaying ? nextState.currentSong : null
+    if (playingSong && playingSong.id !== lastRecordedPlayRef.current) {
+      lastRecordedPlayRef.current = playingSong.id
+      recordPlayInStorage(playingSong)
+    } else if (!nextState.currentSong) {
+      lastRecordedPlayRef.current = null
+    }
     setYoutubePlaybackState(nextState)
     setYoutubePlayerVisible(Boolean(nextState.currentSong))
     setPlaybackOwner((owner) => {
