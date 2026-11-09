@@ -410,7 +410,11 @@ function YoutubeView({
     setOfficialLibraryBusy(true)
     if (!silent) setAccountError('')
     try {
-      const library = await api.sessionLibrary()
+      const fetched = await api.sessionLibrary()
+      // El servidor entrega listas vacías (en vez de error) cuando YouTube falla: no pisar con eso una biblioteca que ya teníamos.
+      const previous = libraryCacheRef.current ?? persistedCache.read(LIBRARY_CACHE_KEY)
+      const fetchedEmpty = !fetched.likedSongs?.length && !fetched.playlists?.length
+      const library = fetchedEmpty && previous ? previous : fetched
       rememberLibrary(library)
       onAddSongFavorites(library.likedSongs.map((song) => adaptSong(song)))
       if (show) browse.showOfficialLibrary(library)
