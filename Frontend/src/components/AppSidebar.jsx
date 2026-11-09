@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   Album,
   CircleUserRound,
@@ -8,7 +9,9 @@ import {
   House,
   Import,
   ListMusic,
-  MonitorPlay,
+  ChartColumn,
+  ChevronDown,
+  Library,
   MoreVertical,
   Pencil,
   Pin,
@@ -23,9 +26,19 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { getPlaylistTrackCount } from '../features/playlists/playlistTracks.js'
+import { readStorage, writeStorage } from '../lib/storage.js'
 
-// YouTube Music es la sección principal; Mysic (catálogo propio) queda como grupo secundario.
-const mainNavigationItem = { id: 'youtube', label: 'YouTube Music', icon: MonitorPlay }
+// Opciones principales: Inicio es la portada de YouTube Music; todo el catálogo propio de Mysic
+// vive dentro del desplegable "Mysic".
+const mainNavigationItems = [
+  { id: 'youtube', label: 'Inicio', icon: House, youtubeView: 'home' },
+  { id: 'youtube-explore', label: 'Explorar', icon: Compass, youtubeView: 'explore' },
+  { id: 'youtube-library', label: 'Biblioteca', icon: Library, youtubeView: 'library' },
+  { id: 'stats', label: 'Estadísticas', icon: ChartColumn },
+]
+
+const GROUP_STORAGE_KEY = 'mysic:sidebar:mysic-open'
+const MYSIC_SECTIONS = ['home', 'explore', 'for-you', 'import', 'recent', 'albums', 'album', 'artists', 'artist', 'playlists', 'playlist', 'downloads']
 
 const primaryNavigationItems = [
   { id: 'home', label: 'Inicio', icon: House },
@@ -54,19 +67,43 @@ function AppSidebar({
   onTogglePlaylistPinned,
   onImportNav,
   onMobileClose,
+  onYoutubeNavigate,
   playlists = [],
+  youtubeView = 'home',
 }) {
-  function renderItem({ id, label, icon: Icon }) {
-    const isActive = activeSection === id
+  const inMysicGroup = MYSIC_SECTIONS.includes(activeSection)
+  const [groupOpen, setGroupOpen] = useState(() => readStorage(GROUP_STORAGE_KEY, false) === true)
+  // Si estás en una sección de Mysic, el grupo se muestra abierto aunque lo hayas plegado.
+  const groupVisible = groupOpen || inMysicGroup
+
+  function toggleGroup() {
+    const next = !groupVisible
+    setGroupOpen(next)
+    writeStorage(GROUP_STORAGE_KEY, next)
+  }
+
+  function isItemActive({ id, youtubeView: view }) {
+    if (view) {
+      if (activeSection !== 'youtube') return false
+      const current = youtubeView === 'explore' || youtubeView === 'library' ? youtubeView : 'home'
+      return current === view
+    }
+    return activeSection === id
       || (id === 'playlists' && activeSection === 'playlist')
       || (id === 'albums' && activeSection === 'album')
+      || (id === 'artists' && activeSection === 'artist')
+  }
+
+  function renderItem(item) {
+    const { id, label, icon: Icon, youtubeView: view } = item
+    const isActive = isItemActive(item)
 
     return (
       <button
         className={`app-sidebar__item${isActive ? ' app-sidebar__item--active' : ''}`}
         type="button"
         aria-current={isActive ? 'page' : undefined}
-        onClick={() => onNavigate(id)}
+        onClick={() => (view ? onYoutubeNavigate?.(view) : onNavigate(id))}
         title={collapsed ? label : undefined}
         key={id}
       >
@@ -90,24 +127,38 @@ function AppSidebar({
         id="mobile-navigation"
       >
         <nav className="app-sidebar__navigation" aria-label="Navegación principal">
-          {renderItem(mainNavigationItem)}
-          {!collapsed && <p className="app-sidebar__label">Mysic</p>}
-          {primaryNavigationItems.map(renderItem)}
-          {canImportMusic && (
-            <button
-              className={`app-sidebar__item${activeSection === 'import' ? ' app-sidebar__item--active' : ''}`}
-              type="button"
-              aria-current={activeSection === 'import' ? 'page' : undefined}
-              onClick={() => onImportNav?.()}
-              title={collapsed ? 'Importar música' : undefined}
-              key="import"
-            >
-              <Import size={19} strokeWidth={1.7} aria-hidden="true" />
-              <span>Importar música</span>
-            </button>
-          )}
-          {!collapsed && <p className="app-sidebar__label">Tu música</p>}
-          {libraryNavigationItems.map(renderItem)}
+          {mainNavigationItems.map(renderItem)}
+
+          <button
+            className={`app-sidebar__group-toggle${groupVisible ? ' app-sidebar__group-toggle--open' : ''}`}
+            type="button"
+            aria-expanded={groupVisible}
+            aria-controls="sidebar-mysic-group"
+            title={collapsed ? 'Mysic' : undefined}
+            onClick={toggleGroup}
+          >
+            <ListMusic size={19} strokeWidth={1.7} aria-hidden="true" />
+            <span>Mysic</span>
+            <ChevronDown className="app-sidebar__group-chevron" size={16} strokeWidth={1.8} aria-hidden="true" />
+          </button>
+          <div className="app-sidebar__group" id="sidebar-mysic-group" hidden={!groupVisible}>
+            {primaryNavigationItems.map(renderItem)}
+            {canImportMusic && (
+              <button
+                className={`app-sidebar__item${activeSection === 'import' ? ' app-sidebar__item--active' : ''}`}
+                type="button"
+                aria-current={activeSection === 'import' ? 'page' : undefined}
+                onClick={() => onImportNav?.()}
+                title={collapsed ? 'Importar música' : undefined}
+                key="import"
+              >
+                <Import size={19} strokeWidth={1.7} aria-hidden="true" />
+                <span>Importar música</span>
+              </button>
+            )}
+            {!collapsed && <p className="app-sidebar__label">Tu música</p>}
+            {libraryNavigationItems.map(renderItem)}
+          </div>
         </nav>
 
         {!collapsed && (

@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import ArtistsPage from './ArtistsPage.jsx'
 import FavoriteSearch from './FavoriteSearch.jsx'
+import StatsPage from './StatsPage.jsx'
 import HomeRail from './HomeRail.jsx'
 import SongList from './SongList.jsx'
 
@@ -27,6 +29,7 @@ function SectionRoute({
   onPreviewStart,
   onPreviewStop,
   onSongSelect,
+  onToggleArtistFavorite,
   onToggleFavorite,
   preview,
   recentSongs,
@@ -137,10 +140,25 @@ function SectionRoute({
 
   if (section === 'artists') {
     return (
-      <div className="route-page">
-        <RouteHeading title="Artistas" />
-        <HomeRail items={artistItems} onSelect={(itemId) => onArtistSelect?.(itemId.replace(/^artist-/, ''))} title="Artistas" variant="artist" />
-      </div>
+      <ArtistsPage
+        albumItems={albumItems}
+        artistItems={artistItems}
+        likedArtistIds={likedArtistIds}
+        onArtistSelect={onArtistSelect}
+        onToggleArtistFavorite={onToggleArtistFavorite}
+      />
+    )
+  }
+
+  if (section === 'stats') {
+    return (
+      <StatsPage
+        albumItems={albumItems}
+        artistItems={artistItems}
+        likedSongIds={likedSongIds}
+        onArtistSelect={onArtistSelect}
+        songs={songs}
+      />
     )
   }
 

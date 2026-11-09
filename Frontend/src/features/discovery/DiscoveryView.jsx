@@ -413,6 +413,7 @@ function useDiscoveryPage({
   const [youtubePlaybackRequest, setYoutubePlaybackRequest] = useState(null)
   const [youtubeSearchRequest, setYoutubeSearchRequest] = useState({ nonce: 0, query: '' })
   const [youtubeStopNonce, setYoutubeStopNonce] = useState(0)
+  const [youtubeViewKind, setYoutubeViewKind] = useState('home')
   const [activeAlbumId, setActiveAlbumId] = useState(getAlbumIdFromHash)
   const [activeArtistId, setActiveArtistId] = useState(getArtistIdFromHash)
   const [activeArtistProfile, setActiveArtistProfile] = useState(null)
@@ -715,6 +716,22 @@ function useDiscoveryPage({
     setYoutubeVisited,
   })
 
+  useEffect(() => {
+    const onView = (event) => setYoutubeViewKind(event.detail?.kind ?? 'home')
+    window.addEventListener('mysic:youtube-view', onView)
+    return () => window.removeEventListener('mysic:youtube-view', onView)
+  }, [])
+
+  // Inicio / Explorar / Biblioteca de la barra lateral: abren la sección de YouTube Music en esa vista.
+  function openYoutubeView(view) {
+    setMobileMenuOpen(false)
+    const alreadyThere = activeSection === 'youtube'
+    if (!alreadyThere) navigateTo('youtube')
+    if (view === 'home' && !alreadyThere) return
+    window.__mysicYoutubeNav = view
+    window.dispatchEvent(new CustomEvent('mysic:youtube-nav', { detail: { view } }))
+  }
+
   function changeGlobalSearch(query) {
     if (query.trim()) setYoutubeVisited(true)
     setYoutubeSearchRequest((current) => ({ ...current, query }))
@@ -891,6 +908,8 @@ function useDiscoveryPage({
           setMobileMenuOpen(false)
           navigateTo(section)
         }}
+        onYoutubeNavigate={openYoutubeView}
+        youtubeView={youtubeViewKind}
         onOpenPlaylist={(playlistId) => {
           setMobileMenuOpen(false)
           navigateToPlaylist(playlistId)
@@ -984,6 +1003,7 @@ function useDiscoveryPage({
                 onPreviewStart={startPreview}
                 onPreviewStop={stopPreview}
                 onSongSelect={selectSong}
+                onToggleArtistFavorite={onToggleArtistFavorite}
                 onToggleFavorite={toggleSongFavorite}
                 preview={preview}
                 recentSongs={recentSongs}

@@ -402,6 +402,31 @@ function YoutubeView({
     }
   }
 
+  // Navegación desde la barra lateral (Inicio / Explorar / Biblioteca). Si esta vista aún no estaba montada
+  // cuando se pidió, la petición queda en window.__mysicYoutubeNav y se aplica al montar.
+  const applySidebarNavigation = useEffectEvent((view) => {
+    if (view === 'explore') browse.showExplore()
+    else if (view === 'library') syncOfficialLibrary()
+    else browse.showHome()
+  })
+  useEffect(() => {
+    const pending = window.__mysicYoutubeNav
+    if (pending) {
+      window.__mysicYoutubeNav = null
+      applySidebarNavigation(pending)
+    }
+    function onNavigate(event) {
+      window.__mysicYoutubeNav = null
+      applySidebarNavigation(event.detail?.view)
+    }
+    window.addEventListener('mysic:youtube-nav', onNavigate)
+    return () => window.removeEventListener('mysic:youtube-nav', onNavigate)
+  }, [])
+  const browseViewKind = browse.view.kind
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('mysic:youtube-view', { detail: { kind: browseViewKind } }))
+  }, [browseViewKind])
+
   // Opciones de cuenta en el menú de usuario de la barra de título (ver accountMenuBridge.js).
   // Las acciones viven en un ref para que la instantánea publicada no cambie en cada render.
   const accountActionsRef = useRef(null)

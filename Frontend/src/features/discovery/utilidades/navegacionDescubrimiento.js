@@ -18,6 +18,7 @@ export const sectionHashes = {
   downloads: '#/descargas',
   youtube: '#/youtube',
   import: '#/importar',
+  stats: '#/estadisticas',
 }
 
 const hashSections = Object.fromEntries(

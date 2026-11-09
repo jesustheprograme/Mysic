@@ -1,0 +1,116 @@
+/* Página de artistas: tarjetas verticales con retrato y degradado inferior del color de la foto. */
+.artists-page { display: grid; gap: 22px; align-content: start; }
+
+.artists-page__head h1 { margin: 0; font-size: clamp(30px, 4vw, 44px); font-weight: 750; letter-spacing: -0.02em; color: #fff; }
+.artists-page__head p { margin: 6px 0 0; color: var(--m-text-dim, #98a19d); font-size: 14px; }
+
+.artists-page__toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.artists-page__filters { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.artists-page__pill {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  border: 1px solid var(--m-line-strong, rgb(255 255 255 / 0.14));
+  border-radius: 999px;
+  color: #e8ebe9;
+  background: rgb(255 255 255 / 0.04);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.artists-page__pill:hover { background: rgb(255 255 255 / 0.09); }
+.artists-page__pill.is-active { border-color: transparent; color: #111; background: var(--m-accent, #ff6542); }
+
+.artists-page__search {
+  min-width: min(300px, 100%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--m-line-strong, rgb(255 255 255 / 0.14));
+  border-radius: 10px;
+  color: var(--m-text-dim, #98a19d);
+  background: rgb(255 255 255 / 0.04);
+}
+
+.artists-page__search input { width: 100%; min-height: 36px; border: 0; outline: 0; color: #fff; background: transparent; font-size: 13px; }
+.artists-page__search:focus-within { border-color: var(--m-accent, #ff6542); }
+
+.artists-page__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.artist-card {
+  --artist-tint: #17181b;
+  position: relative;
+  aspect-ratio: 3 / 4;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #121315;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.07);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.artist-card:hover, .artist-card:focus-within { transform: translateY(-3px); box-shadow: 0 0 0 1px rgb(255 255 255 / 0.16), 0 12px 28px rgb(0 0 0 / 0.4); }
+
+.artist-card__open { position: absolute; inset: 0; width: 100%; display: block; padding: 0; color: inherit; text-align: left; }
+
+.artist-card__open img, .artist-card__open > i { position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit: cover; }
+
+/* Desvanecido: del color de la foto (oscurecido) en la base a transparente hacia la mitad. */
+.artist-card__shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--artist-tint) 55%, #000) 0%,
+    color-mix(in srgb, var(--artist-tint) 52%, #000 48%) 24%,
+    color-mix(in srgb, var(--artist-tint) 40%, transparent) 46%,
+    transparent 68%
+  );
+}
+
+.artist-card__copy { position: absolute; right: 14px; bottom: 50px; left: 14px; display: grid; gap: 3px; }
+.artist-card__copy strong { overflow: hidden; color: #fff; font-size: 17px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 8px rgb(0 0 0 / 0.45); }
+.artist-card__copy small { overflow: hidden; color: rgb(255 255 255 / 0.78); font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; }
+
+.artist-card__actions { position: absolute; bottom: 10px; left: 10px; display: flex; align-items: center; }
+
+@media (max-width: 680px) {
+  .artists-page__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .artists-page__search { width: 100%; }
+}
+
+/* Estadísticas */
+.stats-page__cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin: 0; }
+.stats-page__card { display: grid; gap: 6px; padding: 16px; border-radius: 14px; background: rgb(255 255 255 / 0.05); box-shadow: 0 0 0 1px rgb(255 255 255 / 0.07); }
+.stats-page__card dt { color: var(--m-text-dim, #98a19d); font-size: 12px; }
+.stats-page__card dd { margin: 0; color: #fff; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+.stats-page__top h2 { margin: 0 0 10px; color: #f4f4ef; font-size: 17px; font-weight: 650; }
+.stats-page__top ol { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.stats-page__top button { width: 100%; display: grid; grid-template-columns: minmax(90px, 200px) minmax(0, 1fr) 36px; align-items: center; gap: 14px; padding: 9px 10px; border-radius: 10px; color: #e8ebe9; font-size: 14px; text-align: left; }
+.stats-page__top button:hover { background: rgb(255 255 255 / 0.06); }
+.stats-page__top button > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats-page__bar { height: 6px; overflow: hidden; border-radius: 999px; background: rgb(255 255 255 / 0.08); }
+.stats-page__bar i { height: 100%; display: block; border-radius: inherit; background: var(--m-accent, #ff6542); }
+.stats-page__top small { color: var(--m-text-dim, #98a19d); text-align: right; }
+
+/* Grupo "Mysic" desplegable de la barra lateral */
+.app-sidebar__group-toggle { position: relative; width: 100%; min-height: 40px; display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 11px; margin-top: 10px; padding: 0 13px; border-radius: 7px; color: #8f9795; font-size: 14px; font-weight: 590; text-align: left; }
+.app-sidebar__group-toggle:hover { color: #fff; background: rgb(255 255 255 / 0.05); }
+.app-sidebar__group-chevron { transition: transform 160ms ease; }
+.app-sidebar__group-toggle--open .app-sidebar__group-chevron { transform: rotate(180deg); }
+.app-sidebar__group { display: grid; gap: 3px; margin-left: 10px; padding-left: 6px; border-left: 1px solid rgb(255 255 255 / 0.08); }
+.app-sidebar__group[hidden] { display: none; }
+.app-sidebar--collapsed .app-sidebar__group-toggle { grid-template-columns: 1fr; justify-items: center; padding: 0; }
+.app-sidebar--collapsed .app-sidebar__group-toggle span, .app-sidebar--collapsed .app-sidebar__group-chevron { display: none; }
+.app-sidebar--collapsed .app-sidebar__group { margin-left: 0; padding-left: 0; border-left: 0; }
