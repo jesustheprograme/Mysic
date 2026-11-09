@@ -6,8 +6,7 @@ import { SectionIcon, ShelfHeading } from '../youtube/ShelfLayouts.jsx'
 
 const portraitDirections = ['left', 'down', 'right', 'up']
 const PORTRAIT_DURATION = 5600
-const SONGS_PER_COLUMN = 4
-const FEATURED_SONGS = SONGS_PER_COLUMN * 3
+const FEATURED_SONGS = 8
 
 function getArtistTitleScale(title) {
   const length = Array.from(title.trim()).length
@@ -111,7 +110,6 @@ function ArtistView({
     release.releaseType === 'single' || (!release.releaseType && release.songCount === 1)
   )).map(toRailItem), [albums])
   const featuredSongs = artistSongs.slice(0, FEATURED_SONGS)
-  const songRows = Math.min(SONGS_PER_COLUMN, Math.max(1, Math.ceil(featuredSongs.length / 3)))
   const portraits = artist.images?.length ? artist.images : [artist.artwork].filter(Boolean)
   const [portraitIndex, setPortraitIndex] = useState(0)
   const activePortraitIndex = portraits.length ? portraitIndex % portraits.length : 0
@@ -246,7 +244,7 @@ function ArtistView({
               kind="songs"
               title="Canciones más escuchadas"
             />
-            <ol className="sl-songs" style={{ '--sl-rows': songRows }}>
+            <ol className="sl-songs">
               {featuredSongs.map((song) => (
                 <ArtistSongRow
                   key={song.id}

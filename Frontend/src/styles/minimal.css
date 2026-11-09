@@ -596,6 +596,9 @@
   background-repeat: no-repeat;
 }
 
+/* El tinte solo va en el inicio: las páginas de álbum, playlist, artista y las listas tienen su propio color. */
+.music-app .music-app__content:has(.collection-detail, .artist-profile, .route-page) { background-image: none; }
+
 /* Las capas intermedias dejan de pintar un negro opaco que tapaba el color. */
 .music-app .music-app__main,
 .music-app .music-workspace { background: transparent; }
@@ -997,13 +1000,13 @@
   }
 }
 
-/* Canciones del artista: columnas según el ancho (no tres fijas) y acciones extra solo al pasar el cursor,
+/* Canciones del artista: una por fila y acciones extra solo al pasar el cursor,
    para que el título tenga sitio incluso con el reproductor abierto. */
 @media (min-width: 821px) {
   .music-app .artist-profile__content .sl-songs {
     grid-auto-flow: row;
     grid-template-rows: none;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .music-app .artist-profile__content .sl-song__cover img { width: 44px; height: 44px; }
