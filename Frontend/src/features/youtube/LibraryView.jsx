@@ -1,8 +1,13 @@
 import { ArrowDownAZ, Play, RefreshCw, Search } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import HomeRail from '../discovery/HomeRail.jsx'
-import { buildLibrary, LIBRARY_TABS, LIKED_ID, parseLibraryId, REPEAT_ID } from './libraryModel.js'
+import { CARD_SIZES } from './homeLayout.js'
+import { CardMenu } from './ItemMenus.jsx'
+import { adaptBrowseItem } from './lib/adapters.js'
+import { buildLibrary, LIBRARY_TABS, LIKED_ID, REPEAT_ID } from './libraryModel.js'
 import { readTopPlays } from './playHistory.js'
+import { prefetchHandlers } from './prefetchDetail.js'
+import useHomeLayout from './useHomeLayout.js'
 import './library-view.css'
 
 // Con bibliotecas de miles de elementos no se pintan todos a la vez: la cuadrícula va creciendo por tandas
@@ -14,11 +19,21 @@ const GRID_BATCH = 60
 let lastTab = 'all'
 const revealedDepth = new Map()
 
+// Las tarjetas son las del inicio: mismo adaptador, mismo HomeRail, mismo menú y misma precarga al pasar el cursor.
+// Solo las tarjetas especiales ("Música que me gusta", "En repetición") se adaptan aparte.
+const toCard = (entry) => (entry.kind === 'special'
+  ? { artist: entry.subtitle, artwork: entry.thumbnail, detail: 'Lista', id: entry.id, title: entry.title }
+  : adaptBrowseItem(entry))
+
 /** Cuadrícula que crece por tandas: solo hay en el DOM lo que ya se ha desplazado más lo siguiente. */
-function ProgressiveGrid({ depthKey, items, onSelect, title, variant }) {
+function ProgressiveGrid({ controller, depthKey, entries, onOpen, title, variant }) {
   const [limit, setLimit] = useState(() => (depthKey && revealedDepth.get(depthKey)) || GRID_BATCH)
   const sentinelRef = useRef(null)
-  const hasMore = limit < items.length
+  const hasMore = limit < entries.length
+  const shown = useMemo(() => entries.slice(0, limit), [entries, limit])
+  const items = useMemo(() => shown.map(toCard), [shown])
+  const byId = useMemo(() => new Map(shown.map((entry) => [entry.id, entry])), [shown])
+  const kindOf = (item) => byId.get(item.id)?.kind
 
   useEffect(() => {
     if (depthKey) revealedDepth.set(depthKey, limit)
@@ -36,13 +51,33 @@ function ProgressiveGrid({ depthKey, items, onSelect, title, variant }) {
 
   return (
     <>
-      <HomeRail items={items.slice(0, limit)} onSelect={onSelect} title={title} variant={variant} wrap />
+      <HomeRail
+        items={items}
+        onArtistSelect={controller.openArtist}
+        onIntent={(item) => { const kind = kindOf(item); if (kind && kind !== 'special') prefetchHandlers(kind, item.id).start?.() }}
+        onIntentEnd={(item) => { const kind = kindOf(item); if (kind && kind !== 'special') prefetchHandlers(kind, item.id).stop?.() }}
+        onSelect={(id) => onOpen(byId.get(id))}
+        renderMenu={(item) => {
+          const entry = byId.get(item.id)
+          return entry && entry.kind !== 'special' ? <CardMenu ctx={controller} entry={entry} title={item.title} /> : null
+        }}
+        title={title}
+        variant={variant}
+        wrap
+      />
       {hasMore && <div className="lib-page__sentinel" ref={sentinelRef} aria-hidden="true" />}
     </>
   )
 }
+
+/**
+ * Biblioteca: reutiliza las tarjetas del inicio. "Todo" junta playlists, álbumes y artistas en una sola cuadrícula
+ * sin segmentar; cada pestaña filtra un tipo. La cuadrícula es progresiva. El tamaño de las tarjetas es el de
+ * "Editar inicio", igual que en el inicio.
+ */
 export default function LibraryView({ controller, data, renderSongs }) {
   const { downloads, officialLibraryBusy, openAlbum, openArtist, openPlaylist, playSongs, syncOfficialLibrary } = controller
+  const { layout } = useHomeLayout()
   const [tab, setTabState] = useState(lastTab)
   const setTab = (next) => {
     lastTab = next
@@ -67,28 +102,29 @@ export default function LibraryView({ controller, data, renderSongs }) {
   const activeTab = tabs.some((item) => item.id === tab) ? tab : 'all'
   const searchable = activeTab !== 'songs' && activeTab !== 'downloads'
 
-  function open(value) {
-    const { kind, id } = parseLibraryId(value)
-    if (kind === LIKED_ID) setTab('songs')
-    else if (kind === REPEAT_ID) playSongs(repeat, repeat[0].id)
-    else if (kind === 'pl') openPlaylist(id)
-    else if (kind === 'al') openAlbum(id)
-    else if (kind === 'ar') openArtist(id)
+  function open(entry) {
+    if (!entry) return
+    if (entry.id === LIKED_ID) setTab('songs')
+    else if (entry.id === REPEAT_ID) playSongs(repeat, repeat[0].id)
+    else if (entry.kind === 'playlist') openPlaylist(entry.id)
+    else if (entry.kind === 'album') openAlbum(entry.id)
+    else if (entry.kind === 'artist') openArtist(entry.id)
   }
 
-  const playlistItems = [...library.pinned, ...library.playlists]
+  const playlistEntries = [...library.pinned, ...library.playlists]
   const sections = [
-    { items: playlistItems, key: 'playlists', title: 'Playlists' },
-    { items: library.albums, key: 'albums', title: 'Álbumes' },
-    { items: library.artists, key: 'artists', title: 'Artistas' },
-    { items: library.uploads, key: 'uploads', title: 'Subidos' },
+    { entries: playlistEntries, key: 'playlists', title: 'Playlists' },
+    { entries: library.albums, key: 'albums', title: 'Álbumes' },
+    { entries: library.artists, key: 'artists', title: 'Artistas', variant: 'artist' },
+    { entries: library.uploads, key: 'uploads', title: 'Subidos' },
   ]
-  const everything = { items: [...playlistItems, ...library.albums, ...library.artists, ...library.uploads], key: 'all', title: 'Biblioteca' }
+  const everything = { entries: [...playlistEntries, ...library.albums, ...library.artists, ...library.uploads], key: 'all', title: 'Biblioteca' }
   const visibleSections = activeTab === 'all' ? [everything] : sections.filter((section) => section.key === activeTab)
-  const nothingFound = searchable && visibleSections.every((section) => section.items.length === 0)
+  const nothingFound = searchable && visibleSections.every((section) => section.entries.length === 0)
+  const size = CARD_SIZES[layout.cardSize] ?? CARD_SIZES.medium
 
   return (
-    <div className="home-page lib-page">
+    <div className="home-page lib-page" style={{ '--shelf-card': size.css, '--shelf-card-min': `${size.min}px` }}>
       <h1 className="lib-page__title">Biblioteca</h1>
 
       <div className="lib-page__row">
@@ -132,7 +168,15 @@ export default function LibraryView({ controller, data, renderSongs }) {
       {activeTab === 'downloads' && renderSongs(downloaded, 'Descargas')}
 
       {visibleSections.map((section) => (
-        <ProgressiveGrid depthKey={query ? null : section.key} items={section.items} key={`${section.key}-${query}-${sortAZ}`} onSelect={open} title={section.title} variant={section.variant} />
+        <ProgressiveGrid
+          controller={controller}
+          depthKey={query ? null : section.key}
+          entries={section.entries}
+          key={`${section.key}-${query}-${sortAZ}`}
+          onOpen={open}
+          title={section.title}
+          variant={section.variant}
+        />
       ))}
 
       {nothingFound && (

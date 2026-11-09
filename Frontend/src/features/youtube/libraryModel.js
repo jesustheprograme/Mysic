@@ -20,33 +20,25 @@ export function thumb(url, size = 360) {
 }
 
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`
-
-/** Quita el prefijo de tipo de un id de tarjeta ("pl:abc" -> { kind: 'pl', id: 'abc' }). */
-export function parseLibraryId(value) {
-  if (value === LIKED_ID || value === REPEAT_ID) return { kind: value, id: value }
-  const index = value.indexOf(':')
-  return { kind: value.slice(0, index), id: value.slice(index + 1) }
-}
+const labelOf = (entry) => entry.title ?? entry.name ?? ''
 
 const uniqueById = (items) => {
   const seen = new Set()
   return items.filter((item) => item.id && !seen.has(item.id) && seen.add(item.id))
 }
 
+// Las entradas tienen la misma forma que los elementos de las secciones del inicio ({ kind, id, title, thumbnail, ... }),
+// así las tarjetas, menús y precargas son exactamente los del inicio (adaptBrowseItem + HomeRail + CardMenu).
+const toAlbum = (album) => ({ kind: 'album', id: album.id, title: album.title, thumbnail: thumb(album.thumbnail), artist: album.artist, artistId: album.artistId, year: album.year })
+const toArtist = (artist) => ({ kind: 'artist', id: artist.id, name: artist.name ?? artist.title, thumbnail: thumb(artist.thumbnail), subtitle: artist.subtitle ?? 'Artista' })
+
 /** Álbumes: los que entrega el servidor (biblioteca real de la cuenta) o, si no los hay, los deducidos de los Me gusta. */
 function collectAlbums(data) {
-  if (Array.isArray(data.albums) && data.albums.length) {
-    return uniqueById(data.albums.map((album) => ({
-      id: album.id,
-      title: album.title,
-      artwork: thumb(album.thumbnail),
-      meta: [album.artist, album.year].filter(Boolean).join(' · ') || 'Álbum',
-    }))).map((album) => ({ ...album, id: `al:${album.id}` }))
-  }
+  if (Array.isArray(data.albums) && data.albums.length) return uniqueById(data.albums.map(toAlbum))
   const albums = new Map()
   ;(data.likedSongs ?? []).forEach((song) => {
     if (song.albumId && song.album && !albums.has(song.albumId)) {
-      albums.set(song.albumId, { id: `al:${song.albumId}`, title: song.album, artwork: thumb(song.thumbnail), meta: song.artist ?? 'Álbum' })
+      albums.set(song.albumId, toAlbum({ id: song.albumId, title: song.album, thumbnail: song.thumbnail, artist: song.artist, artistId: song.artistId }))
     }
   })
   return [...albums.values()]
@@ -55,54 +47,44 @@ function collectAlbums(data) {
 /** Artistas: biblioteca y suscripciones del servidor o, si no los hay, los deducidos de los Me gusta. */
 function collectArtists(data) {
   const fromServer = [...(data.artists ?? []), ...(data.subscriptions ?? [])]
-  if (fromServer.length) {
-    return uniqueById(fromServer.map((artist) => ({
-      id: artist.id,
-      title: artist.name ?? artist.title,
-      artwork: thumb(artist.thumbnail),
-      meta: artist.subtitle ?? 'Artista',
-    }))).map((artist) => ({ ...artist, id: `ar:${artist.id}` }))
-  }
+  if (fromServer.length) return uniqueById(fromServer.map(toArtist))
   const artists = new Map()
   ;(data.likedSongs ?? []).forEach((song) => {
     if (!song.artistId) return
     const current = artists.get(song.artistId)
     if (current) current.count += 1
-    else artists.set(song.artistId, { id: `ar:${song.artistId}`, title: song.artist, artwork: thumb(song.thumbnail), count: 1 })
+    else artists.set(song.artistId, { ...toArtist({ id: song.artistId, name: song.artist, thumbnail: song.thumbnail }), count: 1 })
   })
-  return [...artists.values()].map(({ count, ...artist }) => ({ ...artist, meta: plural(count, 'canción', 'canciones') }))
+  return [...artists.values()].map(({ count, ...artist }) => ({ ...artist, subtitle: plural(count, 'canción', 'canciones') }))
 }
 
 /**
- * Tarjetas de la biblioteca con la forma de HomeRail ({ id, title, artwork, meta }). Usa los álbumes, artistas,
- * suscripciones y subidos que entregue el servidor y, mientras no existan, deduce álbumes y artistas de los Me gusta.
- * `repeat` son las canciones más reproducidas ("En repetición").
+ * Entradas de la biblioteca por tipo, con la forma de los elementos de las secciones del inicio. Usa los álbumes,
+ * artistas, suscripciones y subidos del servidor y, mientras no existan, deduce álbumes y artistas de los Me gusta.
+ * `repeat` son las canciones más reproducidas ("En repetición"); las dos tarjetas especiales llevan kind 'special'.
  */
 export function buildLibrary(data, { query = '', repeat = [], sort = 'recent' } = {}) {
   const likedSongs = data.likedSongs ?? []
   const playlists = (data.playlists ?? []).filter((playlist) => !isYoutubeLikedList(playlist))
   const needle = query.trim().toLocaleLowerCase()
-  const keep = (item) => !needle || `${item.title} ${item.meta ?? ''}`.toLocaleLowerCase().includes(needle)
-  const order = (items) => (sort === 'az' ? [...items].sort((a, b) => a.title.localeCompare(b.title)) : items)
+  const keep = (entry) => !needle || `${labelOf(entry)} ${entry.artist ?? entry.subtitle ?? ''}`.toLocaleLowerCase().includes(needle)
+  const order = (entries) => (sort === 'az' ? [...entries].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) : entries)
 
   const allAlbums = collectAlbums(data)
   const allArtists = collectArtists(data)
-  const allUploads = uniqueById((data.uploads ?? []).map((album) => ({
-    id: album.id, title: album.title, artwork: thumb(album.thumbnail), meta: album.artist ?? 'Subido',
-  }))).map((album) => ({ ...album, id: `al:${album.id}` }))
+  const allUploads = uniqueById((data.uploads ?? []).map(toAlbum))
 
-  const liked = { id: LIKED_ID, title: 'Música que me gusta', artwork: thumb(likedSongs[0]?.thumbnail), meta: plural(likedSongs.length, 'canción', 'canciones') }
+  const liked = { kind: 'special', id: LIKED_ID, title: 'Música que me gusta', thumbnail: thumb(likedSongs[0]?.thumbnail), subtitle: plural(likedSongs.length, 'canción', 'canciones') }
   const onRepeat = repeat.length
-    ? { id: REPEAT_ID, title: 'En repetición', artwork: thumb(repeat[0].thumbnail), meta: plural(repeat.length, 'canción', 'canciones') }
+    ? { kind: 'special', id: REPEAT_ID, title: 'En repetición', thumbnail: thumb(repeat[0].thumbnail), subtitle: plural(repeat.length, 'canción', 'canciones') }
     : null
-  const pinned = [onRepeat, liked].filter((item) => item && (!needle || keep(item)))
 
   return {
     albums: order(allAlbums.filter(keep)),
     artists: order(allArtists.filter(keep)),
-    pinned,
+    pinned: [onRepeat, liked].filter((entry) => entry && keep(entry)),
     playlists: order(playlists.map((playlist) => ({
-      id: `pl:${playlist.id}`, title: playlist.title, artwork: thumb(playlist.thumbnail), meta: plural(playlist.itemCount ?? 0, 'canción', 'canciones'),
+      kind: 'playlist', id: playlist.id, title: playlist.title, thumbnail: thumb(playlist.thumbnail), subtitle: plural(playlist.itemCount ?? 0, 'canción', 'canciones'),
     })).filter(keep)),
     totals: { albums: allAlbums.length, artists: allArtists.length, playlists: playlists.length, uploads: allUploads.length },
     uploads: order(allUploads.filter(keep)),
