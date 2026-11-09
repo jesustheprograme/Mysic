@@ -26,3 +26,6 @@ atlas-credentials*.env
 *.njsproj
 *.sln
 *.sw?
+
+# Salida de npm run smoke:render
+.smoke-out

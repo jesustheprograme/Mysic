@@ -1,0 +1,4 @@
+const store = new Map()
+globalThis.localStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) }
+globalThis.window = { localStorage: globalThis.localStorage, addEventListener() {}, removeEventListener() {}, dispatchEvent() {}, location: { origin: 'http://localhost', hash: '' }, matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }) }
+globalThis.document = { querySelector: () => null, addEventListener() {}, removeEventListener() {}, createElement: () => ({ getContext: () => null, style: {} }), hidden: false, head: { appendChild() {} } }

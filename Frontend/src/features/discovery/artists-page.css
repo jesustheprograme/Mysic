@@ -114,3 +114,4 @@
 .app-sidebar--collapsed .app-sidebar__group-toggle { grid-template-columns: 1fr; justify-items: center; padding: 0; }
 .app-sidebar--collapsed .app-sidebar__group-toggle span, .app-sidebar--collapsed .app-sidebar__group-chevron { display: none; }
 .app-sidebar--collapsed .app-sidebar__group { margin-left: 0; padding-left: 0; border-left: 0; }
+.artists-page__sentinel { height: 1px; }

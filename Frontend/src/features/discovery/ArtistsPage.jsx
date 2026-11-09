@@ -58,6 +58,42 @@ function ArtistCard({ albumCount, artist, liked, onOpen, onToggleFavorite }) {
   )
 }
 
+const GRID_BATCH = 60
+
+/** Cuadrícula que crece por tandas al acercarse al final: con cientos de artistas no se pintan todos de golpe. */
+function ArtistGrid({ albumCounts, artists, likedArtistIds, onOpen, onToggleFavorite }) {
+  const [limit, setLimit] = useState(GRID_BATCH)
+  const sentinelRef = useRef(null)
+  const hasMore = limit < artists.length
+
+  useEffect(() => {
+    const node = sentinelRef.current
+    if (!node || !hasMore) return undefined
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) setLimit((current) => current + GRID_BATCH)
+    }, { rootMargin: '900px' })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [hasMore, limit])
+
+  return (
+    <>
+      <ul className="artists-page__grid">
+        {artists.slice(0, limit).map((artist) => (
+          <ArtistCard
+            albumCount={albumCounts.get(artist.artistId) ?? 0}
+            artist={artist}
+            key={artist.id}
+            liked={Boolean(likedArtistIds?.has(artist.artistId))}
+            onOpen={onOpen}
+            onToggleFavorite={onToggleFavorite}
+          />
+        ))}
+      </ul>
+      {hasMore && <div className="artists-page__sentinel" ref={sentinelRef} aria-hidden="true" />}
+    </>
+  )
+}
 function ArtistsPage({ albumItems, artistItems, likedArtistIds, onArtistSelect, onToggleArtistFavorite }) {
   const [filter, setFilter] = useState('all')
   const [sortAZ, setSortAZ] = useState(false)
@@ -103,18 +139,14 @@ function ArtistsPage({ albumItems, artistItems, likedArtistIds, onArtistSelect, 
       </div>
 
       {visible.length ? (
-        <ul className="artists-page__grid">
-          {visible.map((artist) => (
-            <ArtistCard
-              albumCount={albumCounts.get(artist.artistId) ?? 0}
-              artist={artist}
-              key={artist.id}
-              liked={Boolean(likedArtistIds?.has(artist.artistId))}
-              onOpen={onArtistSelect}
-              onToggleFavorite={onToggleArtistFavorite}
-            />
-          ))}
-        </ul>
+        <ArtistGrid
+          albumCounts={albumCounts}
+          artists={visible}
+          key={`${filter}-${sortAZ}-${query}`}
+          likedArtistIds={likedArtistIds}
+          onOpen={onArtistSelect}
+          onToggleFavorite={onToggleArtistFavorite}
+        />
       ) : (
         <p className="collection-empty" role="status">{filter === 'liked' && !query ? 'Aún no tienes artistas favoritos.' : 'No encontramos artistas con esa búsqueda.'}</p>
       )}
