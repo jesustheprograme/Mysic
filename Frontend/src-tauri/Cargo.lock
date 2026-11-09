@@ -2104,7 +2104,7 @@ dependencies = [
 
 [[package]]
 name = "mysic"
-version = "0.1.51"
+version = "0.1.53"
 dependencies = [
  "rfd",
  "serde",

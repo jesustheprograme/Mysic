@@ -2,8 +2,9 @@
 .lib-page { display: grid; gap: 18px; align-content: start; }
 .lib-page__title { margin: 0; color: #fff; font-size: clamp(26px, 3.4vw, 34px); font-weight: 750; letter-spacing: -0.02em; }
 .lib-page__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
-.lib-page__tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
-.lib-page__tools .artists-page__search { min-width: min(240px, 100%); }
+.lib-page__tools { flex: 1 1 340px; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.lib-page__tools .artists-page__search { flex: 1 1 140px; min-width: 0; max-width: 320px; }
+.lib-page__tools .artists-page__pill { flex: none; white-space: nowrap; }
 .lib-page__bar { display: flex; }
 .lib-page__sentinel { height: 1px; }
 

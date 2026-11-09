@@ -1,14 +1,10 @@
 import { ArrowDownAZ, Play, RefreshCw, Search } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import HomeRail from '../discovery/HomeRail.jsx'
-import { SectionIcon } from './ShelfLayouts.jsx'
 import { buildLibrary, LIBRARY_TABS, LIKED_ID, parseLibraryId } from './libraryModel.js'
 import './library-view.css'
 
-// Con bibliotecas de miles de elementos no se pintan todos a la vez: el resumen enseña unos pocos por tipo
-// y la cuadrícula completa va creciendo por tandas al acercarse al final.
-const OVERVIEW_LIMIT = 24
-const GRID_BATCH = 60
+// Con bibliotecas de miles de elementos no se pintan todos a la vez: la cuadrícula va creciendo por tandas\n// al acercarse al final.\nconst GRID_BATCH = 60
 
 // La pestaña activa sobrevive al desmontaje: al volver de un álbum o artista se reabre donde estabas.
 let lastTab = 'all'
@@ -76,7 +72,8 @@ export default function LibraryView({ controller, data, renderSongs }) {
     { items: library.albums, kind: 'rail', key: 'albums', title: 'Álbumes' },
     { items: library.artists, kind: 'artists', key: 'artists', title: 'Artistas', variant: 'artist' },
   ]
-  const visibleSections = tab === 'all' ? sections.filter((section) => section.items.length) : sections.filter((section) => section.key === tab)
+  const everything = { items: [...playlistItems, ...library.albums, ...library.artists], key: 'all', title: 'Biblioteca' }
+  const visibleSections = tab === 'all' ? [everything] : sections.filter((section) => section.key === tab)
   const nothingFound = searchable && visibleSections.every((section) => section.items.length === 0)
 
   return (
@@ -124,21 +121,7 @@ export default function LibraryView({ controller, data, renderSongs }) {
       {tab === 'downloads' && renderSongs(downloaded, 'Descargas')}
 
       {visibleSections.map((section) => (
-        tab === 'all'
-          ? (
-            <HomeRail
-              headingAction={section.items.length > OVERVIEW_LIMIT
-                ? <button className="home-shelf__see-all" type="button" onClick={() => setTab(section.key)}>Ver todo ({section.items.length})</button>
-                : undefined}
-              icon={<SectionIcon kind={section.kind} />}
-              items={section.items.slice(0, OVERVIEW_LIMIT)}
-              key={section.key}
-              onSelect={open}
-              title={section.title}
-              variant={section.variant}
-            />
-          )
-          : <ProgressiveGrid items={section.items} key={`${section.key}-${query}-${sortAZ}`} onSelect={open} title={section.title} variant={section.variant} />
+        <ProgressiveGrid items={section.items} key={`${section.key}-${query}-${sortAZ}`} onSelect={open} title={section.title} variant={section.variant} />
       ))}
 
       {nothingFound && (
