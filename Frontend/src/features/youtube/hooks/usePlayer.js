@@ -2,9 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { localAudioUrl, streamUrl } from '../lib/api.js';
 import { readStorage, writeStorage } from '../lib/storage.js';
-// MYSIC-LOCAL: lógica pura de la cola, fuera de este archivo generado (ver MYSIC-LOCAL más abajo).
+// La cola y el respaldo de stream son integraciones propias de Mysic.
 import { insertIntoQueue } from '../queueOps.js';
-// MYSIC-LOCAL: respaldo de audio por el servidor cuando YouTube no permite incrustar el vídeo (ver streamFallback.js).
 import { readBlockedIds, rememberBlockedId, shouldFallbackToStream, writeBlockedIds } from '../streamFallback.js';
 
 export const PLAY_EVENT = 'yotubei:play';
@@ -32,7 +31,6 @@ function loadIframeApi() {
   });
   return iframeApiPromise;
 }
-
 export function preloadYoutubePlayer() {
   return loadIframeApi();
 }
@@ -61,7 +59,7 @@ export function usePlayer({ isDownloaded, enabled = true, onQueueEnd, onQueueSta
   const currentSong = currentIndex >= 0 ? queue[currentIndex] : null;
   const videoId = currentSong?.id;
   const isLocal = Boolean(currentSong && (currentSong.local || isDownloaded(currentSong.id)));
-  // MYSIC-LOCAL: vídeos que YouTube no deja incrustar: se reproducen como audio por /youtube/stream/:id.
+  // Los vídeos que no admiten iframe pasan a /youtube/stream/:id.
   const [blockedIds, setBlockedIds] = useState(readBlockedIds);
   const isStreamed = Boolean(videoId && !isLocal && blockedIds.includes(videoId));
   const usesAudio = isLocal || isStreamed;
@@ -91,8 +89,7 @@ export function usePlayer({ isDownloaded, enabled = true, onQueueEnd, onQueueSta
     setIsBuffering(true);
   }, []);
 
-  // MYSIC-LOCAL: añadido a mano (no existe en Yotubei). Si se regenera este archivo hay que volver a
-  // aplicarlo o llevarlo al repositorio de origen. Inserta canciones en la cola sin reiniciar la actual.
+  // Inserta canciones en la cola sin reiniciar la actual.
   const enqueue = useCallback((songs, options) => {
     const result = insertIntoQueue(queue, currentIndex, songs, options);
     if (result.queue === queue) return;
@@ -244,9 +241,11 @@ export function usePlayer({ isDownloaded, enabled = true, onQueueEnd, onQueueSta
             },
             onError: (event) => {
               youtubeCreatingRef.current = false;
-              setIsPlaying(false);
-              // MYSIC-LOCAL: si no deja incrustarlo, se pasa al audio por el servidor en vez de mostrar el error.
+              // Si el iframe lo bloquea, se pasa al audio por el servidor.
               const failedId = event.target?.getVideoData?.()?.video_id || videoIdRef.current;
+              // Un error tardío de la canción anterior no debe alterar la actual.
+              if (!failedId || failedId !== videoIdRef.current) return;
+              setIsPlaying(false);
               if (failedId && shouldFallbackToStream(event.data)) {
                 event.target?.stopVideo?.();
                 setPlayerError('');

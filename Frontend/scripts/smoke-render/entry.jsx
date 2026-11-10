@@ -6,14 +6,11 @@ import { createElement as h } from 'react'
 import LibraryView from '../../src/features/youtube/LibraryView.jsx'
 import ArtistsPage from '../../src/features/discovery/ArtistsPage.jsx'
 import StatsPage from '../../src/features/discovery/StatsPage.jsx'
+import { persistedCache } from '../../src/lib/persistedCache.js'
 import AppSidebar from '../../src/components/AppSidebar.jsx'
 import SectionRoute from '../../src/features/discovery/SectionRoute.jsx'
 import { usePlayer } from '../../src/features/youtube/hooks/usePlayer.js'
 
-// Entorno mínimo de navegador para el render del servidor.
-const store = new Map()
-globalThis.localStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) }
-globalThis.window = globalThis.window ?? { localStorage: globalThis.localStorage, addEventListener() {}, removeEventListener() {}, location: { origin: 'http://localhost' } }
 
 const results = []
 function check(name, fn) {
@@ -103,5 +100,20 @@ check('usePlayer renderiza e inicia sin streaming', () => {
   return out
 })
 
+const activeLabel = (html) => html.match(/aria-current="page"[^>]*>(?:(?!<\/button>)[\s\S])*?<span>([^<]+)<\/span>/)?.[1]
+check('AppSidebar resalta Biblioteca cuando se está en la Biblioteca', () => {
+  const base = { activeSection: 'youtube', collapsed: false, onNavigate() {}, onYoutubeNavigate() {}, playlists: [], canImportMusic: false }
+  const seen = {}
+  for (const view of ['home', 'explore', 'library']) seen[view] = activeLabel(renderToString(h(AppSidebar, { ...base, youtubeView: view })))
+  if (seen.home !== 'Inicio' || seen.explore !== 'Explorar' || seen.library !== 'Biblioteca') throw new Error(`resaltado incorrecto ${JSON.stringify(seen)}`)
+  return seen
+})
+check('Estadísticas sin catálogo del servidor usa la biblioteca de YouTube guardada', () => {
+  persistedCache.write('youtube-library', { likedSongs: likedSongs.slice(0, 50), playlists, albums: [], artists: [] })
+  const html = renderToString(h(StatsPage, { albumItems: [], artistItems: [], likedSongIds: new Set(), onArtistSelect() {}, songs: [] }))
+  if (!html.includes('biblioteca de YouTube Music')) throw new Error('no cambió a la biblioteca de YouTube')
+  if (!html.includes('>50<')) throw new Error(`no muestra los 50 Me gusta guardados: ${html.slice(html.indexOf('stats-page__cards'), html.indexOf('stats-page__cards') + 420)}`)
+  return { bytes: html.length }
+})
 console.log(JSON.stringify(results, null, 1))
 process.exitCode = results.every((r) => r.ok) ? 0 : 1

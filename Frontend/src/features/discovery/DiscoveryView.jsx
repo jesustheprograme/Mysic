@@ -28,6 +28,7 @@ import { useDownloads } from '../youtube/hooks/useDownloads.js'
 import { useYoutubeFavorites } from '../youtube/hooks/useYoutubeFavorites.js'
 import { adaptSong } from '../youtube/lib/adapters.js'
 import { recordPlayInStorage } from '../youtube/playHistory.js'
+import { sidebarViewFor } from './utilidades/sidebarView.js'
 
 const MusicImportView = lazy(() => import('../music-import/MusicImportView.jsx'))
 const NewArtistSpotlight = lazy(() => import('./NewArtistSpotlight.jsx'))
@@ -719,7 +720,7 @@ function useDiscoveryPage({
   })
 
   useEffect(() => {
-    const onView = (event) => setYoutubeViewKind(event.detail?.kind ?? 'home')
+    const onView = (event) => setYoutubeViewKind((previous) => sidebarViewFor(event.detail?.kind, previous))
     window.addEventListener('mysic:youtube-view', onView)
     return () => window.removeEventListener('mysic:youtube-view', onView)
   }, [])
