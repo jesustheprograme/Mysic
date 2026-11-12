@@ -1,6 +1,6 @@
 [package]
 name = "mysic"
-version = "0.1.63"
+version = "0.1.85"
 description = "Mysic desktop music player"
 authors = ["Mysic"]
 edition = "2021"
@@ -17,11 +17,13 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = [] }
 rfd = "0.12"
+# Resolución del audio en el equipo del usuario (src/resolver.rs). TLS nativo de Windows: sin herramientas de C extra.
+reqwest = { version = "0.12", default-features = false, features = ["native-tls", "gzip", "json"] }
 tauri-plugin-oauth = "2"
 tauri-plugin-opener = "2"
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_System_Com", "Win32_System_Registry", "Win32_UI_Controls", "Win32_UI_HiDpi", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 [profile.dev]
 debug = 0

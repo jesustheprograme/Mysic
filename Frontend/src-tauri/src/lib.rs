@@ -4,6 +4,8 @@ use std::process::Command;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 mod local_audio;
+mod resolver;
+mod taskbar;
 mod youtube_session;
 
 fn automa_mysic_dir() -> PathBuf {
@@ -283,11 +285,17 @@ pub fn run() {
         .setup(|app| {
             let dir = app.path().app_local_data_dir()?.join("audio");
             app.manage(local_audio::LocalAudio::open(dir));
+            app.manage(std::sync::Arc::new(resolver::Resolver::new()));
             Ok(())
         })
         .register_asynchronous_uri_scheme_protocol(local_audio::SCHEME, |context, request, responder| {
             let audio = context.app_handle().state::<local_audio::LocalAudio>().inner().clone();
             tauri::async_runtime::spawn_blocking(move || responder.respond(local_audio::respond(&audio, &request)));
+        })
+        // Audio de YouTube resuelto en este equipo y servido por tramos (ver resolver.rs).
+        .register_asynchronous_uri_scheme_protocol(resolver::SCHEME, |context, request, responder| {
+            let resolver = context.app_handle().state::<std::sync::Arc<resolver::Resolver>>().inner().clone();
+            tauri::async_runtime::spawn(async move { responder.respond(resolver::respond(&resolver, request).await) });
         })
         .invoke_handler(tauri::generate_handler![
             local_audio::local_audio_list,
@@ -310,6 +318,11 @@ pub fn run() {
             apply_music_import,
             open_mini_player,
             set_mini_player_bounds,
+            taskbar::set_taskbar_playback,
+            resolver::resolve_audio,
+            resolver::set_client_config,
+            resolver::warm_resolver,
+            resolver::forget_audio,
             youtube_session::open_youtube_music_login,
         ])
         .run(tauri::generate_context!())
