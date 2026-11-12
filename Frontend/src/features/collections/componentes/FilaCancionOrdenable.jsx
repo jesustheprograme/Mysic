@@ -3,6 +3,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, ListPlus } from 'lucide-react'
 import HeartToggle from '../../../components/HeartToggle.jsx'
 import PreviewIndicator from '../../../components/PreviewIndicator.jsx'
+import { sizedImage } from '../../../lib/imageSize.js'
 
 function formatDuration(seconds) {
   const minutes = Math.floor(seconds / 60)
@@ -17,7 +18,7 @@ function formatTrackNumber(song, index, displayTrackNumber) {
 function TrackPlaybackButton({ displayTrackNumber, index, isPlaying, isSelected, onToggle, song, withArtwork }) {
   const label = isPlaying ? `Pausar ${song.title}` : `Reproducir ${song.title}`
   const content = withArtwork
-    ? <img src={song.artwork} alt="" loading="lazy" />
+    ? <img src={sizedImage(song.artwork, 44)} alt="" width="44" height="44" loading="lazy" decoding="async" />
     : <span className="collection-detail__track-number" aria-hidden="true">{formatTrackNumber(song, index, displayTrackNumber)}</span>
 
   return (
@@ -86,6 +87,7 @@ export default function FilaCancionOrdenable({
   onAlbumSelect,
   onArtistSelect,
   onPlaybackToggle,
+  onSongIntent,
   onSongSelect,
   onToggleFavorite,
   nodeRef,
@@ -142,6 +144,9 @@ export default function FilaCancionOrdenable({
   return (
     <li
         className={className}
+        onFocusCapture={() => onSongIntent?.(song)}
+        onPointerDown={() => onSongIntent?.(song)}
+        onPointerEnter={() => onSongIntent?.(song)}
         ref={(node) => {
         setNodeRef(node)
           if (nodeRef) nodeRef.current = node

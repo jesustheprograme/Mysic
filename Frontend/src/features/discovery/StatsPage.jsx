@@ -1,15 +1,14 @@
 import { useMemo } from 'react'
 import { persistedCache } from '../../lib/persistedCache.js'
-import { LIBRARY_CACHE_KEY } from '../youtube/libraryCache.js'
 import { buildStats } from './statsModel.js'
 import './artists-page.css'
 
 /** Resumen de tu música. Usa el catálogo del servidor y, si no lo hay, la biblioteca de YouTube guardada en el equipo. */
-function StatsPage({ albumItems, artistItems, likedSongIds, onArtistSelect, songs }) {
+function StatsPage({ albumItems, artistItems, likedSongIds, onArtistSelect, songs, youtubeLibraryKey }) {
   const stats = useMemo(() => {
-    const youtube = songs.length ? null : persistedCache.read(LIBRARY_CACHE_KEY)
+    const youtube = songs.length || !youtubeLibraryKey ? null : persistedCache.read(youtubeLibraryKey)
     return buildStats({ albumItems, artistItems, likedSongIds, songs, youtube })
-  }, [albumItems, artistItems, likedSongIds, songs])
+  }, [albumItems, artistItems, likedSongIds, songs, youtubeLibraryKey])
   const maxCount = stats.top[0]?.songCount || 1
   const canOpen = stats.source === 'server'
 

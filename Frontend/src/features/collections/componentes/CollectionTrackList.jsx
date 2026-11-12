@@ -11,7 +11,7 @@ const dragModifiers = [restrictToFirstScrollableAncestor, restrictToVerticalAxis
 
 export default function CollectionTrackList({
   activeTrackRef, albumTrackNumbers, emptyState, likedSongIds, metricsRef, onAddToPlaylist, onAlbumSelect, onArtistSelect,
-  onMoveSong, onPlaybackToggle, onSongSelect, onToggleFavorite, renderTrackActions, selectedSongAlbumId,
+  onMoveSong, onPlaybackToggle, onSongIntent, onSongSelect, onToggleFavorite, renderTrackActions, selectedSongAlbumId,
   selectedSongId, selectedSongPlaying, selectedSongSource, showsDiscHeadings, showsTrackArtwork, songs, trackGroups, tracksRef,
 }) {
   const sensors = useSensors(
@@ -57,6 +57,7 @@ export default function CollectionTrackList({
         onAlbumSelect={onAlbumSelect}
         onArtistSelect={onArtistSelect}
         onPlaybackToggle={onPlaybackToggle}
+        onSongIntent={onSongIntent}
         onSongSelect={(songId) => onSongSelect(songId, { contextSong: song, contextSongs: songs })}
         onToggleFavorite={onToggleFavorite}
         nodeRef={selected ? activeTrackRef : null}

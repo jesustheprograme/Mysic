@@ -52,7 +52,6 @@
   background: rgba(20, 24, 23, 0.98);
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.38);
   transition: height 180ms cubic-bezier(0.32, 0.72, 0, 1);
-  will-change: height;
 }
 
 .mini-player--surface-open .mini-player__surface {
@@ -522,8 +521,53 @@
   display: none;
 }
 
+/* La ventana del mini reproductor no carga los estilos generales del buscador: aquí va todo lo que necesita. */
+.mini-player__catalog-search .favorites-search {
+  display: block;
+}
+
 .mini-player__catalog-search .favorites-search__field {
   min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  color: #76817e;
+  background: rgba(255, 255, 255, 0.035);
+  cursor: text;
+}
+
+.mini-player__catalog-search .favorites-search__field:focus-within {
+  border-color: rgba(167, 139, 250, 0.55);
+  color: #b8a5f7;
+}
+
+.mini-player__catalog-search .favorites-search__field svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+}
+
+.mini-player__catalog-search .favorites-search input {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  color: #e8eae6;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+}
+
+.mini-player__catalog-search .favorites-search input::placeholder {
+  color: #68736f;
+}
+
+.mini-player__catalog-search .favorites-search input:focus-visible {
+  outline: none;
 }
 
 .mini-player__catalog-results {

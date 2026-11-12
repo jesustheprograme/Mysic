@@ -1,9 +1,10 @@
+import { sizedImage } from '../../lib/imageSize.js'
+
 export const LIBRARY_TABS = [
   { id: 'all', label: 'Todo' },
   { id: 'playlists', label: 'Playlists' },
   { id: 'albums', label: 'Álbumes' },
   { id: 'artists', label: 'Artistas' },
-  { id: 'songs', label: 'Canciones' },
   { id: 'uploads', label: 'Subidos' },
   { id: 'downloads', label: 'Descargas' },
 ]
@@ -11,12 +12,14 @@ export const LIBRARY_TABS = [
 export const LIKED_ID = 'liked'
 export const REPEAT_ID = 'repeat'
 // YouTube devuelve su lista de Me gusta como una playlist más (id LM); aquí ya está como "Música que me gusta".
-const isYoutubeLikedList = (playlist) => /^(VL)?LM$/.test(playlist.id)
+export const isYoutubeLikedList = (playlist) => /^(VL)?LM$/.test(playlist.id)
 
-/** Pide la imagen al tamaño de su hueco (hosts de Google aceptan =wN-hN / =sN): evita decodificar 544px para una tarjeta de 150. */
-export function thumb(url, size = 360) {
-  if (typeof url !== 'string') return url
-  return url.replace(/=w\d+-h\d+/, `=w${size}-h${size}`).replace(/=s\d+/, `=s${size}`)
+/** Lado nominal (px CSS) de una tarjeta de la biblioteca: pide 240 px a densidad 1–1,25 y 360 px a partir de 1,5. */
+export const LIBRARY_CARD_PX = 180
+
+/** Pide la imagen al tamaño de su hueco (px CSS × densidad de pantalla, por escalones): evita decodificar 544px para una tarjeta de 150. */
+export function thumb(url, cssPx = LIBRARY_CARD_PX) {
+  return sizedImage(url, cssPx)
 }
 
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`

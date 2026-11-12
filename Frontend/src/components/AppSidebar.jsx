@@ -26,6 +26,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { getPlaylistTrackCount } from '../features/playlists/playlistTracks.js'
+import { countText, EMPTY_LIBRARY_SUMMARY } from '../features/youtube/librarySummary.js'
+import { sizedImage } from '../lib/imageSize.js'
 import { readStorage, writeStorage } from '../lib/storage.js'
 
 // Opciones principales: Inicio es la portada de YouTube Music; todo el catálogo propio de Mysic
@@ -69,6 +71,9 @@ function AppSidebar({
   onMobileClose,
   onYoutubeNavigate,
   playlists = [],
+  // Playlists y Me gusta de la cuenta de YouTube Music (se vinculan solos) y cuál de ellos está abierto.
+  youtubeActive = null,
+  youtubeLibrary = EMPTY_LIBRARY_SUMMARY,
   youtubeView = 'home',
 }) {
   const inMysicGroup = MYSIC_SECTIONS.includes(activeSection)
@@ -85,6 +90,8 @@ function AppSidebar({
   function isItemActive({ id, youtubeView: view }) {
     if (view) {
       if (activeSection !== 'youtube') return false
+      // Con una playlist o los Me gusta abiertos, se resalta esa entrada y no la sección desde la que se llegó.
+      if (youtubeActive) return false
       const current = youtubeView === 'explore' || youtubeView === 'library' ? youtubeView : 'home'
       return current === view
     }
@@ -169,6 +176,35 @@ function AppSidebar({
               <Plus size={17} strokeWidth={1.8} aria-hidden="true" />
             </button>
           </div>
+          {youtubeLibrary.liked && (
+            <div className={`app-sidebar__playlist${activeSection === 'youtube' && youtubeActive?.type === 'liked' ? ' app-sidebar__playlist--active' : ''}`}>
+              <button className="app-sidebar__playlist-main" type="button" onClick={() => onYoutubeNavigate?.({ type: 'liked' })}>
+                <span className="app-sidebar__playlist-art app-sidebar__playlist-art--liked" aria-hidden="true"><Heart size={16} fill="currentColor" strokeWidth={1.6} /></span>
+                <span className="app-sidebar__playlist-copy">
+                  <strong>Música que me gusta</strong>
+                  <small>{countText(youtubeLibrary.liked.count, youtubeLibrary.liked.hasMore)}</small>
+                </span>
+              </button>
+            </div>
+          )}
+          {youtubeLibrary.playlists.map((playlist) => (
+            <div
+              className={`app-sidebar__playlist${activeSection === 'youtube' && youtubeActive?.type === 'playlist' && youtubeActive.id === playlist.id ? ' app-sidebar__playlist--active' : ''}`}
+              key={`yt-${playlist.id}`}
+            >
+              <button className="app-sidebar__playlist-main" type="button" title={playlist.title} onClick={() => onYoutubeNavigate?.({ id: playlist.id, type: 'playlist' })}>
+                {playlist.thumbnail ? (
+                  <img loading="lazy" decoding="async" className="app-sidebar__playlist-art" src={sizedImage(playlist.thumbnail, 34)} alt="" width="34" height="34" />
+                ) : (
+                  <span className="app-sidebar__playlist-art" aria-hidden="true" />
+                )}
+                <span className="app-sidebar__playlist-copy">
+                  <strong>{playlist.title}</strong>
+                  <small>{countText(playlist.count)}</small>
+                </span>
+              </button>
+            </div>
+          ))}
           {playlists.map((playlist) => (
               <div
                 className={`app-sidebar__playlist${activePlaylistId === playlist.id ? ' app-sidebar__playlist--active' : ''}`}
@@ -180,7 +216,7 @@ function AppSidebar({
                   onClick={() => onOpenPlaylist(playlist.id)}
                 >
                   {playlist.artwork ? (
-                    <img loading="lazy" decoding="async" className="app-sidebar__playlist-art" src={playlist.artwork} alt="" />
+                    <img loading="lazy" decoding="async" className="app-sidebar__playlist-art" src={sizedImage(playlist.artwork, 34)} alt="" width="34" height="34" />
                   ) : (
                     <span className="app-sidebar__playlist-art" aria-hidden="true" />
                   )}

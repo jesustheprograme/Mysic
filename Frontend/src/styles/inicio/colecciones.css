@@ -166,7 +166,6 @@
   border-radius: 999px;
   background: rgba(10, 13, 13, 0.52);
   box-shadow: 0 11px 28px rgba(0, 0, 0, 0.15);
-  backdrop-filter: blur(12px);
 }
 
 .playlist-page--reference .playlist-page__tab {
@@ -201,7 +200,6 @@
   border-radius: 15px;
   background: rgba(10, 14, 13, 0.46);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.12);
-  backdrop-filter: blur(12px);
 }
 
 .playlist-page--reference .playlist-table__header,
@@ -320,7 +318,6 @@
   color: #909a96;
   text-align: center;
   background: rgba(10, 14, 13, 0.46);
-  backdrop-filter: blur(12px);
 }
 
 @media (max-width: 900px) {
@@ -530,7 +527,6 @@
   margin-top: -22px;
   background: rgba(13, 16, 16, 0.28);
   box-shadow: none;
-  backdrop-filter: blur(8px);
 }
 
 .playlist-page--reference .playlist-table__header,
@@ -908,8 +904,8 @@
   place-items: center;
   border-radius: 50%;
   color: #bec5c2;
+  /* Sin desenfoque: va sobre una cabecera ya difuminada y oscurecida. */
   background: rgba(255, 255, 255, 0.045);
-  backdrop-filter: blur(10px);
   transition: color 160ms ease, background-color 160ms ease, transform 160ms ease;
 }
 
@@ -1178,8 +1174,8 @@
   border-radius: 6px;
   color: #929a97;
   outline: 1px solid transparent;
+  /* Sin will-change: una capa de GPU permanente por fila multiplicaba la memoria en listas largas. */
   scale: 1;
-  will-change: transform;
   transition:
     color 180ms ease,
     background-color 220ms ease,
@@ -1760,30 +1756,31 @@
     opacity 1.45s cubic-bezier(0.22, 1, 0.36, 1),
     transform 1.8s cubic-bezier(0.22, 1, 0.36, 1),
     filter 1.45s ease;
-  will-change: opacity, transform;
+  /* Sin will-change ni translate3d: cada retrato oculto retenía una capa de GPU del tamaño del
+     panel. El navegador ya promueve la capa mientras dura la transición. */
 }
 
 .artist-profile__portrait--left {
-  transform: translate3d(-42px, 0, 0) scale(1.035);
+  transform: translate(-42px, 0) scale(1.035);
 }
 
 .artist-profile__portrait--right {
-  transform: translate3d(42px, 0, 0) scale(1.035);
+  transform: translate(42px, 0) scale(1.035);
 }
 
 .artist-profile__portrait--up {
-  transform: translate3d(0, -42px, 0) scale(1.035);
+  transform: translate(0, -42px) scale(1.035);
 }
 
 .artist-profile__portrait--down {
-  transform: translate3d(0, 42px, 0) scale(1.035);
+  transform: translate(0, 42px) scale(1.035);
 }
 
 .artist-profile__portrait--active {
   z-index: 1;
   opacity: 1;
   filter: saturate(0.94) contrast(1.02) brightness(0.9);
-  transform: translate3d(0, 0, 0) scale(1);
+  transform: translate(0, 0) scale(1);
 }
 
 .artist-profile__shade {
@@ -1851,7 +1848,6 @@
   border: 1px solid rgba(255, 255, 255, 0.14);
   color: #e4e9e6;
   background: rgba(255, 255, 255, 0.07);
-  backdrop-filter: blur(12px);
 }
 
 .artist-profile__play svg,
@@ -1895,7 +1891,6 @@
   overflow: hidden;
   background: transparent;
   transition: height 380ms cubic-bezier(0.22, 1, 0.36, 1), transform 160ms ease;
-  will-change: height;
 }
 
 .artist-profile__portrait-progress-item::before {
@@ -2477,9 +2472,9 @@
     width: 44px;
     height: 44px;
     color: #fff;
-    background: rgba(5, 6, 6, 0.5);
+    /* Más opaco en lugar de desenfocar lo que hay detrás. */
+    background: rgba(5, 6, 6, 0.64);
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(16px);
   }
 
   .collection-detail__summary {
@@ -2501,9 +2496,8 @@
     justify-content: flex-end;
     padding: 5px 9px;
     color: #fff;
-    background: rgba(5, 6, 6, 0.48);
+    background: rgba(5, 6, 6, 0.64);
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(16px);
   }
 
   .collection-detail__creator img {
@@ -2810,7 +2804,6 @@
     width: 18px;
     height: 3px;
     transition: width 380ms cubic-bezier(0.22, 1, 0.36, 1), transform 160ms ease;
-    will-change: width;
   }
 
   .artist-profile__portrait-progress-item.is-active {
@@ -2944,8 +2937,8 @@
 /* Compact playlist editor using the same neutral palette as the application. */
 .playlist-editor-modal.playlist-modal {
   padding: 24px;
-  background: rgba(6, 9, 8, 0.78);
-  backdrop-filter: blur(15px) saturate(0.72);
+  /* Velo plano y más opaco: un desenfoque a ventana completa se recalcula en cada fotograma. */
+  background: rgba(6, 9, 8, 0.86);
 }
 
 .playlist-editor-modal .playlist-modal__panel {
@@ -3314,8 +3307,7 @@
 
 .playlist-delete-modal.playlist-modal {
   padding: 18px;
-  background: rgba(6, 9, 8, 0.7);
-  backdrop-filter: blur(10px) saturate(0.78);
+  background: rgba(6, 9, 8, 0.82);
 }
 
 .playlist-delete-modal__panel {

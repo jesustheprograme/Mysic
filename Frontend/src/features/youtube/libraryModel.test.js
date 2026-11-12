@@ -26,11 +26,20 @@ test('filtra por texto y ordena de la A a la Z', () => {
   assert.equal(filtered.pinned.length, 0)
 })
 
+// Sin ventana (Node) la densidad es 1: la tarjeta nominal de 180 px pide el escalón de 240.
 test('thumb reescribe el tamaño de las imagenes de Google y respeta el resto', () => {
-  assert.equal(thumb('https://lh3.googleusercontent.com/x=w544-h544-l90-rj'), 'https://lh3.googleusercontent.com/x=w360-h360-l90-rj')
-  assert.equal(thumb('https://yt3.ggpht.com/y=s900-c-k'), 'https://yt3.ggpht.com/y=s360-c-k')
+  assert.equal(thumb('https://lh3.googleusercontent.com/x=w544-h544-l90-rj'), 'https://lh3.googleusercontent.com/x=w240-h240-l90-rj')
+  assert.equal(thumb('https://yt3.ggpht.com/y=s900-c-k'), 'https://yt3.ggpht.com/y=s240-c-k')
+  assert.equal(thumb('https://lh3.googleusercontent.com/x=w544-h544-l90-rj', 44), 'https://lh3.googleusercontent.com/x=w96-h96-l90-rj')
   assert.equal(thumb('https://i.ytimg.com/vi/a/hq720.jpg'), 'https://i.ytimg.com/vi/a/hq720.jpg')
+  // Una tarjeta de biblioteca es demasiado grande para mqdefault: la miniatura de vídeo se conserva.
+  assert.equal(thumb('https://i.ytimg.com/vi/dQw4w9WgXcQ/hq720.jpg'), 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hq720.jpg')
   assert.equal(thumb(undefined), undefined)
+})
+
+test('buildLibrary entrega las carátulas ya al tamaño de la tarjeta', () => {
+  const library = buildLibrary({ albums: [{ id: 'MPREb_1', title: 'Real', thumbnail: 'https://lh3.googleusercontent.com/a=w544-h544-l90-rj' }], likedSongs: [], playlists: [] })
+  assert.equal(library.albums[0].thumbnail, 'https://lh3.googleusercontent.com/a=w240-h240-l90-rj')
 })
 
 test('usa álbumes, artistas, suscripciones y subidos del servidor cuando existen', () => {

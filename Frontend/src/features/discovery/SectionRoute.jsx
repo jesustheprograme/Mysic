@@ -38,6 +38,7 @@ function SectionRoute({
   selectedSongId,
   selectedSongPlaying,
   songs,
+  youtubeLibraryKey,
 }) {
   const [songQuery, setSongQuery] = useState('')
   const [albumQuery, setAlbumQuery] = useState('')
@@ -158,6 +159,7 @@ function SectionRoute({
         likedSongIds={likedSongIds}
         onArtistSelect={onArtistSelect}
         songs={songs}
+        youtubeLibraryKey={youtubeLibraryKey}
       />
     )
   }

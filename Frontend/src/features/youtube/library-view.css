@@ -1,19 +1,58 @@
 /* Biblioteca: título, fila de pestañas + herramientas y selector de pestañas con contadores. */
 .lib-page { display: grid; gap: 18px; align-content: start; }
 .lib-page__title { margin: 0; color: #fff; font-size: clamp(26px, 3.4vw, 34px); font-weight: 750; letter-spacing: -0.02em; }
-.lib-page__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+/* Título a la izquierda y buscador, A-Z y Sincronizar a su derecha, a la altura del título. */
+.lib-page__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.lib-page__row { display: flex; flex-wrap: wrap; align-items: center; }
 .lib-page__tools { flex: 1 1 340px; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .lib-page__tools .artists-page__search { flex: 1 1 140px; min-width: 0; max-width: 320px; }
 .lib-page__tools .artists-page__pill { flex: none; white-space: nowrap; }
 .lib-page__bar { display: flex; }
-.lib-page__sentinel { height: 1px; }
 
 .lib-tabs { width: fit-content; max-width: 100%; display: flex; gap: 4px; padding: 4px; overflow-x: auto; border-radius: 999px; background: rgb(255 255 255 / 0.06); box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08); scrollbar-width: none; }
 .lib-tabs::-webkit-scrollbar { display: none; }
 .lib-tabs button { flex: none; min-height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 16px; border-radius: 999px; color: #aab2af; font-size: 13.5px; font-weight: 600; }
 .lib-tabs button:hover { color: #fff; }
 .lib-tabs button[aria-selected='true'] { color: #fff; background: rgb(255 255 255 / 0.13); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18); }
-.lib-tabs__count { min-width: 18px; padding: 1px 6px; border-radius: 999px; color: #c9d0cd; background: rgb(255 255 255 / 0.1); font-size: 11px; font-weight: 600; text-align: center; }
 
-/* Tarjetas fuera de pantalla: el navegador se salta su maquetación y pintado. */
-.lib-page .home-shelf__rail--wrap > .home-shelf-card { content-visibility: auto; contain-intrinsic-size: auto 230px; }
+/* Cuadrícula ventaneada (useVirtualGrid): solo están montadas las filas visibles; el padding del contenedor
+   ocupa el sitio del resto. Su maquetación queda aislada del resto de la página y, como el contenido de arriba
+   cambia por relleno al desplazarse, no participa en el anclaje de scroll. Los menús de tarjeta se abren en un
+   portal, así que el aislamiento no los recorta. */
+.lib-grid { min-width: 0; contain: layout style; overflow-anchor: none; }
+/* Solo recibe el foco por código (cuando la tarjeta enfocada se desmonta): sin contorno. */
+.lib-grid:focus { outline: none; }
+
+/* Filas de alto fijo (--lib-row lo pone el componente: portada + texto): la altura total no depende de qué
+   tarjetas estén montadas y la barra de scroll no salta. */
+.music-app .home-page.lib-page .lib-grid .home-shelf > .home-shelf__rail.home-shelf__rail--wrap {
+  /* Columnas y ancho de tarjeta los calcula useVirtualGrid (7 por fila; 6 con el reproductor abierto). */
+  grid-template-columns: repeat(var(--lib-cols, auto-fill), var(--lib-card-w, 148px));
+  grid-template-rows: none;
+  grid-auto-rows: var(--lib-row, auto);
+  column-gap: 18px;
+  row-gap: var(--lib-row-gap, 24px);
+}
+
+/* Pestaña Artistas: tarjetas .artist-card (artists-page.css) de ancho fijo en filas de alto fijo (3:4). */
+.lib-grid__artists {
+  display: grid;
+  grid-template-columns: repeat(var(--lib-cols, auto-fill), var(--lib-card-w, 168px));
+  grid-auto-rows: var(--lib-row, auto);
+  justify-content: center;
+  gap: var(--lib-row-gap, 24px) 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Con 6-7 tarjetas por fila el texto va más pequeño que en la página Artistas y crece o baja con el ancho de la
+   tarjeta (--lib-card-w), para que el nombre y el detalle quepan sin cortarse tan pronto. */
+.lib-grid__artists .artist-card__copy { right: 10px; left: 10px; bottom: 14px; gap: 2px; }
+.lib-grid__artists .artist-card__copy strong { font-size: clamp(12.5px, calc(var(--lib-card-w, 150px) * 0.098), 17px); line-height: 1.2; }
+.lib-grid__artists .artist-card__copy small { font-size: clamp(10px, calc(var(--lib-card-w, 150px) * 0.068), 12px); }
+/* Degradado del color de la foto a la mitad de intensidad: la portada se ve menos "nublada". */
+.lib-grid__artists .artist-card__shade { opacity: 0.5; }
+
+/* Filas de margen fuera de pantalla: el navegador se salta su maquetación y pintado. */
+.lib-page .home-shelf__rail--wrap > .home-shelf-card { content-visibility: auto; contain-intrinsic-size: auto 210px; }

@@ -1,4 +1,5 @@
 import { ChevronRight, Clock3, Disc3, Music2, Search, Trash2, UserRound } from 'lucide-react'
+import { sizedImage } from '../../lib/imageSize.js'
 import { imageUrl } from './lib/api.js'
 import './search-dropdown.css'
 
@@ -21,16 +22,20 @@ const FALLBACK_ICONS = {
   song: Music2,
 }
 
+// Lado de la miniatura según .sx-thumb--medium / --large: la imagen se pide (y el proxy la guarda) a ese tamaño.
+const THUMB_PX = { large: 72, medium: 58 }
+
 // Las filas que llevan a otra pantalla muestran chevron; las canciones muestran su duración.
 const NAVIGATES = new Set(['album', 'artist'])
 
 function Thumbnail({ row, size }) {
   const Fallback = FALLBACK_ICONS[row.kind] ?? Search
   const shape = row.kind === 'artist' ? 'round' : 'square'
+  const px = THUMB_PX[size] ?? THUMB_PX.large
   return (
     <span className={`sx-thumb sx-thumb--${shape} sx-thumb--${size}`}>
       {row.thumbnail
-        ? <img loading="lazy" decoding="async" src={imageUrl(row.thumbnail)} alt="" />
+        ? <img loading="lazy" decoding="async" src={imageUrl(sizedImage(row.thumbnail, px))} alt="" width={px} height={px} />
         : <Fallback size={size === 'large' ? 26 : 20} aria-hidden="true" />}
     </span>
   )

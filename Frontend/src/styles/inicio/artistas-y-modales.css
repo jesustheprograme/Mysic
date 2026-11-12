@@ -22,7 +22,6 @@
 .new-artist-modal {
   padding: 3.5vh 24px;
   background: rgba(0, 0, 0, 0.86);
-  backdrop-filter: blur(18px) saturate(0.35);
 }
 
 .new-artist-modal__panel {
@@ -313,8 +312,8 @@
   display: grid;
   place-items: center;
   padding: 28px;
-  background: rgba(0, 0, 0, 0.48);
-  backdrop-filter: blur(4px) saturate(0.82);
+  /* Velo plano y algo más opaco en lugar de desenfocar la ventana entera. */
+  background: rgba(0, 0, 0, 0.62);
   animation: artist-intro-fade 180ms ease-out both;
 }
 
@@ -749,10 +748,9 @@
   padding: 40px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 28px;
-  background: rgba(15, 15, 15, 0.78);
+  background: rgba(15, 15, 15, 0.9);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
   text-align: center;
-  backdrop-filter: blur(24px);
 }
 
 .artist-spotlight-demo__welcome > span {
@@ -795,8 +793,7 @@
 }
 
 .artist-intro--spotlight {
-  background: rgba(1, 3, 4, 0.7);
-  backdrop-filter: blur(7px) saturate(0.72);
+  background: rgba(1, 3, 4, 0.8);
 }
 
 .artist-intro__dialog.artist-spotlight-card {

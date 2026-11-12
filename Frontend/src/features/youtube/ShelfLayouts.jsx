@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Disc3, ListMusic, Play, RotateCcw, UserRound, UsersRound } from 'lucide-react'
 import HeartToggle from '../../components/HeartToggle.jsx'
+import { sizedImage } from '../../lib/imageSize.js'
 import { SongMenu } from './ItemMenus.jsx'
 import { adaptSong } from './lib/adapters.js'
 import './shelf-layouts.css'
@@ -46,7 +47,7 @@ export function TileShelf({ items, onSelect, selectedId, title }) {
         {items.slice(0, expanded ? TILES_COLLAPSED + TILES_PER_ROW * EXPANDED_EXTRA_ROWS : TILES_COLLAPSED).map((item) => (
           <li key={item.id}>
             <button className={`sl-tile${selectedId === item.id ? ' sl-tile--active' : ''}`} type="button" onClick={() => onSelect(item)}>
-              {item.artwork ? <img src={item.artwork} alt="" width="48" height="48" loading="lazy" decoding="async" /> : <i aria-hidden="true" />}
+              {item.artwork ? <img src={sizedImage(item.artwork, 48)} alt="" width="48" height="48" loading="lazy" decoding="async" /> : <i aria-hidden="true" />}
               <span>
                 <strong>{item.title}</strong>
                 <small>{item.artist ?? item.meta}</small>
@@ -65,10 +66,15 @@ function SongRow({ ctx, onPlay, selected, song }) {
   const adapted = adaptSong(song)
   const liked = ctx.likedSongIds.has(song.id)
   return (
-    <li className={`sl-song${selected ? ' sl-song--active' : ''}${liked ? ' sl-song--liked' : ''}`}>
+    <li
+      className={`sl-song${selected ? ' sl-song--active' : ''}${liked ? ' sl-song--liked' : ''}`}
+      onFocusCapture={() => ctx.player.warmSong(song)}
+      onPointerDown={() => ctx.player.warmSong(song)}
+      onPointerEnter={() => ctx.player.warmSong(song)}
+    >
       <div className="sl-song__main">
         <button className="sl-song__cover" type="button" aria-label={`Reproducir ${song.title}`} onClick={onPlay}>
-          {song.thumbnail ? <img src={song.thumbnail} alt="" width="44" height="44" loading="lazy" decoding="async" /> : <i aria-hidden="true" />}
+          {song.thumbnail ? <img src={sizedImage(song.thumbnail, 44)} alt="" width="44" height="44" loading="lazy" decoding="async" /> : <i aria-hidden="true" />}
         </button>
         <span className="sl-song__text">
           <strong><button type="button" title={song.title} onClick={onPlay}>{song.title}</button></strong>

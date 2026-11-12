@@ -3,6 +3,8 @@
 // Único punto de acceso al backend: rutas, URLs de medios y llamadas JSON.
 // En desarrollo las rutas son relativas y Vite las reenvía al backend (vite.config.js).
 import { API_URL } from '../../../lib/api.js';
+// Integración propia de Mysic: caché única de álbum, playlist y artista (precarga y clic comparten petición).
+import { createDetailCache } from '../detailCache.js';
 
 export const API_BASE = `${API_URL}/youtube`;
 
@@ -12,6 +14,12 @@ const warmedSearches = new Map();
 const DETAIL_CACHE_TTL_MS = 5 * 60_000;
 const DETAIL_CACHE_LIMIT = 30;
 const detailRequests = new Map();
+const STREAM_WARM_TTL_MS = 5 * 60_000;
+const STREAM_WARM_LIMIT = 30;
+const warmedStreams = new Map();
+const details = createDetailCache({ fetcher: (path) => fetchJson(path, undefined, 1) });
+export const setDetailScope = (scope) => details.setScope(scope);
+export const clearDetailScope = (scope) => details.clearScope(scope);
 
 function searchKey(q, type) {
   return `${type}:${q.trim().toLocaleLowerCase()}`;
@@ -151,6 +159,30 @@ function detail(key, path, signal) {
 export const streamUrl = (id) => `${API_BASE}/stream/${id}`;
 export const localAudioUrl = (id) => `${API_BASE}/downloads/${id}/audio`;
 
+// Resuelve y deja en la caché del backend la URL firmada de YouTube. No descarga el audio:
+// el <audio> que realmente vaya a sonar abre /stream/:id después y reutiliza la resolución.
+export function warmStream(id) {
+  if (!id) return Promise.resolve();
+  const key = String(id);
+  const now = Date.now();
+  for (const [cachedId, entry] of warmedStreams) {
+    if (now - entry.createdAt > STREAM_WARM_TTL_MS) warmedStreams.delete(cachedId);
+  }
+  let entry = warmedStreams.get(key);
+  if (!entry) {
+    const request = fetchJson(`/stream/${encodeURIComponent(key)}/info`, undefined, 0)
+      .catch((error) => {
+        warmedStreams.delete(key);
+        throw error;
+      });
+    request.catch(() => {});
+    entry = { createdAt: now, request };
+    warmedStreams.set(key, entry);
+    while (warmedStreams.size > STREAM_WARM_LIMIT) warmedStreams.delete(warmedStreams.keys().next().value);
+  }
+  return entry.request;
+}
+
 // Las carátulas remotas pasan por el proxy del backend (caché en disco y sin bloqueos del navegador).
 // Las rutas relativas (p. ej. carátulas de descargas) se dejan tal cual.
 export const imageUrl = (url) => {
@@ -173,18 +205,21 @@ export const api = {
   home: (signal) => fetchJson('/home', signal),
   explore: (signal) => fetchJson('/explore', signal),
   radio: (id, signal) => fetchJson(`/radio/${encodeURIComponent(id)}`, signal),
-  playlist: (id, signal) => fetchJson(`/playlist/${encodeURIComponent(id)}`, signal),
+  playlist: (id, signal) => details.get('playlist', id, `/playlist/${encodeURIComponent(id)}`, signal),
   recommendations: (id, signal) => fetchJson(`/recommendations/${encodeURIComponent(id)}`, signal),
   search,
   warmSearch,
   suggest: (q, signal) => detail(`suggest:${q.trim().toLocaleLowerCase()}`, `/suggest?q=${encodeURIComponent(q)}`, signal),
-  artist: (id, signal) => detail(`artist:${id}`, `/artist/${encodeURIComponent(id)}`, signal),
-  prefetchArtist: (id) => detail(`artist:${id}`, `/artist/${encodeURIComponent(id)}`).catch(() => {}),
+  artist: (id, signal) => details.get('artist', id, `/artist/${encodeURIComponent(id)}`, signal),
+  prefetchArtist: (id) => details.get('artist', id, `/artist/${encodeURIComponent(id)}`).catch(() => {}),
+  prefetchAlbum: (id) => details.get('album', id, `/album/${encodeURIComponent(id)}`).catch(() => {}),
+  prefetchPlaylist: (id) => details.get('playlist', id, `/playlist/${encodeURIComponent(id)}`).catch(() => {}),
+  warmStream,
   artistReleases: (id, signal) => detail(`artist-releases:${id}`, `/artist/${encodeURIComponent(id)}/releases`, signal),
   artistTopSongs: (id, signal) => detail(`artist-top-songs:${id}`, `/artist/${encodeURIComponent(id)}/top-songs`, signal),
   artistSongs: (id, signal) => fetchJson(`/artist/${encodeURIComponent(id)}/songs`, signal),
   artistImages: (id, signal) => fetchJson(`/artist/${id}/images`, signal),
-  album: (id, signal) => fetchJson(`/album/${encodeURIComponent(id)}`, signal),
+  album: (id, signal) => details.get('album', id, `/album/${encodeURIComponent(id)}`, signal),
   downloads: {
     list: () => fetchJson('/downloads'),
     add: (song) => send('/downloads', 'POST', { song }),

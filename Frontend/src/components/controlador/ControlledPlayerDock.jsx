@@ -4,7 +4,9 @@ import ControlledWaveform from '../reproductor/ControlledWaveform.jsx'
 import { useArtworkAccent } from '../../features/adaptive-theme/useArtworkAccent.js'
 import useAmbientAccent from '../../features/adaptive-theme/useAmbientAccent.js'
 import LyricsSection from '../../features/lyrics/LyricsSection.jsx'
+import useTaskbarControls from '../../features/taskbar/useTaskbarControls.js'
 import HeartToggle from '../HeartToggle.jsx'
+import { sizedImage } from '../../lib/imageSize.js'
 import {
   CompactNowPlaying,
   PlayerPanelContent,
@@ -15,12 +17,12 @@ import {
 
 // Reproductor del catálogo de YouTube Music: el audio lo gestiona usePlayer (externalPlayback) y
 // este componente solo lo pinta.
-function playerArtworkUrl(url) {
-  if (!url?.includes('yt3.googleusercontent.com')) return url
-  return url.replace(/=w\d+-h\d+-/, '=w544-h544-')
-}
+// La carátula del panel mide como mucho 220 px (.player-dock__artwork): se pide a ese tamaño por la
+// densidad de la pantalla (240 px a 1x, 544 px a 2x) en vez de 544 px siempre.
+const DOCK_ARTWORK_PX = 220
+const playerArtworkUrl = (url) => sizedImage(url, DOCK_ARTWORK_PX)
 
-function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = false, onClose, onNext, onOpenMiniPlayer, onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, queue, suppressed = false, track }) {
+function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = false, onAlbumSelect, onArtistSelect, onClose, onNext, onOpenMiniPlayer, onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, queue, suppressed = false, track }) {
   const [volumeExpanded, setVolumeExpanded] = useState(false)
   // Referencia estable: con una función nueva en cada tick, `memo` de PlayerQueue no serviría.
   const handleQueueSelect = useCallback((_item, index) => onQueueSelect(index), [onQueueSelect])
@@ -38,6 +40,18 @@ function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = fal
     togglePlayback,
     volume,
   } = externalPlayback
+  // Botones de la miniatura de la barra de tareas (Windows): los maneja el reproductor que tiene el control.
+  useTaskbarControls({
+    active: !suppressed,
+    canLike: Boolean(onToggleFavorite),
+    hasTrack: Boolean(track?.id),
+    isPlaying,
+    liked,
+    onNext,
+    onPrevious,
+    onToggleLike: onToggleFavorite,
+    onTogglePlayback: togglePlayback,
+  })
   const progress = duration > 0 ? Math.min((currentTime / duration) * 100, 100) : 0
   const artwork = playerArtworkUrl(track.artwork)
   const displayedTrack = artwork === track.artwork ? track : { ...track, artwork }
@@ -95,8 +109,13 @@ function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = fal
         </div>
 
         <PlayerPanelContent
+          album={track.album ?? track.albumTitle}
+          albumId={track.albumId}
           artwork={artwork}
           artist={track.artist}
+          artistId={track.artistId}
+          onAlbumSelect={onAlbumSelect}
+          onArtistSelect={onArtistSelect}
           currentTime={currentTime}
           duration={duration}
           error={error}

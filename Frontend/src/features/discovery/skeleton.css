@@ -4,6 +4,10 @@
   display: block;
   border-radius: 6px;
   background: oklch(1 0 0 / 0.07);
+}
+
+/* El pulso va en el contenedor: animar cada pieza creaba unas 40 capas de GPU a la vez; así es una. */
+.home-skeleton {
   animation: skeleton-pulse 1.6s ease-in-out infinite;
 }
 
@@ -88,7 +92,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton {
+  .home-skeleton {
     animation: none;
   }
 }

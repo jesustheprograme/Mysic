@@ -225,7 +225,10 @@
  *    perdidos) y las portadas de lista no hacen zoom al apuntar (de 46-52 % de fotogramas de
  *    más de 20 ms a 7-9 % al quitarlo).
  *  - Sin sombras largas en superficies que se desplazan.
- * Los modales, menús y chips pequeños conservan su desenfoque: son elementos únicos.
+ *  - Sin will-change permanente ni translate3d: cada uno retiene una capa de GPU aunque no se anime.
+ *  - Los velos de los modales son planos y opacos (sin backdrop-filter), y los fundidos de las
+ *    cabeceras son degradados encima de la imagen, no mask-image.
+ * No queda ningún backdrop-filter activo en la app; no lo reintroduzcas en filas ni tarjetas.
  * ========================================================================== */
 
 /* Superficies siempre visibles con fondo ya opaco: el desenfoque no aportaba nada visible. */
@@ -667,10 +670,11 @@
     inset: -60px;
     background: var(--collection-artwork) center 25% / cover no-repeat;
     filter: blur(40px) saturate(1.5) brightness(0.62) contrast(1.05);
-    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 30%, rgb(0 0 0 / 0.55) 65%, transparent 100%);
-    mask-image: linear-gradient(to bottom, #000 0%, #000 30%, rgb(0 0 0 / 0.55) 65%, transparent 100%);
   }
 
+  /* El fundido hacia la página es el último degradado (el de más abajo), no una máscara sobre la
+     capa desenfocada: una máscara añade otra superficie de GPU del tamaño de la cabecera. Las
+     paradas son las de la máscara anterior (30 %, 65 % y 100 % de una caja 60px mayor por lado). */
   .music-app .collection-detail__summary::after {
     content: '';
     position: absolute;
@@ -678,7 +682,13 @@
     inset: 0;
     background:
       linear-gradient(90deg, rgb(5 6 6 / 0.72) 0%, rgb(5 6 6 / 0.35) 45%, rgb(5 6 6 / 0) 100%),
-      linear-gradient(180deg, transparent 45%, rgb(5 6 6 / 0.75) 100%);
+      linear-gradient(180deg, transparent 45%, rgb(5 6 6 / 0.75) 100%),
+      linear-gradient(
+        to bottom,
+        rgb(5 6 6 / 0) calc(30% - 24px),
+        rgb(5 6 6 / 0.45) calc(65% + 18px),
+        rgb(5 6 6) calc(100% + 60px)
+      );
   }
 
   .music-app .collection-detail__artwork {
@@ -930,11 +940,9 @@
   .music-app .artist-profile__hero::before,
   .music-app .artist-profile__hero::after { display: none; }
 
-  /* La foto llena todo el panel y se funde por la derecha y por abajo con la página. */
-  .music-app .artist-profile__portraits {
-    -webkit-mask-image: linear-gradient(90deg, #000 62%, transparent 100%);
-    mask-image: linear-gradient(90deg, #000 62%, transparent 100%);
-  }
+  /* La foto llena todo el panel y se funde por la derecha y por abajo con la página. El fundido
+     derecho es un degradado de .artist-profile__shade (abajo), no una máscara: enmascarar el
+     contenedor de retratos lo recomponía en una superficie aparte en cada fundido. */
 
   .music-app .artist-profile .artist-profile__portrait {
     inset: 0;
@@ -949,7 +957,8 @@
   .music-app .artist-profile__shade {
     background:
       linear-gradient(0deg, #050606 0%, rgb(5 6 6 / 0.82) 20%, rgb(5 6 6 / 0.1) 60%),
-      linear-gradient(180deg, rgb(5 6 6 / 0.45) 0%, transparent 28%);
+      linear-gradient(180deg, rgb(5 6 6 / 0.45) 0%, transparent 28%),
+      linear-gradient(90deg, rgb(5 6 6 / 0) 62%, var(--mysic-surface, #050606) 100%);
   }
 
   .music-app .artist-profile__hero .collection-detail__back { top: 14px; left: 20px; }

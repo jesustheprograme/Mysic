@@ -19,6 +19,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { isTauri } from '@tauri-apps/api/core'
 import CatalogSearchControls from '../discovery/CatalogSearchControls.jsx'
+import { sizedImage } from '../../lib/imageSize.js'
 import { api, imageUrl } from '../youtube/lib/api.js'
 import { rankSearchResult } from '../youtube/lib/searchRanking.js'
 import {
@@ -206,14 +207,25 @@ function useMiniPlayerController({ hostDocument = document, hostWindow = window 
         setCatalogResults({ type: 'downloads', query, songs, artists: [], albums: [] })
         return
       }
-      const response = rankSearchResult(await api.search(query, nextType, controller.signal), query)
-      setCatalogResults({
-        type: nextType,
-        query,
-        songs: nextType === 'all' ? response.songs ?? [] : nextType === 'song' ? response.items ?? [] : [],
-        artists: nextType === 'all' ? response.artists ?? [] : nextType === 'artist' ? response.items ?? [] : [],
-        albums: nextType === 'all' ? response.albums ?? [] : nextType === 'album' ? response.items ?? [] : [],
-      })
+      // La búsqueda general del servidor (	ype=all) devuelve las listas vacías: igual que la ventana principal, se
+      // piden canciones, artistas y álbumes por separado y cada sección aparece en cuanto llega.
+      const types = nextType === 'all' ? (['song', 'artist', 'album'] as const) : ([nextType] as const)
+      const sectionKey = { song: 'songs', artist: 'artists', album: 'albums' } as const
+      setCatalogResults({ type: nextType, query, songs: [], artists: [], albums: [] })
+      const outcomes = await Promise.all(types.map(async (type) => {
+        try {
+          const items: CatalogItem[] = rankSearchResult(await api.search(query, type, controller.signal), query).items ?? []
+          if (searchControllerRef.current === controller) {
+            setCatalogResults((current) => current && current.query === query ? { ...current, [sectionKey[type]]: items } : current)
+          }
+          return true
+        } catch (error) {
+          if (controller.signal.aborted) throw error
+          return error
+        }
+      }))
+      const failure = outcomes.find((outcome) => outcome !== true)
+      if (failure && outcomes.every((outcome) => outcome !== true)) throw failure
     } catch (error) {
       if (!controller.signal.aborted) setCatalogError(error instanceof Error ? error.message : 'No se pudo buscar.')
     } finally {
@@ -224,13 +236,28 @@ function useMiniPlayerController({ hostDocument = document, hostWindow = window 
   function changeCatalogType(type: 'all' | 'song' | 'artist' | 'album') {
     setCatalogType(type)
     setCatalogDownloads(false)
-    if (queueSearch.trim()) searchCatalog(type, false)
   }
 
   function showCatalogDownloads() {
     setCatalogDownloads(true)
-    if (queueSearch.trim()) searchCatalog(catalogType, true)
   }
+
+  // Se busca mientras se escribe (con una pausa) y al cambiar de tipo; Intro busca al instante. Con menos de 2 letras
+  // no se busca y se limpia el resultado anterior.
+  const searchRef = useRef(searchCatalog)
+  searchRef.current = searchCatalog
+  useEffect(() => {
+    if (activeQueueTab !== 'search') return undefined
+    if (queueSearch.trim().length < 2) {
+      searchControllerRef.current?.abort()
+      setCatalogResults(null)
+      setCatalogLoading(false)
+      setCatalogError('')
+      return undefined
+    }
+    const timer = window.setTimeout(() => { void searchRef.current(catalogType, catalogDownloads) }, 350)
+    return () => window.clearTimeout(timer)
+  }, [activeQueueTab, catalogDownloads, catalogType, queueSearch])
 
   function playCatalogSong(song: CatalogItem) {
     const playable = {
@@ -393,11 +420,11 @@ function useMiniPlayerController({ hostDocument = document, hostWindow = window 
   }
 
   function renderCatalogResults() {
-    if (catalogLoading) return <p className="mini-player__empty">Buscando en YouTube Music…</p>
     if (catalogError) return <p className="mini-player__empty" role="alert">{catalogError}</p>
-    if (!catalogResults) return <p className="mini-player__empty">Busca canciones, artistas o álbumes.</p>
+    if (!catalogResults) return <p className="mini-player__empty">{catalogLoading ? 'Buscando en YouTube Music…' : 'Busca canciones, artistas o álbumes.'}</p>
     const hasResults = catalogResults.songs.length || catalogResults.artists.length || catalogResults.albums.length
-    if (!hasResults) return <p className="mini-player__empty">No se encontraron resultados.</p>
+    // Mientras llegan las secciones se muestran las que ya están; el mensaje solo si todavía no hay ninguna.
+    if (!hasResults) return <p className="mini-player__empty">{catalogLoading ? 'Buscando en YouTube Music…' : 'No se encontraron resultados.'}</p>
 
     return (
       <div className="mini-player__related mini-player__catalog-results">
@@ -408,7 +435,7 @@ function useMiniPlayerController({ hostDocument = document, hostWindow = window 
               <div className="mini-player__related-song-column">
                 {catalogResults.songs.slice(0, 12).map((song) => (
                   <button type="button" key={song.id} onClick={() => playCatalogSong(song)}>
-                    <img loading="lazy" decoding="async" src={imageUrl(song.thumbnail ?? song.artwork)} alt="" />
+                    <img loading="lazy" decoding="async" src={imageUrl(sizedImage(song.thumbnail ?? song.artwork, 32))} alt="" width="32" height="32" />
                     <span><strong>{song.title}</strong><small>{song.artist}</small></span>
                   </button>
                 ))}
@@ -422,7 +449,7 @@ function useMiniPlayerController({ hostDocument = document, hostWindow = window 
             <div className="mini-player__related-grid mini-player__related-grid--albums">
               {catalogResults.albums.slice(0, 10).map((album) => (
                 <button type="button" key={album.id} onClick={() => dispatchMiniPlayerCommand({ type: 'open-global', kind: 'album', id: album.id })}>
-                  <img loading="lazy" decoding="async" src={imageUrl(album.thumbnail)} alt="" />
+                  <img loading="lazy" decoding="async" src={imageUrl(sizedImage(album.thumbnail, 102))} alt="" width="102" height="102" />
                   <span><strong>{album.title}</strong><small>{album.artist ?? album.subtitle}</small></span>
                 </button>
               ))}
@@ -435,7 +462,7 @@ function useMiniPlayerController({ hostDocument = document, hostWindow = window 
             <div className="mini-player__related-grid mini-player__related-grid--artists">
               {catalogResults.artists.slice(0, 10).map((artist) => (
                 <button type="button" key={artist.id} onClick={() => dispatchMiniPlayerCommand({ type: 'open-global', kind: 'artist', id: artist.id })}>
-                  <img loading="lazy" decoding="async" className="mini-player__related-artist" src={imageUrl(artist.thumbnail)} alt="" />
+                  <img loading="lazy" decoding="async" className="mini-player__related-artist" src={imageUrl(sizedImage(artist.thumbnail, 84))} alt="" width="84" height="84" />
                   <span><strong>{artist.name ?? artist.title}</strong><small>{artist.subtitle ?? 'Artista'}</small></span>
                 </button>
               ))}
@@ -646,7 +673,7 @@ function renderMiniPlayer(controller: ReturnType<typeof useMiniPlayerController>
                           <div className="mini-player__related-song-column" key={songs[0].id}>
                             {songs.map((song) => (
                               <button type="button" key={song.id} onClick={() => selectQueueSong(song)}>
-                                <img loading="lazy" decoding="async" src={song.artwork} alt="" />
+                                <img loading="lazy" decoding="async" src={sizedImage(song.artwork, 32)} alt="" width="32" height="32" />
                                 <span><strong>{song.title}</strong><small>{song.artist}</small></span>
                               </button>
                             ))}
@@ -672,7 +699,7 @@ function renderMiniPlayer(controller: ReturnType<typeof useMiniPlayerController>
                       <div className="mini-player__related-grid mini-player__related-grid--albums" ref={relatedAlbumsRef}>
                         {relatedAlbums.map(([album, song]) => (
                           <button type="button" key={album} onClick={() => selectQueueSong(song)}>
-                            <img loading="lazy" decoding="async" src={song.artwork} alt="" />
+                            <img loading="lazy" decoding="async" src={sizedImage(song.artwork, 102)} alt="" width="102" height="102" />
                             <span><strong>{album}</strong><small>{song.artist}</small></span>
                           </button>
                         ))}
@@ -696,7 +723,7 @@ function renderMiniPlayer(controller: ReturnType<typeof useMiniPlayerController>
                       <div className="mini-player__related-grid mini-player__related-grid--artists" ref={relatedArtistsRef}>
                         {relatedArtists.map(([artist, song]) => (
                           <button type="button" key={artist} onClick={() => selectQueueSong(song)}>
-                            <img loading="lazy" decoding="async" className="mini-player__related-artist" src={song.artwork} alt="" />
+                            <img loading="lazy" decoding="async" className="mini-player__related-artist" src={sizedImage(song.artwork, 84)} alt="" width="84" height="84" />
                             <span><strong>{artist}</strong><small>Artista</small></span>
                           </button>
                         ))}
@@ -710,7 +737,7 @@ function renderMiniPlayer(controller: ReturnType<typeof useMiniPlayerController>
                     <li key={song.id}>
                       <button type="button" onClick={() => selectQueueSong(song)}>
                         <span className="mini-player__queue-index">{queue.findIndex((item) => item.id === song.id) + 1}</span>
-                        <img loading="lazy" decoding="async" src={song.artwork} alt="" />
+                        <img loading="lazy" decoding="async" src={sizedImage(song.artwork, 24)} alt="" width="24" height="24" />
                         <span className="mini-player__queue-copy">
                           <strong>{song.title}</strong>
                           <small>{song.artist}</small>

@@ -1,5 +1,5 @@
 import { Check, Copy, ExternalLink, LayoutGrid, Library, Link2, Link2Off, LoaderCircle, UserRound, WifiOff } from 'lucide-react'
-import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ArtistSongsView from '../collections/ArtistSongsView.jsx'
 import ArtistView from '../collections/ArtistView.jsx'
 import CollectionDetailView from '../collections/CollectionDetailView.jsx'
@@ -7,6 +7,10 @@ import CatalogSearchControls from '../discovery/CatalogSearchControls.jsx'
 import HomeRail from '../discovery/HomeRail.jsx'
 import CommunityShelf from './CommunityShelf.jsx'
 import LibraryView from './LibraryView.jsx'
+import { mergeShelves } from './homeMore.js'
+import { landingCache, NO_SHELVES } from './landingCache.js'
+import useHomeMore from './useHomeMore.js'
+import './landing-states.css'
 import { CardMenu } from './ItemMenus.jsx'
 import { applyHomeLayout, CARD_SIZES, chooseShelfLayout, DEFAULT_LAYOUT } from './homeLayout.js'
 import { SectionIcon, SongShelf, TileShelf } from './ShelfLayouts.jsx'
@@ -19,18 +23,22 @@ import { adaptAlbum, adaptArtist, adaptBrowseItem, adaptReleases, adaptSong } fr
 const HomeLayoutPanel = lazy(() => import('./HomeLayoutPanel.jsx'))
 
 const ignorePreview = () => {}
+const EMPTY_SONGS = []
 
-function SongResults({ controller, sourceSongs, title = 'Canciones' }) {
+function SongResults({ controller, hasMore, loadingMore, onLoadMore, sourceSongs, title = 'Canciones' }) {
   const { likedSongIds, onAddToPlaylist, openAlbum, openArtist, player, playSongs, renderSongActions, toggleSongFavorite } = controller
   return (
     <SongList
       emptyMessage="No se encontraron canciones."
+      hasMore={hasMore}
       likedSongIds={likedSongIds}
+      loadingMore={loadingMore}
       onAddToPlaylist={onAddToPlaylist}
       onAlbumSelect={openAlbum}
       onArtistSelect={openArtist}
+      onLoadMore={onLoadMore}
       onPlaybackToggle={player.togglePlay}
-      onPreviewStart={ignorePreview}
+      onPreviewStart={player.warmSong}
       onPreviewStop={ignorePreview}
       onSongSelect={(songId) => playSongs(sourceSongs, songId)}
       onToggleFavorite={toggleSongFavorite}
@@ -52,10 +60,12 @@ function intentProps(kindOf) {
 }
 
 const searchRailKind = (variant) => () => (variant === 'artist' ? 'artist' : 'album')
+// Los resultados usan la tarjeta por defecto (--shelf-card: 148 px).
+const SEARCH_RAIL_ARTWORK_PX = 148
 
 function SearchRail({ emptyMessage, items, onSelect, title, variant }) {
   if (!items) return null
-  return <HomeRail fitColumns emptyMessage={emptyMessage} items={items} onSelect={onSelect} title={title} variant={variant} {...intentProps(searchRailKind(variant))} />
+  return <HomeRail artworkSize={SEARCH_RAIL_ARTWORK_PX} fitColumns emptyMessage={emptyMessage} items={items} onSelect={onSelect} title={title} variant={variant} {...intentProps(searchRailKind(variant))} />
 }
 
 function getGroupedResults(results) {
@@ -205,7 +215,7 @@ function CatalogTabs({ browse }) {
 }
 
 function CatalogNavigation({ controller, editingHome = false, onEditHome }) {
-  const { account, accountError, actionError, browse, changeTab, downloads, searchType, showDownloads } = controller
+  const { account, accountError, accountNotice, actionError, browse, changeTab, downloads, retryAccount, searchType, showDownloads } = controller
   const showingDownloads = browse.view.kind === 'downloads'
   const heading = getCatalogHeading(browse.view.kind, account?.personalized)
 
@@ -213,6 +223,7 @@ function CatalogNavigation({ controller, editingHome = false, onEditHome }) {
     <header className="yt-hub">
       <h1 className="sr-only">{heading}</h1>
       {accountError && <div className="collection-empty" role="alert">{accountError}</div>}
+      {accountNotice && <Notice onAction={retryAccount}>{accountNotice}</Notice>}
       <div className="yt-hub__tabs-row">
         {onEditHome && <button className="yt-edit-home" type="button" aria-label="Editar inicio" aria-expanded={editingHome} title="Editar inicio" onClick={onEditHome}><LayoutGrid size={16} aria-hidden="true" /></button>}
         <CatalogTabs browse={browse} />
@@ -225,7 +236,10 @@ function CatalogNavigation({ controller, editingHome = false, onEditHome }) {
   )
 }
 
-function BrowseShelves({ controller, shelves }) {
+// Lado (px CSS) de una tarjeta de carrusel: es fijo (--shelf-card), así que la carátula se pide justo a ese tamaño.
+const railArtworkPx = (cardSize) => (CARD_SIZES[cardSize] ?? CARD_SIZES[DEFAULT_LAYOUT.cardSize]).min
+
+function BrowseShelves({ artworkSize = railArtworkPx(DEFAULT_LAYOUT.cardSize), controller, shelves }) {
   const { openAlbum, openArtist, openPlaylist, player, playSongs, startPlaylist } = controller
   if (!shelves.length) return <div className="collection-empty">No hay recomendaciones disponibles por ahora.</div>
 
@@ -251,6 +265,7 @@ function BrowseShelves({ controller, shelves }) {
     }
     return (
       <HomeRail
+        artworkSize={artworkSize}
         fitColumns
         icon={<SectionIcon kind={kind} />}
         items={shelf.items.map(adaptBrowseItem)}
@@ -272,23 +287,79 @@ function BrowseShelves({ controller, shelves }) {
     )
   })
 }
+// Esqueleto de la portada mientras no hay nada que mostrar (arranque en frío). Nunca una cuenta falsa ni un hueco.
+function FeedSkeleton({ label = 'Cargando recomendaciones' }) {
+  return <div className="home-page yt-landing"><div className="yt-feed-skeleton" role="status" aria-label={label}><i /><i /><i /></div></div>
+}
+
+// Aviso discreto con reintento: la información que ya se ve se conserva.
+function Notice({ actionLabel = 'Reintentar', children, onAction }) {
+  return (
+    <div className="yt-notice" role="status">
+      <span>{children}</span>
+      {onAction && <button type="button" onClick={onAction}>{actionLabel}</button>}
+    </div>
+  )
+}
+
+/** Final del Inicio: pide la siguiente página al acercarse; un fallo detiene la carga automática y ofrece reintentar. */
+function HomeMoreFooter({ more, onReload }) {
+  const sentinelRef = useRef(null)
+  const { autoload, loadMore, pages } = more
+  useEffect(() => {
+    const node = sentinelRef.current
+    if (!node || !autoload) return undefined
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) loadMore()
+    }, { rootMargin: '700px' })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [autoload, loadMore, pages])
+
+  if (more.status === 'failed') {
+    const expired = more.failure === 'expired'
+    return <Notice actionLabel={expired ? 'Actualizar Inicio' : 'Reintentar'} onAction={expired ? onReload : loadMore}>{expired ? 'Esta parte del Inicio caducó.' : 'No se pudieron cargar más secciones.'}</Notice>
+  }
+  return more.hasMore ? <div className="yt-more-sentinel" ref={sentinelRef} aria-hidden="true" /> : null
+}
+
 function LandingView({ controller }) {
-  const { browse } = controller
+  const { browse, landing } = controller
   const isHome = browse.view.kind === 'home'
   const { layout, reset, update } = useHomeLayout()
   const [editing, setEditing] = useState(false)
-  const rawShelves = browse.view.data?.shelves
+  const data = browse.view.data
+  // Las páginas siguientes solo se piden sobre datos reales de esta visita (la copia guardada no trae token válido).
+  const more = useHomeMore({ enabled: isHome && landing.source === 'live' && Boolean(data?.continuation), resetKey: data, token: data?.continuation })
+  // Secciones extra que ya se vieron en esta ejecución (por usuario y cuenta): al volver al Inicio desde Explorar, la
+  // Biblioteca o un detalle, la primera página se vuelve a pedir, pero lo ya cargado se sigue mostrando (y se
+  // actualiza al llegar páginas nuevas) en vez de desaparecer y reaparecer.
+  const extrasScope = isHome ? landing.scope : null
+  const carriedExtras = extrasScope ? landingCache.getExtras(extrasScope) : NO_SHELVES
+  const rawShelves = useMemo(() => {
+    if (!data?.shelves) return undefined
+    const withCarried = carriedExtras.length ? mergeShelves(data.shelves, carriedExtras) : data.shelves
+    return more.shelves.length ? mergeShelves(withCarried, more.shelves) : withCarried
+  }, [carriedExtras, data, more.shelves])
+  useEffect(() => {
+    if (extrasScope && more.shelves.length) landingCache.setExtras(extrasScope, mergeShelves(landingCache.getExtras(extrasScope), more.shelves))
+  }, [extrasScope, more.shelves])
   // Orden y visibilidad solo en el inicio; Explorar y Recomendado muestran todo tal como llega.
   const applied = useMemo(() => applyHomeLayout(rawShelves, isHome ? layout : DEFAULT_LAYOUT), [isHome, layout, rawShelves])
   const closePanel = useCallback(() => setEditing(false), [])
 
   return (
-    <div className="home-page yt-landing" style={{ '--shelf-card': CARD_SIZES[layout.cardSize].css, '--shelf-card-min': `${CARD_SIZES[layout.cardSize].min}px` }}>
+    <div className="home-page yt-landing" aria-busy={landing.refreshing || undefined} style={{ '--shelf-card': CARD_SIZES[layout.cardSize].css, '--shelf-card-min': `${CARD_SIZES[layout.cardSize].min}px` }}>
       <CatalogNavigation controller={controller} onEditHome={isHome ? () => setEditing((open) => !open) : undefined} editingHome={editing} />
-      {browse.error && <div className="collection-empty" role="alert">{browse.error}</div>}
-      {browse.loading && <div className="yt-feed-skeleton" role="status" aria-label="Cargando recomendaciones"><i /><i /><i /></div>}
-      {!browse.loading && browse.view.data && <BrowseShelves controller={controller} shelves={applied.visible} />}
-      {!browse.loading && !browse.view.data && !browse.error && <div className="collection-empty">No hay contenido disponible por ahora.</div>}
+      {/* Con contenido a la vista, un fallo al refrescar es un aviso con reintento; sin contenido, un error normal. */}
+      {browse.error && (data
+        ? <Notice onAction={isHome ? browse.showHome : browse.view.kind === 'explore' ? browse.showExplore : undefined}>{browse.error}</Notice>
+        : <div className="collection-empty" role="alert">{browse.error}</div>)}
+      {/* Esqueleto solo si no hay nada que mostrar: con datos (reales o guardados) se refresca por detrás sin borrarlos. */}
+      {browse.loading && !data && <div className="yt-feed-skeleton" role="status" aria-label="Cargando recomendaciones"><i /><i /><i /></div>}
+      {data && <BrowseShelves artworkSize={railArtworkPx(layout.cardSize)} controller={controller} shelves={applied.visible} />}
+      {isHome && data && <HomeMoreFooter more={more} onReload={browse.showHome} />}
+      {!browse.loading && !data && !browse.error && <div className="collection-empty">No hay contenido disponible por ahora.</div>}
       {editing && isHome && (
         <Suspense fallback={null}>
           <HomeLayoutPanel layout={layout} onChange={update} onClose={closePanel} onReset={reset} sections={applied.sections} />
@@ -297,7 +368,6 @@ function LandingView({ controller }) {
     </div>
   )
 }
-
 function ConnectivityNotice({ online }) {
   return !online && <div className="collection-empty" role="status"><WifiOff aria-hidden="true" /> Sin conexión. Solo están disponibles las descargas.</div>
 }
@@ -316,8 +386,8 @@ function OfficialLibraryView({ controller }) {
   return (
     <LibraryView
       controller={controller}
-      data={controller.browse.view.data}
-      renderSongs={(songs, title) => <SongResults controller={controller} sourceSongs={songs} title={title} />}
+      data={controller.libraryData ?? controller.browse.view.data}
+      renderSongs={(songs, title, paging) => <SongResults controller={controller} sourceSongs={songs} title={title} {...paging} />}
     />
   )
 }
@@ -347,14 +417,36 @@ function AlbumDetail({ controller }) {
   const { browse, downloads, likedAlbumIds, likedSongIds, onAddToPlaylist, openArtist, player, playSongs, renderSongActions, toggleAlbumFavorite, toggleSongFavorite } = controller
   const data = browse.view.data
   const sourceSongs = data.tracks
-  return <CollectionDetailView collection={{ albumId: data.id, artist: data.artist, artistArtwork: data.thumbnail, artistId: data.artistId, artwork: data.thumbnail, kind: 'Álbum', title: data.title, year: data.year }} collectionFavorite={likedAlbumIds.has(data.id)} likedSongIds={likedSongIds} onAddToPlaylist={onAddToPlaylist} onArtistSelect={openArtist} onBack={controller.goBack} onDownloadCollection={() => downloads.downloadMany(sourceSongs)} onPlaybackToggle={player.togglePlay} onShuffle={() => controller.playShuffled(sourceSongs)} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleCollectionFavorite={(liked) => toggleAlbumFavorite(data.id, liked)} onToggleFavorite={toggleSongFavorite} renderTrackActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} songs={sourceSongs.map(adaptSong)} />
+  return <CollectionDetailView collection={{ albumId: data.id, artist: data.artist, artistArtwork: data.thumbnail, artistId: data.artistId, artwork: data.thumbnail, kind: 'Álbum', title: data.title, year: data.year }} collectionFavorite={likedAlbumIds.has(data.id)} likedSongIds={likedSongIds} onAddToPlaylist={onAddToPlaylist} onArtistSelect={openArtist} onBack={controller.goBack} onDownloadCollection={() => downloads.downloadMany(sourceSongs)} onPlaybackToggle={player.togglePlay} onShuffle={() => controller.playShuffled(sourceSongs)} onSongIntent={player.warmSong} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleCollectionFavorite={(liked) => toggleAlbumFavorite(data.id, liked)} onToggleFavorite={toggleSongFavorite} renderTrackActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} songs={sourceSongs.map(adaptSong)} />
+}
+
+// "Música que me gusta": una página de playlist (una canción por fila, con su artista y su álbum como enlaces), no un
+// bloque de tarjetas. La lista llega por páginas: mientras abierta la página se van pidiendo las que faltan.
+function LikedSongsDetail({ controller }) {
+  const { libraryData, libraryMeta, likedSongIds, loadMoreLibrary, onAddToPlaylist, openAlbum, openArtist, player, playSongs, renderSongActions, toggleSongFavorite } = controller
+  const sourceSongs = libraryData?.likedSongs ?? EMPTY_SONGS
+  const songs = useMemo(() => sourceSongs.map(adaptSong), [sourceSongs])
+  const hasMore = Boolean(libraryMeta?.hasMore?.['liked-songs'] && !libraryMeta?.errors?.['liked-songs'])
+  const loadingMore = Boolean(libraryMeta?.loading?.['liked-songs'])
+  useEffect(() => {
+    if (hasMore && !loadingMore) loadMoreLibrary?.('liked-songs')
+  }, [hasMore, loadMoreLibrary, loadingMore, sourceSongs.length])
+  const collection = useMemo(() => ({
+    artist: 'YouTube Music',
+    artwork: sourceSongs[0]?.thumbnail,
+    description: hasMore ? 'Cargando el resto de tus canciones…' : undefined,
+    id: 'liked',
+    kind: 'Playlist',
+    title: 'Música que me gusta',
+  }), [hasMore, sourceSongs])
+  return <CollectionDetailView collection={collection} likedSongIds={likedSongIds} onAddToPlaylist={onAddToPlaylist} onAlbumSelect={openAlbum} onArtistSelect={openArtist} onBack={controller.goBack} onPlaybackToggle={player.togglePlay} onShuffle={() => controller.playShuffled(sourceSongs)} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleFavorite={toggleSongFavorite} renderTrackActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} selectedSongSource="youtube" songs={songs} />
 }
 
 function PlaylistDetail({ controller }) {
   const { browse, downloads, likedSongIds, onAddToPlaylist, openAlbum, openArtist, player, playSongs, renderSongActions, toggleSongFavorite } = controller
   const data = browse.view.data
   const sourceSongs = data.songs
-  return <CollectionDetailView collection={{ artist: 'YouTube Music', artwork: data.thumbnail, description: data.description, id: data.id, kind: 'Playlist', title: data.title }} likedSongIds={likedSongIds} onAddToPlaylist={onAddToPlaylist} onAlbumSelect={openAlbum} onArtistSelect={openArtist} onBack={controller.goBack} onDownloadCollection={() => downloads.downloadMany(sourceSongs)} onPlaybackToggle={player.togglePlay} onShuffle={() => controller.playShuffled(sourceSongs)} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleFavorite={toggleSongFavorite} renderTrackActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} selectedSongSource="youtube" songs={sourceSongs.map(adaptSong)} />
+  return <CollectionDetailView collection={{ artist: 'YouTube Music', artwork: data.thumbnail, description: data.description, id: data.id, kind: 'Playlist', title: data.title }} likedSongIds={likedSongIds} onAddToPlaylist={onAddToPlaylist} onAlbumSelect={openAlbum} onArtistSelect={openArtist} onBack={controller.goBack} onDownloadCollection={() => downloads.downloadMany(sourceSongs)} onPlaybackToggle={player.togglePlay} onShuffle={() => controller.playShuffled(sourceSongs)} onSongIntent={player.warmSong} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleFavorite={toggleSongFavorite} renderTrackActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} selectedSongSource="youtube" songs={sourceSongs.map(adaptSong)} />
 }
 
 // Sin cuenta vinculada la portada no muestra nada más que este botón centrado. La vinculación en
@@ -380,13 +472,16 @@ function UnlinkedPrompt({ controller }) {
 export default function YoutubeCatalogContent({ controller }) {
   const kind = controller.browse.view.kind
   const isLanding = ['home', 'explore', 'recommendations'].includes(kind)
-  if (isLanding && controller.account === null) return null
+  // Un fallo en frío no deja la portada vacía ni pinta una cuenta nueva: esqueleto hasta confirmar la cuenta.
+  if (controller.libraryOpening) return <FeedSkeleton label="Cargando biblioteca" />
+  if (isLanding && controller.account === null) return <FeedSkeleton />
   if (isLanding && !controller.account.connected) return <UnlinkedPrompt controller={controller} />
   if (kind === 'search') return <SearchView controller={controller} />
   if (['home', 'explore', 'recommendations'].includes(kind)) return <LandingView controller={controller} />
   if (kind === 'artist') return <ArtistDetail controller={controller} />
   if (kind === 'artist-songs') return <ArtistSongsDetail controller={controller} />
   if (kind === 'album') return <AlbumDetail controller={controller} />
+  if (kind === 'liked') return <LikedSongsDetail controller={controller} />
   if (kind === 'playlist') return <PlaylistDetail controller={controller} />
   if (kind === 'downloads') return <DownloadsView controller={controller} />
   if (kind === 'official-library') return <OfficialLibraryView controller={controller} />

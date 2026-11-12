@@ -402,8 +402,8 @@
   margin: 0;
   border: 0;
   overflow-y: auto;
-  background: rgba(4, 6, 6, 0.76);
-  backdrop-filter: blur(8px);
+  /* Velo plano, sin backdrop-filter: a ventana completa obliga a recomponer todo lo de detrás. */
+  background: rgba(4, 6, 6, 0.84);
   animation: playlist-modal-enter 180ms ease-out both;
 }
 
@@ -657,8 +657,7 @@
 
 .playlist-picker.playlist-modal {
   padding: 40px 24px;
-  background: rgba(6, 9, 8, 0.78);
-  backdrop-filter: blur(15px) saturate(0.72);
+  background: rgba(6, 9, 8, 0.86);
 }
 
 .playlist-picker__panel {

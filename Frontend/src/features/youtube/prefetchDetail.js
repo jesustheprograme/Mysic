@@ -1,13 +1,15 @@
-import { api, fetchJson } from './lib/api.js'
+import { api } from './lib/api.js'
 import { createIntentPrefetcher, defaultCanRun } from './intentPrefetch.js'
 
 const prefetcher = createIntentPrefetcher({ canRun: defaultCanRun })
 
 const tasks = {
-  // Artista: caché en memoria del cliente generado. Álbum y playlist: la respuesta queda en la caché HTTP.
-  album: (id) => () => fetchJson(`/album/${encodeURIComponent(id)}`),
+  // Álbum, artista y playlist pasan por la misma caché que el clic (detailCache): la precarga y la apertura
+  // comparten la petición en vuelo y el resultado. Canción: solo resuelve la URL firmada; el audio espera al clic.
+  album: (id) => () => api.prefetchAlbum(id),
   artist: (id) => () => api.prefetchArtist(id),
-  playlist: (id) => () => fetchJson(`/playlist/${encodeURIComponent(id)}`),
+  playlist: (id) => () => api.prefetchPlaylist(id),
+  song: (id) => () => api.warmStream(id),
 }
 
 /** Devuelve el par de manejadores (intención / fin de intención) para una tarjeta de ese tipo. */

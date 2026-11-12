@@ -1,9 +1,12 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRef, useState } from 'react'
 import PreviewIndicator from '../../components/PreviewIndicator.jsx'
+import { sizedImage } from '../../lib/imageSize.js'
 import useRailColumns, { EXPANDED_EXTRA_ROWS, RAIL_GAP } from './railColumns.js'
 
 function HomeRail({
+  // Lado máximo (px CSS) de la carátula: con él se pide la imagen a ese tamaño. Sin él, la URL llega tal cual.
+  artworkSize,
   emptyMessage = 'Todavía no hay elementos.',
   fitColumns = false,
   headingAction,
@@ -66,7 +69,7 @@ function HomeRail({
       </div>
 
       {items.length > 0 ? <div className={`home-shelf__rail${expanded ? ' home-shelf__rail--grid' : ''}${wrap ? ' home-shelf__rail--wrap' : ''}`} data-rail-cols={columns || undefined} ref={railRef} style={columns ? { '--rail-cols': columns } : undefined}>
-        {shown.map((item, index) => {
+        {shown.map((item) => {
           const previewStatus = preview?.itemId === item.id ? preview.status : null
           const isSelected = selectedId === item.id
           const indicatorStatus = previewStatus ?? (isSelected ? selectedItemPlaying ? 'playing' : 'paused' : null)
@@ -100,7 +103,8 @@ function HomeRail({
                 onBlur={() => onIntentEnd?.(item)}
               >
                 <span className={`home-shelf-card__visual${item.artwork ? '' : ' home-shelf-card__visual--empty'}`}>
-                  {item.artwork && <img src={item.artwork} alt="" loading={index < 3 ? 'eager' : 'lazy'} decoding="async" />}
+                  {/* Todas diferidas: las secciones de más abajo no piden ni decodifican nada hasta acercarse. */}
+                  {item.artwork && <img src={artworkSize ? sizedImage(item.artwork, artworkSize) : item.artwork} alt="" width={artworkSize ?? 160} height={artworkSize ?? 160} loading="lazy" decoding="async" />}
                   {item.badge && <span className="home-shelf-card__badge">{item.badge}</span>}
                   {item.artwork && (
                     <span className="home-shelf-card__play" aria-hidden="true">

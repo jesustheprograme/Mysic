@@ -2,9 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, ListPlus } from 'lucide-react'
 import HeartToggle from '../../components/HeartToggle.jsx'
 import PreviewIndicator from '../../components/PreviewIndicator.jsx'
+import { sizedImage } from '../../lib/imageSize.js'
 import { getAdjacentArtworkUrls, getVisiblePages } from './paginatedArtwork.js'
 
 const SONGS_PER_PAGE = 15
+// Lado de la carátula de una fila (.song-row__artwork): la imagen se pide a ese tamaño, no al del catálogo.
+const SONG_ARTWORK_PX = 54
 
 function formatDuration(seconds) {
   if (!Number.isFinite(seconds) || seconds <= 0) return '--:--'
@@ -54,7 +57,7 @@ export function SongRow({
       {showNumber && <span className="song-row__number" aria-hidden="true">{index + 1}</span>}
       <div className="song-row__main">
         <button className="song-row__artwork playback-hover" type="button" aria-label={selected && selectedSongPlaying ? `Pausar ${song.title}` : `Reproducir ${song.title}`} aria-pressed={selected && selectedSongPlaying} onClick={selectSong} onPointerEnter={() => { if (!selected) onPreviewStart?.(song) }} onPointerLeave={onPreviewStop}>
-          {song.artwork && <img src={song.artwork} alt="" loading={index < 4 ? 'eager' : 'lazy'} decoding="async" />}
+          {song.artwork && <img src={sizedImage(song.artwork, SONG_ARTWORK_PX)} alt="" width={SONG_ARTWORK_PX} height={SONG_ARTWORK_PX} loading="lazy" decoding="async" />}
           <span aria-hidden="true"><PreviewIndicator status={indicatorStatus} /></span>
         </button>
         <span className="song-row__copy">
@@ -115,7 +118,8 @@ function SongList({
   }, [currentPage, songs])
 
   useEffect(() => {
-    for (const url of getAdjacentArtworkUrls(songs, currentPage, SONGS_PER_PAGE, pageCount)) {
+    // Se precarga la misma URL reducida que pintará la fila; la original sería otra descarga distinta.
+    for (const url of getAdjacentArtworkUrls(songs, currentPage, SONGS_PER_PAGE, pageCount).map((artwork) => sizedImage(artwork, SONG_ARTWORK_PX))) {
       if (requestedArtworkUrls.current.has(url)) continue
       requestedArtworkUrls.current.add(url)
 

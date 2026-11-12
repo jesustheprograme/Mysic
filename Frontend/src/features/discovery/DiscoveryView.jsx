@@ -27,8 +27,10 @@ import useLocalDownloads from '../offline/useLocalDownloads.js'
 import { useDownloads } from '../youtube/hooks/useDownloads.js'
 import { useYoutubeFavorites } from '../youtube/hooks/useYoutubeFavorites.js'
 import { adaptSong } from '../youtube/lib/adapters.js'
+import { libraryCacheKey } from '../youtube/libraryCache.js'
 import { recordPlayInStorage } from '../youtube/playHistory.js'
 import { sidebarViewFor } from './utilidades/sidebarView.js'
+import { EMPTY_LIBRARY_SUMMARY, LIBRARY_SUMMARY_EVENT, readLibrarySummary } from '../youtube/librarySummary.js'
 
 const MusicImportView = lazy(() => import('../music-import/MusicImportView.jsx'))
 const NewArtistSpotlight = lazy(() => import('./NewArtistSpotlight.jsx'))
@@ -416,6 +418,8 @@ function useDiscoveryPage({
   const [youtubeSearchRequest, setYoutubeSearchRequest] = useState({ nonce: 0, query: '' })
   const [youtubeStopNonce, setYoutubeStopNonce] = useState(0)
   const [youtubeViewKind, setYoutubeViewKind] = useState('home')
+  const [youtubeActive, setYoutubeActive] = useState(null)
+  const [youtubeLibrary, setYoutubeLibrary] = useState(readLibrarySummary)
   const [activeAlbumId, setActiveAlbumId] = useState(getAlbumIdFromHash)
   const [activeArtistId, setActiveArtistId] = useState(getArtistIdFromHash)
   const [activeArtistProfile, setActiveArtistProfile] = useState(null)
@@ -720,9 +724,21 @@ function useDiscoveryPage({
   })
 
   useEffect(() => {
-    const onView = (event) => setYoutubeViewKind((previous) => sidebarViewFor(event.detail?.kind, previous))
+    const onView = (event) => {
+      const { id, kind } = event.detail ?? {}
+      setYoutubeViewKind((previous) => sidebarViewFor(kind, previous))
+      // Una playlist de la cuenta o los Me gusta abiertos: la barra lateral resalta esa entrada.
+      setYoutubeActive(kind === 'liked' ? { type: 'liked' } : kind === 'playlist' && id ? { id, type: 'playlist' } : null)
+    }
     window.addEventListener('mysic:youtube-view', onView)
     return () => window.removeEventListener('mysic:youtube-view', onView)
+  }, [])
+
+  // Playlists y Me gusta de la cuenta de YouTube Music para la barra lateral (los publica YoutubeView).
+  useEffect(() => {
+    const onLibrary = (event) => setYoutubeLibrary(event.detail ?? EMPTY_LIBRARY_SUMMARY)
+    window.addEventListener(LIBRARY_SUMMARY_EVENT, onLibrary)
+    return () => window.removeEventListener(LIBRARY_SUMMARY_EVENT, onLibrary)
   }, [])
 
   // Inicio / Explorar / Biblioteca de la barra lateral: abren la sección de YouTube Music en esa vista.
@@ -730,7 +746,6 @@ function useDiscoveryPage({
     setMobileMenuOpen(false)
     const alreadyThere = activeSection === 'youtube'
     if (!alreadyThere) navigateTo('youtube')
-    if (view === 'home' && !alreadyThere) return
     window.__mysicYoutubeNav = view
     window.dispatchEvent(new CustomEvent('mysic:youtube-nav', { detail: { view } }))
   }
@@ -920,6 +935,8 @@ function useDiscoveryPage({
           navigateTo(section)
         }}
         onYoutubeNavigate={openYoutubeView}
+        youtubeActive={youtubeActive}
+        youtubeLibrary={youtubeLibrary}
         youtubeView={youtubeViewKind}
         onOpenPlaylist={(playlistId) => {
           setMobileMenuOpen(false)
@@ -1018,6 +1035,7 @@ function useDiscoveryPage({
                 onToggleFavorite={toggleSongFavorite}
                 preview={preview}
                 recentSongs={recentSongs}
+                youtubeLibraryKey={libraryCacheKey(youtubeFavoriteStoragePrefix)}
                 searchKey={normalizedQuery}
                 section={activeSection}
                 selectedSongId={selectedSongId}
@@ -1222,6 +1240,8 @@ function useDiscoveryPage({
           isLoading={discoveryLoading}
           onAnalyserChange={setPlayerAnalyser}
           onClose={() => selectSong(null)}
+          onAlbumSelect={(albumId) => navigateToAlbum(`album-${albumId}`)}
+          onArtistSelect={navigateToArtist}
           onNext={() => advancePlaybackFrom(selectedSong, 1)}
           onOpenMiniPlayer={() => {
             claimMiniPlayer('mysic')

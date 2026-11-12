@@ -2,6 +2,7 @@ import { ListMusic, X } from 'lucide-react'
 import { useArtworkAccent } from '../../features/adaptive-theme/useArtworkAccent.js'
 import useAmbientAccent from '../../features/adaptive-theme/useAmbientAccent.js'
 import LyricsSection from '../../features/lyrics/LyricsSection.jsx'
+import useTaskbarControls from '../../features/taskbar/useTaskbarControls.js'
 import HeartToggle from '../HeartToggle.jsx'
 import {
   CompactNowPlaying,
@@ -17,10 +18,22 @@ import useAudioPlayerDock from './useAudioPlayerDock.js'
 // Reproductor del catálogo propio de Mysic: el audio lo gestiona useAudioPlayerDock (WaveSurfer).
 function AudioPlayerDock(props) {
   const {
-    collapsed = false, isLoading = false, liked = false, onClose, onNext, onOpenMiniPlayer,
+    collapsed = false, isLoading = false, liked = false, onAlbumSelect, onArtistSelect, onClose, onNext, onOpenMiniPlayer,
     onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, queue, suppressed = false, track,
   } = props
   const player = useAudioPlayerDock(props)
+  // Botones de la miniatura de la barra de tareas (Windows): los maneja el reproductor que tiene el control.
+  useTaskbarControls({
+    active: !suppressed,
+    canLike: Boolean(onToggleFavorite),
+    hasTrack: Boolean(track?.id) && !isLoading,
+    isPlaying: player.isPlaying,
+    liked,
+    onNext,
+    onPrevious,
+    onToggleLike: onToggleFavorite,
+    onTogglePlayback: player.togglePlayback,
+  })
   const accent = useArtworkAccent(track.artwork)
   useAmbientAccent(accent)
   const dockStyle = accent ? { ...player.playerStyle, '--player-accent': accent } : player.playerStyle
@@ -81,8 +94,13 @@ function AudioPlayerDock(props) {
       ) : (
         <>
           <PlayerPanelContent
+            album={track.album ?? track.albumTitle}
+            albumId={track.albumId}
             artwork={track.artwork}
             artist={track.artist}
+            artistId={track.artistId}
+            onAlbumSelect={onAlbumSelect}
+            onArtistSelect={onArtistSelect}
             currentTime={player.currentTime}
             duration={player.duration}
             hasAudio={player.hasAudio}

@@ -52,7 +52,8 @@
   border: 1px solid rgba(255, 255, 255, 0.14);
   color: #e4e9e6;
   background: rgba(255, 255, 255, 0.07);
-  backdrop-filter: blur(12px);
+  /* Sustituye al backdrop-filter que había: conserva el contexto de apilamiento sin crear capa. */
+  isolation: isolate;
 }
 
 .heart-container--artist[aria-pressed='true'] {

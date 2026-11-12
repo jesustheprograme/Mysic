@@ -23,6 +23,7 @@ function CollectionDetailView({
   onMoveSong,
   onPlaybackToggle,
   onShuffle,
+  onSongIntent,
   onSongSelect,
   onToggleFavorite,
   onToggleCollectionFavorite,
@@ -156,6 +157,7 @@ function CollectionDetailView({
         onArtistSelect={onArtistSelect}
         onMoveSong={onMoveSong}
         onPlaybackToggle={onPlaybackToggle}
+        onSongIntent={onSongIntent}
         onSongSelect={onSongSelect}
         onToggleFavorite={onToggleFavorite}
         renderTrackActions={renderTrackActions}

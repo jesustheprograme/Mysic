@@ -1,34 +1,44 @@
 import { LoaderCircle, MoreVertical, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { memo, useEffect, useRef, useState } from 'react'
 import VerticalSpectrum from '../VerticalSpectrum.jsx'
+import { sizedImage } from '../../lib/imageSize.js'
 import { formatTime } from './utilidadesReproductor.js'
 
 // El dock se repinta unas 5 veces por segundo (currentTime). Estas piezas no dependen del tiempo:
 // con `memo` solo se vuelven a renderizar cuando cambian sus propios datos.
-const TrackSummary = memo(function TrackSummary({ artwork, artist, title }) {
+// Artista y álbum son enlaces cuando se conoce su id y hay manejador: abren su página.
+const TrackSummary = memo(function TrackSummary({ album, albumId, artwork, artist, artistId, onAlbumSelect, onArtistSelect, title }) {
   return (
     <>
       <div className="player-dock__artwork">
-        <span
-          className="player-dock__artwork-backdrop"
-          style={{ backgroundImage: artwork ? `url(${artwork})` : undefined }}
-          aria-hidden="true"
-        />
+        {/* Cuadrado exacto: object-fit: cover recorta las franjas negras laterales de las miniaturas de vídeo 16:9. */}
         {artwork && <img src={artwork} alt="" decoding="async" />}
       </div>
       <div className="player-dock__details">
         <strong>{title}</strong>
-        <span>{artist}</span>
+        <span className="player-dock__meta">
+          {artistId && onArtistSelect
+            ? <button className="player-dock__link player-dock__link--artist" type="button" title={`Abrir artista ${artist}`} onClick={() => onArtistSelect(artistId)}>{artist}</button>
+            : <span className="player-dock__link player-dock__link--artist">{artist}</span>}
+          {album && (
+            <>
+              <i aria-hidden="true">·</i>
+              {albumId && onAlbumSelect
+                ? <button className="player-dock__link" type="button" title={`Abrir álbum ${album}`} onClick={() => onAlbumSelect(albumId)}>{album}</button>
+                : <span className="player-dock__link">{album}</span>}
+            </>
+          )}
+        </span>
       </div>
     </>
   )
 })
 
-export function PlayerPanelContent({ artwork, artist, currentTime, duration, error, hasAudio, isBuffering = false, isPlaying, onNext, onPrevious, onTogglePlayback, progress, title, trackAction = null }) {
+export function PlayerPanelContent({ album, albumId, artwork, artist, artistId, currentTime, duration, error, hasAudio, isBuffering = false, isPlaying, onAlbumSelect, onArtistSelect, onNext, onPrevious, onTogglePlayback, progress, title, trackAction = null }) {
   return (
     <>
       <div className={`player-dock__track${trackAction ? '' : ' player-dock__track--without-action'}`}>
-        <TrackSummary artwork={artwork} artist={artist} title={title} />
+        <TrackSummary album={album} albumId={albumId} artwork={artwork} artist={artist} artistId={artistId} onAlbumSelect={onAlbumSelect} onArtistSelect={onArtistSelect} title={title} />
         {trackAction}
       </div>
 
@@ -76,7 +86,7 @@ const QueueItem = memo(function QueueItem({ index, isActive, item, onSelect }) {
       type="button"
       onClick={() => onSelect(item, index)}
     >
-      <img src={item.artwork} alt="" loading="lazy" decoding="async" />
+      <img src={sizedImage(item.artwork, 36)} alt="" width="36" height="36" loading="lazy" decoding="async" />
       <span>
         <strong>{item.title}</strong>
         <small>{item.artist}</small>
