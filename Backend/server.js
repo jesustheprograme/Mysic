@@ -169,8 +169,16 @@ async function start() {
   const youtubeHomeCache = createResponseCache({ ttlMs: 90 * 1000 })
   app.use(['/api/youtube/link', '/api/youtube/account'], youtubeHomeCache.invalidateOnWrite)
   // El inicio con todas las continuaciones (la ruta generada solo sigue una; ver src/home-extended.mjs).
-  const { createExtendedHomeHandler } = await import('./src/home-extended.mjs')
+  const { createExtendedHomeHandler, createHomeMoreHandler } = await import('./src/home-extended.mjs')
   app.get('/api/youtube/home', youtubeHomeCache.middleware, ...createExtendedHomeHandler())
+  // Páginas siguientes del Inicio (token por usuario); sin caché HTTP, cada token ya es de un solo uso lógico.
+  app.get('/api/youtube/home/more', ...createHomeMoreHandler())
+  // Biblioteca por páginas: vista general (primera página de cada categoría) y una categoría con cursor. /library sigue existiendo.
+  const { createLibraryOverviewHandler, createLibrarySectionHandler } = await import('./src/library-pages.mjs')
+  const youtubeLibraryCache = createResponseCache({ ttlMs: 60 * 1000 })
+  app.use(['/api/youtube/link', '/api/youtube/account'], youtubeLibraryCache.invalidateOnWrite)
+  app.get('/api/youtube/library/overview', youtubeLibraryCache.middleware, ...createLibraryOverviewHandler())
+  app.get('/api/youtube/library/:kind', ...createLibrarySectionHandler())
 
   app.use('/api/youtube', artistCacheHeaders, createYoutubeRouter())
 

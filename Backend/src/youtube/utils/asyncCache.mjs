@@ -1,5 +1,6 @@
+// Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera.
 /** Caché TTL con límite LRU y deduplicación de solicitudes concurrentes. */
-export function createAsyncTtlCache({ ttlMs, maxSize, now = Date.now }) {
+export function createAsyncTtlCache({ ttlMs, maxSize, now = Date.now, shouldCache = () => true }) {
   const values = new Map();
   const pending = new Map();
   const versions = new Map();
@@ -25,7 +26,7 @@ export function createAsyncTtlCache({ ttlMs, maxSize, now = Date.now }) {
       const request = Promise.resolve()
         .then(load)
         .then((value) => {
-          if ((versions.get(key) || 0) === version) remember(key, value);
+          if ((versions.get(key) || 0) === version && shouldCache(value)) remember(key, value);
           return value;
         })
         .finally(() => {

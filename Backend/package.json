@@ -4,7 +4,7 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "node --test scripts/import-music.test.js src/auth.test.js src/catalog.test.js src/object-storage.test.js src/playlists.test.js src/music-import-access.test.js src/lyrics/lyrics.test.js src/ttl-cache.test.js src/response-cache.test.js src/cache-headers.test.js src/home-extended.test.mjs src/youtube/authPaths.test.js src/youtube/routes/downloads.test.mjs src/youtube/youtube/accountLink.test.mjs src/youtube/youtube/artist.test.mjs src/youtube/youtube/browse.test.mjs src/youtube/youtube/dataApi.test.mjs src/youtube/youtube/stream.test.mjs src/youtube/utils/asyncCache.test.mjs src/youtube/utils/persistentSearchCache.test.mjs",
+    "test": "node --test scripts/import-music.test.js src/auth.test.js src/catalog.test.js src/object-storage.test.js src/playlists.test.js src/music-import-access.test.js src/lyrics/lyrics.test.js src/ttl-cache.test.js src/response-cache.test.js src/cache-headers.test.js src/home-extended.test.mjs src/library-pages.test.mjs src/youtube/authPaths.test.js src/youtube/routes/downloads.test.mjs src/youtube/youtube/accountLink.test.mjs src/youtube/youtube/artist.test.mjs src/youtube/youtube/browse.test.mjs src/youtube/youtube/dataApi.test.mjs src/youtube/youtube/stream.test.mjs src/youtube/utils/asyncCache.test.mjs src/youtube/utils/persistentSearchCache.test.mjs src/youtube/youtube/library.test.mjs src/youtube/routes/stream.test.mjs src/youtube/youtube/search.test.mjs",
     "check": "npm test && npx prisma validate",
     "start": "node server.js",
     "dev": "node --watch server.js",

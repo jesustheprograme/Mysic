@@ -1,12 +1,25 @@
 import express from 'express';
 import { asyncRoute, BROWSE_ID_RE, requireYoutube, validateParam, VIDEO_ID_RE } from '../utils/http.mjs';
-import { getExplore, getHome, getPlaylistQueue, getRadio, getRecommendations, getSessionLibrary } from '../youtube/browse.mjs';
+import { getExplore, getHome, getPlaylistQueue, getRadio, getRecommendations, getSessionLibrary, invalidateSessionLibrary } from '../youtube/browse.mjs';
 import { getYoutube } from '../youtube/client.mjs';
-import { connectBrowserSession, connectCapturedBrowserSession, getAccountStatus, getYoutubeForUser, startAccountLink, unlinkAccount } from '../youtube/accountLink.mjs';
+import { connectBrowserSession, connectCapturedBrowserSession, getAccountStatus, getYoutubeForUser, hasStoredBrowserAuth, startAccountLink, unlinkAccount } from '../youtube/accountLink.mjs';
+import { invalidateHomeSessions } from '../../home-extended.mjs';
+import { invalidateLibraryPages } from '../../library-pages.mjs';
 import { getOfficialYoutubeLibrary } from '../youtube/dataApi.mjs';
 
 async function getRequestYoutube(req) {
   return await getYoutubeForUser(req.mysicUser) ?? getYoutube();
+}
+
+function requestUserId(req) {
+  return req.mysicUser?._id?.toString();
+}
+
+// Al vincular, desvincular o cambiar de cuenta se descarta lo que dependía de la sesión anterior.
+function invalidateUserState(userId) {
+  invalidateSessionLibrary(userId);
+  invalidateHomeSessions(userId);
+  invalidateLibraryPages(userId);
 }
 
 export function createBrowseRouter() {
@@ -19,7 +32,9 @@ export function createBrowseRouter() {
 
   router.post('/link/start', asyncRoute(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
-    res.json(await startAccountLink(req.mysicUser));
+    const result = await startAccountLink(req.mysicUser);
+    invalidateUserState(requestUserId(req));
+    res.json(result);
   }, 'No se pudo iniciar la vinculación con YouTube Music'));
 
   router.get('/link/status', asyncRoute(async (req, res) => {
@@ -30,7 +45,9 @@ export function createBrowseRouter() {
   router.post('/link/browser', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     try {
-      res.json(await connectBrowserSession(req.mysicUser, req.body?.requestText));
+      const result = await connectBrowserSession(req.mysicUser, req.body?.requestText);
+      invalidateUserState(requestUserId(req));
+      res.json(result);
     } catch (error) {
       console.warn(`No se pudo validar la sesión de YouTube Music: ${error.message}`);
       res.status(400).json({ error: error.message });
@@ -40,7 +57,9 @@ export function createBrowseRouter() {
   router.post('/link/session', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     try {
-      res.json(await connectCapturedBrowserSession(req.mysicUser, req.body));
+      const result = await connectCapturedBrowserSession(req.mysicUser, req.body);
+      invalidateUserState(requestUserId(req));
+      res.json(result);
     } catch (error) {
       console.warn(`No se pudo validar una sesión capturada de YouTube Music: ${error.message}`);
       res.status(400).json({ error: error.message });
@@ -49,7 +68,9 @@ export function createBrowseRouter() {
 
   router.delete('/link', asyncRoute(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
-    res.json(await unlinkAccount(req.mysicUser));
+    const result = await unlinkAccount(req.mysicUser);
+    invalidateUserState(requestUserId(req));
+    res.json(result);
   }, 'No se pudo desvincular YouTube Music'));
 
   router.post('/official/library', async (req, res) => {
@@ -65,10 +86,17 @@ export function createBrowseRouter() {
     res.setHeader('Cache-Control', 'private, no-store');
     const youtube = await getYoutubeForUser(req.mysicUser);
     if (!youtube) {
+      // Con una sesión guardada, la ausencia de cliente es transitoria (sin red, YouTube caído): no se pide volver a vincular.
+      if (await hasStoredBrowserAuth(req.mysicUser)) {
+        return res.status(503).json({ code: 'YOUTUBE_SESSION_UNAVAILABLE', error: 'No se pudo conectar con YouTube Music ahora. Tu sesión sigue guardada; reintenta en unos segundos.' });
+      }
       return res.status(409).json({ error: 'Conecta una sesión de YouTube Music antes de sincronizar tu biblioteca.' });
     }
     try {
-      return res.json(await getSessionLibrary(youtube));
+      return res.json(await getSessionLibrary(youtube, {
+        userId: requestUserId(req),
+        fresh: req.query.fresh === '1',
+      }));
     } catch (error) {
       console.warn(`No se pudo sincronizar la biblioteca de YouTube Music: ${error.message}`);
       return res.status(502).json({ error: 'YouTube Music no pudo entregar tu biblioteca. Inténtalo nuevamente.' });

@@ -6,11 +6,38 @@ import { createPersistentSearchCache } from '../utils/persistentSearchCache.mjs'
 import { getYoutube } from './client.mjs';
 import { mapAlbumItem, mapArtistItem, mapSong, mapTopResult, pickThumbnail } from './mappers.mjs';
 
-export const SEARCH_TYPES = new Set(['all', 'song', 'artist', 'album']);
+export const SEARCH_TYPES = new Set(['all', 'song', 'artist', 'album', 'video']);
+export const VIDEO_SEARCH_PARAMS = 'EgWKAQIQAWoKEAkQChAFEAMQBA==';
 
 const mapSongs = (r) => (r.songs?.contents || []).filter((s) => s.id).map((s) => mapSong(s));
 const mapArtists = (r) => (r.artists?.contents || []).filter((a) => a.id).map(mapArtistItem);
 const mapAlbums = (r) => (r.albums?.contents || []).filter((a) => a.id).map(mapAlbumItem);
+const videoTypeOf = (item) => {
+  const value = item.videoType
+    || item.video_type
+    || item.flex_columns?.[0]?.title?.runs?.[0]?.endpoint?.payload
+      ?.watchEndpointMusicSupportedConfigs?.watchEndpointMusicConfig?.musicVideoType;
+  if (value === 'MUSIC_VIDEO_TYPE_OMV' || value === 'OMV') return 'OMV';
+  if (value === 'MUSIC_VIDEO_TYPE_UGC' || value === 'UGC') return 'UGC';
+  return null;
+};
+
+export function mapVideo(item) {
+  const id = item?.id ?? item?.video_id;
+  if (!id) return null;
+  const artists = item.artists?.length
+    ? item.artists
+    : item.authors?.length
+      ? item.authors
+      : item.author
+        ? [item.author]
+        : [];
+  const video = mapSong({ ...item, id, artists });
+  const videoType = videoTypeOf(item);
+  return videoType ? { ...video, videoType } : video;
+}
+
+const mapVideos = (results) => (results.videos?.contents || []).map(mapVideo).filter(Boolean);
 const searchCache = createPersistentSearchCache({
   dir: config.searchCacheDir,
   freshTtlMs: config.searchCacheTtlMs,
@@ -27,8 +54,7 @@ export async function searchMusic(text, type) {
   return searchCache.get(key, () => loadSearchMusic(text, type));
 }
 
-async function loadSearchMusic(text, type) {
-  const youtube = getYoutube();
+export async function loadSearchMusic(text, type, youtube = getYoutube()) {
 
   if (type === 'all') {
     const general = await youtube.music.search(text);
@@ -46,7 +72,23 @@ async function loadSearchMusic(text, type) {
   let items = [];
   if (type === 'song') items = mapSongs(results);
   else if (type === 'artist') items = mapArtists(results);
-  else items = mapAlbums(results);
+  else if (type === 'album') items = mapAlbums(results);
+  else {
+    items = mapVideos(results);
+    if (!items.length) {
+      const fallback = await youtube.actions.execute('/search', {
+        query: text,
+        params: VIDEO_SEARCH_PARAMS,
+        client: 'YTMUSIC',
+        parse: true,
+      });
+      const candidates = fallback?.contents_memo?.get('MusicResponsiveListItem') || [];
+      items = candidates
+        .filter((item) => item.item_type === 'video' || videoTypeOf(item))
+        .map(mapVideo)
+        .filter(Boolean);
+    }
+  }
   return { type, items };
 }
 

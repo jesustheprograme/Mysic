@@ -1,6 +1,7 @@
 import { getYoutube } from './client.mjs';
 import { config } from '../config.mjs';
 import { createAsyncTtlCache } from '../utils/asyncCache.mjs';
+import { getExtendedLibrary, invalidateExtendedLibrary } from './library.mjs';
 import { mapAlbumItem, mapArtistItem, mapSong, pickThumbnail, plainText } from './mappers.mjs';
 
 const albumCache = createAsyncTtlCache({ ttlMs: 6 * 60 * 60 * 1000, maxSize: config.requestCacheMax });
@@ -185,6 +186,44 @@ function libraryCards(page) {
   ];
 }
 
+const continuationItem = (page) => page?.contents_memo?.get('ContinuationItem')?.at(-1);
+
+/** Playlists de una página de la biblioteca, ya mapeadas. */
+export function mapLibraryPlaylists(page) {
+  const playlists = [];
+  for (const card of libraryCards(page)) {
+    const playlist = mapBrowseItem(card);
+    if (playlist?.kind !== 'playlist') continue;
+    playlists.push({
+      id: playlist.id,
+      title: playlist.title,
+      description: playlist.subtitle || '',
+      itemCount: itemCount(card.item_count ?? card.song_count ?? playlist.subtitle),
+      thumbnail: playlist.thumbnail,
+    });
+  }
+  return playlists;
+}
+
+/** Una página de playlists. Sin `previous` es la primera; `next` es la página actual si aún tiene continuación. */
+export async function libraryPlaylistsPage(youtube, previous) {
+  const page = previous
+    ? await continuationItem(previous).endpoint.call(youtube.actions, { client: 'YTMUSIC', parse: true })
+    : await youtube.actions.execute('/browse', { browseId: 'FEmusic_liked_playlists', client: 'YTMUSIC', parse: true });
+  return { items: mapLibraryPlaylists(page), next: continuationItem(page)?.endpoint ? page : null };
+}
+
+/** Una página de canciones con Me gusta (lista LM). Mismo contrato que libraryPlaylistsPage. */
+export async function likedSongsPage(youtube, previous) {
+  const page = previous ? await previous.getContinuation() : await youtube.music.getPlaylist('LM');
+  const items = [];
+  for (const item of page.items || []) {
+    const song = mapBrowseItem(item);
+    if (song?.kind === 'song') items.push(song);
+  }
+  return { items, next: page.has_continuation ? page : null };
+}
+
 export async function collectLibraryPlaylists(youtube) {
   const playlists = new Map();
   let page = await youtube.actions.execute('/browse', {
@@ -194,19 +233,11 @@ export async function collectLibraryPlaylists(youtube) {
   });
 
   for (let pageNumber = 0; page && pageNumber < MAX_LIBRARY_PAGES; pageNumber += 1) {
-    for (const card of libraryCards(page)) {
-      const playlist = mapBrowseItem(card);
-      if (playlist?.kind !== 'playlist' || playlists.has(playlist.id)) continue;
-      playlists.set(playlist.id, {
-        id: playlist.id,
-        title: playlist.title,
-        description: playlist.subtitle || '',
-        itemCount: itemCount(card.item_count ?? card.song_count ?? playlist.subtitle),
-        thumbnail: playlist.thumbnail,
-      });
+    for (const playlist of mapLibraryPlaylists(page)) {
+      if (!playlists.has(playlist.id)) playlists.set(playlist.id, playlist);
     }
 
-    const continuation = page.contents_memo?.get('ContinuationItem')?.at(-1);
+    const continuation = continuationItem(page);
     if (!continuation?.endpoint) break;
     try {
       page = await continuation.endpoint.call(youtube.actions, { client: 'YTMUSIC', parse: true });
@@ -217,7 +248,6 @@ export async function collectLibraryPlaylists(youtube) {
   }
   return [...playlists.values()];
 }
-
 export async function collectLikedSongs(youtube) {
   const songs = new Map();
   let page = await youtube.music.getPlaylist('LM');
@@ -238,12 +268,17 @@ export async function collectLikedSongs(youtube) {
   return [...songs.values()];
 }
 
-export async function getSessionLibrary(youtube) {
-  const [playlists, likedSongs] = await Promise.all([
+export function invalidateSessionLibrary(userId) {
+  invalidateExtendedLibrary(userId);
+}
+
+export async function getSessionLibrary(youtube, { userId, fresh = false, diagnostics } = {}) {
+  const [playlists, likedSongs, extended] = await Promise.all([
     collectLibraryPlaylists(youtube),
     collectLikedSongs(youtube),
+    getExtendedLibrary(youtube, { userId, fresh, diagnostics }),
   ]);
-  return { playlists, likedSongs };
+  return { playlists, likedSongs, ...extended };
 }
 
 export async function getRecommendations(videoId, youtube = getYoutube()) {
