@@ -1,3 +1,5 @@
+import { setItemSafe } from './storage.js'
+
 const DEFAULT_PREFIX = 'mysic:cache:v1:'
 const DEFAULT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 const DEFAULT_MAX_BYTES = 1_500_000
@@ -48,8 +50,8 @@ export function createPersistedCache({
         storage.removeItem(prefix + key)
         return false
       }
-      storage.setItem(prefix + key, raw)
-      return true
+      // Si no cabe, se liberan las cachés prescindibles y se reintenta (ver setItemSafe).
+      return setItemSafe(prefix + key, raw, storage)
     } catch {
       return false
     }

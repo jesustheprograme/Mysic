@@ -3,7 +3,7 @@ import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, LayoutGrid, RotateCcw, Check, X } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { SectionIcon } from './ShelfLayouts.jsx'
 import { CARD_SIZES, setAllHidden, toggleHidden, withOrder } from './homeLayout.js'
 import './home-layout.css'
@@ -33,9 +33,9 @@ function SectionRow({ section, onToggle }) {
 
 /**
  * Panel lateral "Editar inicio": tamaño de tarjetas, secciones visibles y su orden.
- * Los cambios se aplican al momento sobre la página (no hay botón de guardar).
+ * Los cambios se aplican al momento sobre la página y se guardan solos; un clic fuera (o Escape) lo cierra.
  */
-export default function HomeLayoutPanel({ layout, onChange, onClose, onReset, sections }) {
+export default function HomeLayoutPanel({ layout, loadingMore = false, onChange, onClose, onReset, sections }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -44,14 +44,28 @@ export default function HomeLayoutPanel({ layout, onChange, onClose, onReset, se
   const visibleCount = sections.filter((section) => !section.hidden).length
   const allVisible = visibleCount === sections.length
 
+  const panelRef = useRef(null)
+
   useEffect(() => {
     const onKeyDown = (event) => { if (event.key === 'Escape') onClose() }
+    // Un clic fuera cierra el panel (los cambios ya están aplicados); la página de detrás sigue siendo desplazable.
+    // El botón que abre el panel se excluye: él mismo lo alterna y, si no, lo cerraría y lo volvería a abrir.
+    const onPointerDown = (event) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      if (panelRef.current?.contains(target) || target.closest('.yt-edit-home')) return
+      onClose()
+    }
     document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('pointerdown', onPointerDown)
+    }
   }, [onClose])
 
   return (
-    <aside className="hl-panel" role="dialog" aria-label="Editar inicio">
+    <aside className="hl-panel" ref={panelRef} role="dialog" aria-label="Editar inicio">
       <header className="hl-panel__header">
         <span className="hl-panel__icon" aria-hidden="true"><LayoutGrid size={20} /></span>
         <div>
@@ -77,7 +91,7 @@ export default function HomeLayoutPanel({ layout, onChange, onClose, onReset, se
 
         <div className="hl-sections__head">
           <h3>Secciones</h3>
-          <span>{visibleCount} de {sections.length} visibles</span>
+          <span>{visibleCount} de {sections.length} visibles{loadingMore ? ' · cargando más…' : ''}</span>
           <button type="button" onClick={() => onChange((current) => setAllHidden(current, keys, allVisible))}>{allVisible ? 'Desactivar todos' : 'Activar todos'}</button>
         </div>
 

@@ -1,11 +1,14 @@
 import { Play } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { sizedImage } from '../../lib/imageSize.js'
+import { ctxMenu } from './contextMenuStore.js'
 import { usePlaylistPreview } from './playlistPreview.js'
-import { ShelfHeading } from './ShelfLayouts.jsx'
+import { SeeAllButton, ShelfHeading } from './ShelfLayouts.jsx'
 import './community-shelf.css'
 
 const SONGS_PER_CARD = 3
+// Plegado: dos filas de tres tarjetas. "Ver todo" despliega todas (cada tarjeta pide sus canciones al verse).
+const COLLAPSED_CARDS = 6
 // Ancho de la columna de la portada (.cs-card): la imagen se pide a ese tamaño.
 const COVER_PX = 132
 
@@ -41,7 +44,7 @@ function SongRows({ currentSongId, onPlaySong, preview }) {
   }
   if (!songs.length) return <li className="cs-empty">No se pudieron cargar las canciones.</li>
   return songs.slice(0, SONGS_PER_CARD).map((song) => (
-    <li key={song.id}>
+    <li key={song.id} onContextMenu={ctxMenu('song', song)}>
       <button className={`cs-song${song.id === currentSongId ? ' cs-song--active' : ''}`} type="button" onClick={() => onPlaySong(songs, song.id)}>
         {song.thumbnail ? <img src={sizedImage(song.thumbnail, 40)} alt="" width="40" height="40" loading="lazy" decoding="async" /> : <i aria-hidden="true" />}
         <span>
@@ -53,13 +56,13 @@ function SongRows({ currentSongId, onPlaySong, preview }) {
   ))
 }
 
-function CommunityCard({ currentSongId, item, onOpen, onPlayPlaylist, onPlaySong }) {
+function CommunityCard({ currentSongId, item, onItemContextMenu, onOpen, onPlayPlaylist, onPlaySong }) {
   const [ref, seen] = useSeen()
   const preview = usePlaylistPreview(item.id, seen)
   const cover = item.artwork ?? preview.data?.thumbnail
 
   return (
-    <article className="cs-card" ref={ref}>
+    <article className="cs-card" ref={ref} onContextMenu={onItemContextMenu ? (event) => onItemContextMenu(item, event) : undefined}>
       <ul className="cs-card__songs" aria-label={`Canciones de ${item.title}`}>
         <SongRows currentSongId={currentSongId} onPlaySong={onPlaySong} preview={preview} />
       </ul>
@@ -81,14 +84,16 @@ function CommunityCard({ currentSongId, item, onOpen, onPlayPlaylist, onPlaySong
  * Bloque "De la comunidad": cada playlist en una tarjeta con sus primeras canciones a la izquierda
  * (una por fila) y su portada, título y botón de reproducir a la derecha.
  */
-export default function CommunityShelf({ currentSongId, items, onOpen, onPlayPlaylist, onPlaySong, title }) {
+export default function CommunityShelf({ currentSongId, items, onItemContextMenu, onOpen, onPlayPlaylist, onPlaySong, title }) {
   const id = 'community-shelf-title'
+  const [expanded, setExpanded] = useState(false)
+  const canExpand = items.length > COLLAPSED_CARDS
   return (
     <section className="home-shelf cs-shelf" aria-labelledby={id}>
-      <ShelfHeading id={id} kind="community" title={title} />
+      <ShelfHeading action={canExpand ? <SeeAllButton expanded={expanded} onToggle={() => setExpanded((open) => !open)} /> : undefined} id={id} kind="community" title={title} />
       <div className="cs-grid">
-        {items.map((item) => (
-          <CommunityCard currentSongId={currentSongId} item={item} key={item.id} onOpen={onOpen} onPlayPlaylist={onPlayPlaylist} onPlaySong={onPlaySong} />
+        {(expanded ? items : items.slice(0, COLLAPSED_CARDS)).map((item) => (
+          <CommunityCard currentSongId={currentSongId} item={item} key={item.id} onItemContextMenu={onItemContextMenu} onOpen={onOpen} onPlayPlaylist={onPlayPlaylist} onPlaySong={onPlaySong} />
         ))}
       </div>
     </section>

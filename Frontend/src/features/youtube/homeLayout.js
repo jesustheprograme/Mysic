@@ -29,6 +29,8 @@ const DEFAULT_ORDER = [
   'lo nuevo y lo que más te gusta',
   'novedades',
   'nuevos lanzamientos',
+  'últimos lanzamientos',
+  'éxitos de hoy',
   'playlists destacadas',
   'playlists destacadas para ti',
   'canciones en tendencia',
@@ -107,6 +109,15 @@ export function applyHomeLayout(shelves, layout) {
     title: translateShelfTitle(byKey.get(key).title),
   }))
   return { sections, visible: sections.filter((section) => !section.hidden).map((section) => section.shelf) }
+}
+
+/**
+ * Orden estable mientras el Inicio se carga por partes: lo que ya se vio conserva su sitio y las secciones que llegan
+ * después van detrás (antes, por prioridad, "Álbumes para ti" o "De tu biblioteca" se colaban por encima de lo que
+ * ya estaba leyendo el usuario y todo el contenido saltaba). Lo ordenado por el usuario sigue mandando.
+ */
+export function layoutKeepingSeen(layout, seen) {
+  return seen.length ? { ...layout, order: unique([...layout.order, ...seen]) } : layout
 }
 
 /** Fija el orden completo actual de las secciones (al soltar una tras arrastrarla). */

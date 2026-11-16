@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { compactStoredFavorites, isFavoriteSongsKey, packFavorites, unpackFavorites } from '../favoriteCodec.js'
 import { readStorage, writeStorage } from '../lib/storage.js'
 
 export function parseFavoriteEntries(stored) {
@@ -28,15 +29,28 @@ export function mergeFavoriteEntries(current, items) {
   return next ?? current
 }
 
+// Las canciones favoritas se guardan compactas (ver favoriteCodec.js): en el formato antiguo llenaban el
+// almacenamiento local y nada más podía guardarse. Los álbumes y artistas favoritos son pocos y siguen igual.
+const stored = (storageKey, entries) => (isFavoriteSongsKey(storageKey) ? packFavorites(serializeFavoriteEntries(entries)) : serializeFavoriteEntries(entries))
+
+// Una vez por arranque: encoge las favoritas antiguas de cualquier usuario de este equipo antes de leer nada.
+let compacted = false
+function compactOnce() {
+  if (compacted || typeof window === 'undefined') return
+  compacted = true
+  compactStoredFavorites(window.localStorage)
+}
+
 function readFavoriteEntries(storageKey, legacyStorageKey) {
-  const stored = readStorage(storageKey, [])
-  if (stored.length || !legacyStorageKey || legacyStorageKey === storageKey) {
-    return parseFavoriteEntries(stored)
+  compactOnce()
+  const saved = unpackFavorites(readStorage(storageKey, []))
+  if (saved.length || !legacyStorageKey || legacyStorageKey === storageKey) {
+    return parseFavoriteEntries(saved)
   }
 
-  const legacyEntries = parseFavoriteEntries(readStorage(legacyStorageKey, []))
+  const legacyEntries = parseFavoriteEntries(unpackFavorites(readStorage(legacyStorageKey, [])))
   if (legacyEntries.size) {
-    writeStorage(storageKey, serializeFavoriteEntries(legacyEntries))
+    writeStorage(storageKey, stored(storageKey, legacyEntries))
     window.localStorage.removeItem(legacyStorageKey)
   }
   return legacyEntries
@@ -52,7 +66,7 @@ export function useYoutubeFavorites(storageKey, legacyStorageKey = null) {
   useEffect(() => {
     if (persistedRef.current === entries) return
     persistedRef.current = entries
-    writeStorage(storageKey, serializeFavoriteEntries(entries))
+    writeStorage(storageKey, stored(storageKey, entries))
   }, [entries, storageKey])
 
   function toggleFavorite(id, liked, item = null) {

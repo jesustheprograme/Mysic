@@ -2,6 +2,8 @@ import { ArrowLeft, ListPlus, Pause, Play, Shuffle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import HeartToggle from '../../components/HeartToggle.jsx'
 import HomeRail from '../discovery/HomeRail.jsx'
+import { ctxMenu } from '../youtube/contextMenuStore.js'
+import SongMoreButton from '../youtube/SongMoreButton.jsx'
 import { SectionIcon, ShelfHeading } from '../youtube/ShelfLayouts.jsx'
 
 const portraitDirections = ['left', 'down', 'right', 'up']
@@ -56,7 +58,7 @@ function ArtistSongRow({ likedSongIds, onAddToPlaylist, onAlbumSelect, onPlay, o
   const albumId = song.albumId ?? song.album?.id ?? song.albumMemberships?.[0]?.id
   const albumTitle = song.albumTitle ?? song.album?.title ?? song.albumMemberships?.[0]?.title
   return (
-    <li className={`sl-song${selected ? ' sl-song--active' : ''}${liked ? ' sl-song--liked' : ''}`}>
+    <li className={`sl-song${selected ? ' sl-song--active' : ''}${liked ? ' sl-song--liked' : ''}`} onContextMenu={song.source === 'youtube' ? ctxMenu('song', song) : undefined}>
       <div className="sl-song__main">
         <button className="sl-song__cover" type="button" aria-label={`Reproducir ${song.title}`} onClick={onPlay}>
           {song.artwork ? <img src={song.artwork} alt="" width="44" height="44" loading="lazy" decoding="async" /> : <i aria-hidden="true" />}
@@ -74,6 +76,7 @@ function ArtistSongRow({ likedSongIds, onAddToPlaylist, onAlbumSelect, onPlay, o
         <HeartToggle className="heart-container--song-row" label={`Me gusta ${song.title}`} liked={liked} onToggle={(next) => onToggleFavorite?.(song.id, next, song)} removeLabel={`Quitar ${song.title} de favoritas`} size={16} />
         {onAddToPlaylist && <button className="sl-song__more" type="button" aria-label={`Añadir ${song.title} a una playlist`} title="Añadir a playlist" onClick={() => onAddToPlaylist(song)}><ListPlus size={16} strokeWidth={1.8} aria-hidden="true" /></button>}
         {renderSongActions?.(song)}
+        <SongMoreButton song={song} />
       </span>
     </li>
   )

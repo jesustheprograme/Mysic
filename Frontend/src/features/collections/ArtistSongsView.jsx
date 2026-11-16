@@ -1,5 +1,6 @@
 import { ArrowLeft, Pause, Play } from 'lucide-react'
 import { useMemo } from 'react'
+import { ctxMenu } from '../youtube/contextMenuStore.js'
 
 function groupSongsByAlbum(songs) {
   const groups = new Map()
@@ -75,7 +76,7 @@ function ArtistSongsView({
                 const selected = song.id === selectedSongId
                 const playing = selected && selectedSongPlaying
                 return (
-                  <li className={selected ? 'is-active' : ''} key={song.id}>
+                  <li className={selected ? 'is-active' : ''} key={song.id} onContextMenu={song.source === 'youtube' ? ctxMenu('song', song) : undefined}>
                     <button type="button" aria-label={`${playing ? 'Pausar' : 'Reproducir'} ${song.title}`} onClick={() => selectSong(song)}>
                       {playing ? <Pause size={12} fill="currentColor" aria-hidden="true" /> : <Play size={12} fill="currentColor" aria-hidden="true" />}
                       <span>{song.title}</span>

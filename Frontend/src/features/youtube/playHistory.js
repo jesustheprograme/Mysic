@@ -1,3 +1,5 @@
+import { setItemSafe } from '../../lib/storage.js'
+
 // Historial local de reproducciones: alimenta "En repetición". Funciones puras + un envoltorio de almacenamiento.
 const STORAGE_KEY = 'mysic:play-history:v1'
 const MAX_ENTRIES = 600
@@ -44,9 +46,29 @@ export function topPlays(entries, { limit = 50, minPlays = 2, now = Date.now(), 
     .map((stat) => stat.song)
 }
 
-function read() {
+let owner = null
+
+/** Usuario dueño del historial: cada cuenta tiene el suyo. El historial global antiguo no se sabe de quién es y se descarta. */
+export function setPlayHistoryOwner(id) {
+  const next = id ? String(id) : null
+  if (next === owner) return
+  owner = next
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
+    localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    // Sin almacenamiento: nada que limpiar.
+  }
+}
+
+/** Usuario actual del historial (null sin sesión): lo comparten las últimas escuchas. */
+export const playHistoryOwner = () => owner
+
+const storageKey = () => `${STORAGE_KEY}:${owner}`
+
+function read() {
+  if (!owner) return []
+  try {
+    const parsed = JSON.parse(localStorage.getItem(storageKey()) ?? '[]')
     return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
@@ -55,10 +77,11 @@ function read() {
 
 /** Guarda una reproducción en el almacenamiento del navegador (un fallo de cuota no rompe la app). */
 export function recordPlayInStorage(song) {
+  if (!owner) return
   try {
     const current = read()
     const next = recordPlay(current, song)
-    if (next !== current) localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+    if (next !== current) setItemSafe(storageKey(), JSON.stringify(next))
   } catch {
     // Sin almacenamiento disponible: simplemente no hay historial.
   }

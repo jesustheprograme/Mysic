@@ -2,6 +2,20 @@
 // cliente, porque el código generado del backend no es editable. Lo desconocido se deja tal cual.
 
 const EXACT = new Map(Object.entries({
+  // Con la cuenta (o el servidor) en español, YouTube ya entrega los títulos traducidos, pero con otras palabras.
+  // Se reducen al mismo nombre que el inglés para que conserven su formato, su orden y lo que el usuario ordenó.
+  'podcasts': 'Pódcasts',
+  'vuelve a escucharlo': 'Volver a escuchar',
+  'volver a escuchar': 'Volver a escuchar',
+  'selecciones rápidas': 'Selección rápida',
+  'selección rápida': 'Selección rápida',
+  'álbumes y singles nuevos': 'Álbumes y sencillos nuevos',
+  'vídeos musicales nuevos': 'Videos musicales nuevos',
+  'new music videos': 'Videos musicales nuevos',
+  'mixes personalizados': 'Mixes para ti',
+  'listas de reproducción destacadas para ti': 'Playlists destacadas para ti',
+  'listas de reproducción destacadas': 'Playlists destacadas',
+  'nuevos descubrimientos y los favoritos de siempre': 'Lo nuevo y lo que más te gusta',
   'listen again': 'Volver a escuchar',
   'forgotten favorites': 'Favoritos olvidados',
   'quick picks': 'Selección rápida',

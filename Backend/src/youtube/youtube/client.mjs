@@ -17,6 +17,12 @@ function getSessionCookie() {
   return process.env.YOUTUBE_COOKIE?.trim() || undefined;
 }
 
+// Idioma y región SOLO si se piden por entorno. Por defecto se queda en inglés de EE. UU.: youtubei.js localiza las
+// secciones de los resultados por su título en inglés ("Songs", "Artists"...) y con lang 'es' las búsquedas por tipo
+// devuelven listas vacías. Los títulos se traducen en el cliente (shelfTitles.js).
+const YOUTUBE_LANG = process.env.YOUTUBE_LANG?.trim() || undefined;
+const YOUTUBE_LOCATION = process.env.YOUTUBE_LOCATION?.trim() || undefined;
+
 /** Devuelve la instancia de Innertube o lanza si todavía no está lista. */
 export function getYoutube() {
   if (!youtube) throw new Error('Sin conexión con YouTube');
@@ -32,7 +38,7 @@ export async function initYoutube(retryMs) {
   try {
     console.log('🔄 Inicializando conexión con YouTube...');
     const cookie = getSessionCookie();
-    youtube = await Innertube.create(cookie ? { cookie } : undefined);
+    youtube = await Innertube.create({ ...(YOUTUBE_LANG ? { lang: YOUTUBE_LANG } : {}), ...(YOUTUBE_LOCATION ? { location: YOUTUBE_LOCATION } : {}), ...(cookie ? { cookie } : {}) });
     console.log('✅ Conexión con YouTubei.js completada con éxito.');
   } catch (error) {
     console.error(

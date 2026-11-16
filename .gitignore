@@ -60,3 +60,5 @@ deploy/*.tar.gz
 deploy/*-profile*/
 deploy/*.png
 limusic_*.exe
+# Temporales de herramientas de agentes (varios GB)
+.codex-temp/

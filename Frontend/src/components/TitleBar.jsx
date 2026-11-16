@@ -1,6 +1,9 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { ArrowLeft, ArrowRight, ChevronDown, Copy, Link2, Link2Off, LogOut, Minus, RefreshCw, RotateCw, Square, UserRound, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronDown, Copy, Link, Link2, Link2Off, LogOut, Minus, Moon, Radio, RefreshCw, RotateCw, Square, Sun, UserRound, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import LinkDialog from '../features/link/LinkDialog.jsx'
+import { AUTOPLAY_EVENT, readAutoplay, writeAutoplay } from '../features/youtube/autoplay.js'
+import useTheme from '../features/theme/useTheme.js'
 import { useAccountMenu } from '../features/youtube/accountMenuBridge.js'
 import './title-bar.css'
 
@@ -74,6 +77,12 @@ function UserMenu({ onLogout, user }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
   const account = useAccountMenu()
+  const [autoplay, setAutoplay] = useState(readAutoplay)
+  useEffect(() => {
+    const onChange = (event) => setAutoplay(Boolean(event.detail))
+    window.addEventListener(AUTOPLAY_EVENT, onChange)
+    return () => window.removeEventListener(AUTOPLAY_EVENT, onChange)
+  }, [])
   const runAccountAction = (action) => {
     setOpen(false)
     action()
@@ -131,6 +140,11 @@ function UserMenu({ onLogout, user }) {
               <span className="titlebar__menu-separator" role="separator" />
             </>
           )}
+          <button className="titlebar__menu-item" type="button" role="menuitemcheckbox" aria-checked={autoplay} title="Al acabarse la cola, sigue con canciones parecidas" onClick={() => writeAutoplay(!autoplay)}>
+            <Radio size={16} strokeWidth={1.8} aria-hidden="true" />
+            <span>Reproducción automática: {autoplay ? 'activada' : 'desactivada'}</span>
+          </button>
+          <span className="titlebar__menu-separator" role="separator" />
           <button className="titlebar__menu-item titlebar__menu-item--danger" type="button" role="menuitem" onClick={onLogout}>
             <LogOut size={16} strokeWidth={1.8} aria-hidden="true" />
             <span>Cerrar sesión</span>
@@ -150,6 +164,9 @@ function UserMenu({ onLogout, user }) {
 export default function TitleBar({ onLogout, user }) {
   const controls = useWindowControls()
   const history = useHistoryButtons()
+  const { theme, toggle } = useTheme()
+  const [linkOpen, setLinkOpen] = useState(false)
+  const light = theme === 'light'
 
   return (
     <header className="titlebar" data-tauri-drag-region>
@@ -170,6 +187,12 @@ export default function TitleBar({ onLogout, user }) {
       <span className="titlebar__title" aria-hidden="true">Mysic</span>
 
       <div className="titlebar__right">
+        <button className="titlebar__nav" type="button" aria-label="Abrir enlace" title="Abrir enlace" onClick={() => setLinkOpen(true)}>
+          <Link size={16} strokeWidth={2} aria-hidden="true" />
+        </button>
+        <button className="titlebar__nav" type="button" aria-label={light ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'} title={light ? 'Modo oscuro' : 'Modo claro'} onClick={toggle}>
+          {light ? <Moon size={16} strokeWidth={2} aria-hidden="true" /> : <Sun size={16} strokeWidth={2} aria-hidden="true" />}
+        </button>
         {user && <UserMenu onLogout={onLogout} user={user} />}
         <span className="titlebar__separator" aria-hidden="true" />
         <button className="titlebar__control" type="button" aria-label="Minimizar" title="Minimizar" onClick={controls.minimize}>
@@ -190,6 +213,7 @@ export default function TitleBar({ onLogout, user }) {
           <X size={16} strokeWidth={1.8} aria-hidden="true" />
         </button>
       </div>
+      {linkOpen && <LinkDialog onClose={() => setLinkOpen(false)} />}
     </header>
   )
 }

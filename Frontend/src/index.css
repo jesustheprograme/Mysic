@@ -199,3 +199,19 @@ img {
     @apply font-sans;
   }
 }
+
+/* Cambio de tema (claro/oscuro) con transición suave. useTheme pone .theme-switching solo mientras dura el fundido:
+   fuera de ese momento no hay transiciones globales (costarían en cada repintado de una app con cientos de elementos). */
+html.theme-switching,
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  @apply transition-colors duration-300;
+}
+
+/* Fundido del cambio de tema con View Transitions (ver useTheme.js): duración igual a duration-300. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 300ms;
+  animation-timing-function: ease;
+}

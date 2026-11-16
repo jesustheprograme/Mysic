@@ -3,8 +3,10 @@ use std::process::Command;
 
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
+mod audio_session;
 mod local_audio;
 mod resolver;
+mod spotify_link;
 mod taskbar;
 mod youtube_session;
 
@@ -286,6 +288,8 @@ pub fn run() {
             let dir = app.path().app_local_data_dir()?.join("audio");
             app.manage(local_audio::LocalAudio::open(dir));
             app.manage(std::sync::Arc::new(resolver::Resolver::new()));
+            // El mezclador de volumen de Windows muestra "Mysic" y su icono en vez de "Microsoft Edge WebView2".
+            audio_session::start();
             Ok(())
         })
         .register_asynchronous_uri_scheme_protocol(local_audio::SCHEME, |context, request, responder| {
@@ -321,9 +325,11 @@ pub fn run() {
             taskbar::set_taskbar_playback,
             resolver::resolve_audio,
             resolver::set_client_config,
+            resolver::fetch_client_config,
             resolver::warm_resolver,
             resolver::forget_audio,
-            youtube_session::open_youtube_music_login,
+            spotify_link::spotify_link_info,
+        youtube_session::open_youtube_music_login,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Mysic");

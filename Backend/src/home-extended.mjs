@@ -82,13 +82,20 @@ const defaultSchedule = (task) => setImmediate(() => { Promise.resolve().then(ta
  * Primera página del Inicio. Responde en cuanto llega; las continuaciones quedan tras un token y el
  * enriquecimiento de álbumes se hace después, mutando las mismas secciones (la copia en caché ya lo incluye).
  */
-export async function loadHomeFirstPage(youtube, { enrich = enrichShelfAlbums, schedule = defaultSchedule, sessions, timeoutMs = FIRST_PAGE_TIMEOUT_MS, userId = 'anon' } = {}) {
-  const home = await withTimeout(youtube.music.getHomeFeed(), timeoutMs, 'HOME_TIMEOUT', 'YouTube Music tardó demasiado en responder.')
-  const shelves = mapSections(home.sections)
+export async function loadHomeFirstPage(youtube, { enrich = enrichShelfAlbums, filter = null, schedule = defaultSchedule, sessions, timeoutMs = FIRST_PAGE_TIMEOUT_MS, userId = 'anon' } = {}) {
+  const feed = await withTimeout(youtube.music.getHomeFeed(), timeoutMs, 'HOME_TIMEOUT', 'YouTube Music tardó demasiado en responder.')
+  const filters = (feed.filters || []).map(plainText).filter(Boolean)
+  let home = feed
+  if (filter) {
+    // Una pastilla de estado de ánimo (Relax, Fiesta...): YouTube devuelve el Inicio filtrado, con sus propias secciones y continuación.
+    const chip = (feed.filters || []).find((candidate) => plainText(candidate) === filter)
+    if (!chip) throw Object.assign(new Error('Ese filtro del Inicio no existe.'), { code: 'HOME_FILTER_INVALID' })
+    home = await withTimeout(feed.applyFilter(chip), timeoutMs, 'HOME_TIMEOUT', 'YouTube Music tardó demasiado en responder.')
+  }  const shelves = mapSections(home.sections)
   schedule(() => enrich(shelves.slice(0, ENRICH_FIRST_SHELVES), youtube))
   return {
     personalized: Boolean(youtube.session?.cookie),
-    filters: (home.filters || []).map(plainText).filter(Boolean),
+    filters,
     shelves,
     continuation: sessions ? sessions.create(userId, home) : null,
   }
@@ -114,19 +121,24 @@ const unavailable = (res) => res.status(503).json({
   error: 'No se pudo conectar con YouTube Music ahora. Tu sesión sigue guardada; reintenta en unos segundos.',
 })
 
+/** `?filter=` de la pastilla elegida (texto, máx. 60), o null para el Inicio normal. */
+export const homeFilterOf = (req) => (typeof req.query?.filter === 'string' ? req.query.filter.trim().slice(0, 60) || null : null)
+
 /** GET /api/youtube/home (primera página). */
-export function createExtendedHomeHandler({ sessions = defaultSessions, inflight = defaultInflight } = {}) {
+export function createExtendedHomeHandler({ anonymous = getYoutube, hasAuth = hasStoredBrowserAuth, inflight = defaultInflight, load = loadHomeFirstPage, sessions = defaultSessions, userClient = getYoutubeForUser } = {}) {
   return [
     requireYoutube,
     asyncRoute(async (req, res) => {
       res.setHeader('Cache-Control', 'private, no-store')
-      const youtube = await getYoutubeForUser(req.mysicUser)
+      const youtube = await userClient(req.mysicUser)
       // Con una sesión guardada pero sin poder crear el cliente (red caída) no se sirve un Inicio anónimo como si fuera el suyo.
-      if (!youtube && await hasStoredBrowserAuth(req.mysicUser)) return unavailable(res)
+      if (!youtube && await hasAuth(req.mysicUser)) return unavailable(res)
       const userId = userIdOf(req)
+      const filter = homeFilterOf(req)
       try {
-        res.json(await inflight(`${userId}:home`, () => loadHomeFirstPage(youtube ?? getYoutube(), { sessions, userId })))
+        res.json(await inflight(`${userId}:home:${filter ?? ''}`, () => load(youtube ?? anonymous(), { filter, sessions, userId })))
       } catch (error) {
+        if (error.code === 'HOME_FILTER_INVALID') return res.status(400).json({ code: error.code, error: error.message })
         if (error.code === 'HOME_TIMEOUT') return res.status(504).json({ code: error.code, error: error.message })
         throw error
       }
@@ -145,8 +157,11 @@ export function createHomeMoreHandler({ sessions = defaultSessions } = {}) {
       try {
         res.json(await loadHomeMore(entry, { sessions }))
       } catch (error) {
-        const status = error.code === 'HOME_TIMEOUT' ? 504 : 502
-        res.status(status).json({ code: error.code ?? 'HOME_MORE_FAILED', error: 'No se pudieron cargar más secciones del Inicio.' })
+        if (error.code === 'HOME_TIMEOUT') return res.status(504).json({ code: error.code, error: 'No se pudieron cargar más secciones del Inicio.' })
+        // Medido (2026-11-16, 3 de 3 rondas): tras la cuarta página YouTube anuncia otra más, pero pedirla falla siempre.
+        // No es un error del usuario sino el final del Inicio: se responde como página vacía y sin continuación.
+        console.warn(`Fin del Inicio (la continuación anunciada falló): ${error.message}`)
+        res.json({ shelves: [], continuation: null })
       }
     }, 'No se pudo cargar más del inicio de YouTube Music'),
   ]

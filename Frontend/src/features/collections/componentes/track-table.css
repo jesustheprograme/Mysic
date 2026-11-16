@@ -1,0 +1,88 @@
+/*
+ * Filas de canciones: acciones y modo tabla de las playlists.
+ * Las reglas de la tabla cuelgan de `.collection-detail .collection-detail__tracks` (3 clases) para ganar a colecciones.css y a minimal.css (`.music-app .collection-detail__table-head`), sin depender del orden de carga.
+ */
+
+/* Acciones: el ✓ "Guardada en" y el corazón de una favorita se ven siempre; el corazón vacío y los demás botones,
+   solo al pasar el cursor o con el foco. */
+.collection-detail .collection-detail__track .collection-detail__track-actions { opacity: 1; }
+
+.collection-detail .collection-detail__track-heart:not([data-liked='true']),
+.collection-detail .collection-detail__track-actions .collection-detail__track-action {
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.collection-detail .collection-detail__track:hover .collection-detail__track-heart,
+.collection-detail .collection-detail__track:focus-within .collection-detail__track-heart,
+.collection-detail .collection-detail__track:hover .collection-detail__track-action,
+.collection-detail .collection-detail__track:focus-within .collection-detail__track-action { opacity: 1; }
+
+/* ---- Modo tabla: # · carátula · título y artista · álbum · fecha de adición · ✓ y corazón · duración ---- */
+.collection-detail__tracks { container-type: inline-size; }
+
+.collection-detail .collection-detail__tracks .collection-detail__track.collection-detail__track--table,
+.collection-detail .collection-detail__tracks .collection-detail__table-head--table {
+  grid-template-columns: 28px 44px minmax(0, 1.5fr) minmax(0, 1fr) 112px 66px 44px;
+  gap: 12px;
+}
+
+.collection-detail .collection-detail__tracks .collection-detail__table-head--table {
+  display: grid;
+  align-items: center;
+  margin: 0 0 6px;
+  padding: 0 12px 10px;
+  border-bottom: 1px solid oklch(1 0 0 / 0.08);
+  color: #9aa19f;
+  font-size: 13px;
+}
+
+.collection-detail .collection-detail__tracks .collection-detail__table-head--table > :first-child { text-align: center; }
+.collection-detail .collection-detail__tracks .collection-detail__table-head--table > svg { justify-self: end; }
+
+.collection-detail .collection-detail__track--table .collection-detail__track-index { color: #9aa19f; }
+
+.collection-detail__track-thumb {
+  width: 44px;
+  height: 44px;
+  display: block;
+  border-radius: 5px;
+  object-fit: cover;
+  background: #171b1a;
+}
+
+.collection-detail__track-album,
+.collection-detail__track-date {
+  min-width: 0;
+  overflow: hidden;
+  color: #a2a9a6;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collection-detail__track-album .collection-detail__catalog-link {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.collection-detail__track-date time { font-variant-numeric: tabular-nums; }
+
+/* Sin sitio: primero se va la fecha y después el álbum (el título nunca se aprieta por ellos). */
+@container (max-width: 760px) {
+  .collection-detail .collection-detail__tracks .collection-detail__track.collection-detail__track--table,
+  .collection-detail .collection-detail__tracks .collection-detail__table-head--table { grid-template-columns: 28px 44px minmax(0, 1.5fr) minmax(0, 1fr) 66px 44px; }
+  .collection-detail .collection-detail__track--table .collection-detail__track-date,
+  .collection-detail .collection-detail__tracks .collection-detail__table-head--table .collection-detail__track-date { display: none; }
+}
+
+@container (max-width: 560px) {
+  .collection-detail .collection-detail__tracks .collection-detail__track.collection-detail__track--table,
+  .collection-detail .collection-detail__tracks .collection-detail__table-head--table { grid-template-columns: 24px 40px minmax(0, 1fr) 66px 40px; gap: 8px; }
+  .collection-detail .collection-detail__track--table .collection-detail__track-album,
+  .collection-detail .collection-detail__tracks .collection-detail__table-head--table .collection-detail__track-album { display: none; }
+  .collection-detail .collection-detail__track--table .collection-detail__track-actions { display: inline-flex; }
+}

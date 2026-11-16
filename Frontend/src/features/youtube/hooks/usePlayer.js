@@ -131,8 +131,13 @@ export function usePlayer({ isDownloaded, enabled = true, onQueueEnd, onQueueSta
   }, [isDownloaded]);
   // Al pasar el cursor: solo se prepara la última fila en la que el puntero se detiene. Recorrer una lista
   // con el ratón no lanza una resolución por fila (cada una es una consulta completa a YouTube).
-  const warmSong = useCallback((song) => {
+  // immediate (pulsar o enfocar una fila) no espera: el clic llega pocos milisegundos después.
+  const warmSong = useCallback((song, immediate = false) => {
     clearTimeout(hoverWarmRef.current);
+    if (immediate) {
+      warmNow(song);
+      return;
+    }
     hoverWarmRef.current = setTimeout(() => warmNow(song), HOVER_WARM_DELAY_MS);
   }, [warmNow]);
   useEffect(() => () => clearTimeout(hoverWarmRef.current), []);
@@ -502,7 +507,7 @@ export function usePlayer({ isDownloaded, enabled = true, onQueueEnd, onQueueSta
     preload: 'auto',
     onCanPlay: () => perfMark('audio-canplay', { id: videoIdRef.current }),
     onPlay: () => { setIsPlaying(true); setIsBuffering(false); window.dispatchEvent(new CustomEvent(PLAY_EVENT)); },
-    onPause: () => setIsPlaying(false),
+    onPause: () => { setIsPlaying(false); setIsBuffering(false); }, // pausar mientras carga no debe dejar el indicador de carga girando
     onWaiting: () => setIsBuffering(true),
     onPlaying: () => { setIsBuffering(false); perfMark('audio-playing', { id: videoIdRef.current }); },
     // Un stream sin longitud conocida informa Infinity: se conserva la duración del catálogo.

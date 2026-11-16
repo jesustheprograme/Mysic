@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { applyHomeLayout, chooseShelfLayout, DEFAULT_LAYOUT, moveKey, sanitizeLayout, setAllHidden, shelfKey, toggleHidden, withOrder } from './homeLayout.js'
+import { applyHomeLayout, chooseShelfLayout, DEFAULT_LAYOUT, layoutKeepingSeen, moveKey, sanitizeLayout, setAllHidden, shelfKey, toggleHidden, withOrder } from './homeLayout.js'
 
 const shelves = [
   { title: 'Trending' },
@@ -77,4 +77,19 @@ test('sanitizeLayout corrige datos guardados inválidos', () => {
   assert.deepEqual(sanitizeLayout(null), DEFAULT_LAYOUT)
   assert.deepEqual(sanitizeLayout({ cardSize: 'enorme', hidden: 'x', order: [1, 'a', 'a'] }), { cardSize: 'medium', hidden: [], order: ['a'] })
   assert.equal(sanitizeLayout({ cardSize: 'large' }).cardSize, 'large')
+})
+
+test('las secciones que llegan despues van detras de las ya vistas', () => {
+  const first = applyHomeLayout([{ title: 'Favoritos olvidados', items: [] }, { title: 'Tendencias', items: [] }], DEFAULT_LAYOUT)
+  const seen = first.sections.map((section) => section.key)
+  const later = applyHomeLayout([{ title: 'Tendencias', items: [] }, { title: 'Favoritos olvidados', items: [] }, { title: 'Álbumes para ti', items: [] }], layoutKeepingSeen(DEFAULT_LAYOUT, seen))
+  assert.deepEqual(later.sections.map((section) => section.key), ['favoritos olvidados', 'tendencias', 'álbumes para ti'])
+  assert.equal(layoutKeepingSeen(DEFAULT_LAYOUT, []), DEFAULT_LAYOUT)
+})
+
+test('los titulos que YouTube ya entrega en espanol conservan formato y orden', () => {
+  assert.equal(shelfKey('Vuelve a escucharlo'), 'volver a escuchar')
+  assert.equal(chooseShelfLayout({ title: 'Vuelve a escucharlo', items: [{ kind: 'playlist' }] }), 'tiles')
+  const sections = applyHomeLayout([{ title: 'Éxitos de hoy', items: [] }, { title: 'Vuelve a escucharlo', items: [] }], { ...DEFAULT_LAYOUT, order: ['volver a escuchar'] }).sections
+  assert.deepEqual(sections.map((section) => section.key), ['volver a escuchar', 'éxitos de hoy'])
 })

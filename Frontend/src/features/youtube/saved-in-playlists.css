@@ -1,0 +1,85 @@
+/* ✓ "Guardada en" (canciones que ya están en alguna de tus playlists) y su tarjeta. */
+.saved-in {
+  width: 29px;
+  height: 29px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  padding: 0;
+  border-radius: 7px;
+  color: var(--m-accent, #ff6542);
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.saved-in:hover,
+.saved-in:focus-visible,
+.saved-in--open { background: color-mix(in srgb, var(--m-accent, #ff6542) 16%, transparent); }
+
+.saved-in-card {
+  position: fixed;
+  z-index: 140;
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid oklch(1 0 0 / 0.1);
+  border-radius: 10px;
+  color: #eceeed;
+  background: oklch(0.21 0.008 165);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 0.55);
+  animation: saved-in-card-in 0.14s ease-out;
+}
+
+@keyframes saved-in-card-in {
+  from { opacity: 0; transform: translateY(-4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .saved-in-card { animation: none; }
+}
+
+.saved-in-card__eyebrow {
+  padding: 0 4px 3px;
+  color: var(--m-accent, #ff6542);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.saved-in-card__list {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 4px;
+  border-radius: 6px;
+  color: inherit;
+  text-align: left;
+}
+
+.saved-in-card__list:hover,
+.saved-in-card__list:focus-visible { background: oklch(1 0 0 / 0.07); }
+
+.saved-in-card__list img,
+.saved-in-card__list i {
+  width: 38px;
+  height: 38px;
+  display: block;
+  border-radius: 4px;
+  object-fit: cover;
+  background: #1a1f1e;
+}
+
+.saved-in-card__list span { display: grid; min-width: 0; gap: 2px; }
+
+.saved-in-card__list strong,
+.saved-in-card__list small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-in-card__list strong { font-size: 13px; font-weight: 650; color: #fff; }
+.saved-in-card__list small { color: #a9adb3; font-size: 11.5px; }
+.saved-in-card__more { padding: 2px 4px 0; color: #a9adb3; font-size: 11px; }

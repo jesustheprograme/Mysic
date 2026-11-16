@@ -24,3 +24,27 @@ const pick = (song) => Object.fromEntries(SONG_FIELDS.filter((field) => song[fie
 export function compactLibrary(library) {
   return { ...library, likedSongs: (library.likedSongs ?? []).map(pick) }
 }
+
+// Me gusta que se guardan en disco cuando la biblioteca entera no cabe en la caché (el resto llega al sincronizar).
+export const TRIMMED_LIKED_LIMIT = 300
+
+// Versión reducida para arrancar: las primeras canciones y `likedTotal` con el total real. Sin ella, una biblioteca
+// grande (miles de Me gusta) superaba el límite de la caché, se descartaba entera y tras recargar no había playlists.
+export function trimLibrary(library, limit = TRIMMED_LIKED_LIMIT) {
+  const liked = library.likedSongs ?? []
+  return liked.length <= limit ? library : { ...library, likedSongs: liked.slice(0, limit), likedTotal: liked.length }
+}
+
+// Biblioteca sin la marca de recorte: lo que llega de la red siempre es la lista real.
+export function withoutTrimMark(library) {
+  if (!library || library.likedTotal == null) return library
+  const rest = { ...library }
+  delete rest.likedTotal
+  return rest
+}
+
+// Escribe la biblioteca para el arranque, siempre en su versión reducida: los Me gusta completos ya están guardados
+// como favoritas (medido: guardarlos dos veces ocupaba 1 MB de los ~5 MB del almacenamiento local). Devuelve si se guardó.
+export function persistLibrary(cache, key, library) {
+  return cache.write(key, trimLibrary(compactLibrary(library)))
+}

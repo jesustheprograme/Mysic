@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { sizedImage } from '../../lib/imageSize.js'
 import ArtistCard from '../discovery/ArtistCard.jsx'
 import HomeRail from '../discovery/HomeRail.jsx'
+import { ctxMenu } from './contextMenuStore.js'
 import { CardMenu } from './ItemMenus.jsx'
 import { adaptBrowseItem } from './lib/adapters.js'
 import { buildLibrary, LIBRARY_TABS, LIKED_ID, REPEAT_ID } from './libraryModel.js'
@@ -10,7 +11,7 @@ import { emptyMeta, nextKindToLoad } from './libraryPages.js'
 import { readTopPlays } from './playHistory.js'
 import { prefetchHandlers } from './prefetchDetail.js'
 import useVirtualGrid from './useVirtualGrid.js'
-import { anchorShiftRows, GRID_ROW_GAP, isNearEnd } from './virtualGrid.js'
+import { anchorShiftRows, artistGridSizing, GRID_ROW_GAP, isNearEnd, LIBRARY_GRID_SIZING } from './virtualGrid.js'
 import './library-view.css'
 
 // Estado que sobrevive al desmontaje (al entrar en un álbum o artista y volver, se reabre donde estabas):
@@ -23,9 +24,9 @@ const spanishCount = (text) => String(text).replace(/(\d[\d.,]*)\s+songs?\b/i, (
 
 // Siete tarjetas por fila (seis con el reproductor lateral abierto) y solo un poco fluidas: la tarjeta reparte el
 // ancho pero nunca baja de minWidth ni sube de maxWidth; si sobra sitio caben más columnas en vez de estirarla.
-const GRID_SIZING = { columns: 7, maxWidth: 190, minWidth: 104, playerColumns: 6 }
+const GRID_SIZING = LIBRARY_GRID_SIZING
 // Las tarjetas de artista (3:4, sin texto debajo) admiten algo más de ancho que las de portada cuadrada.
-const artistSizing = (sizing) => ({ ...sizing, maxWidth: sizing.maxWidth + 20, minWidth: sizing.minWidth + 8 })
+const artistSizing = artistGridSizing
 
 // Las tarjetas son las del inicio: mismo adaptador, mismo HomeRail, mismo menú y misma precarga al pasar el cursor.
 // Solo las tarjetas especiales ("Música que me gusta", "En repetición") se adaptan aparte.
@@ -89,6 +90,7 @@ function VirtualGrid({ artistCounts, controller, entries, loading = false, onNee
                 albumCount={artistCounts?.albums.get(entry.id) || undefined}
                 artist={{ artistId: entry.id, artwork: sizedImage(entry.thumbnail, cardWidth), meta: songs ? `${songs} ${songs === 1 ? 'canción' : 'canciones'}` : spanishCount(entry.subtitle ?? 'Artista'), title: entry.name ?? entry.title }}
                 key={entry.id}
+                onContextMenu={ctxMenu('artist', entry)}
                 onOpen={() => onOpen(entry)}
               />
             )
@@ -107,6 +109,7 @@ function VirtualGrid({ artistCounts, controller, entries, loading = false, onNee
         onArtistSelect={controller.openArtist}
         onIntent={(item) => { const kind = kindOf(item); if (kind && kind !== 'special') prefetchHandlers(kind, item.id).start?.() }}
         onIntentEnd={(item) => { const kind = kindOf(item); if (kind && kind !== 'special') prefetchHandlers(kind, item.id).stop?.() }}
+        onItemContextMenu={(item, event) => { const entry = byId.get(item.id); if (entry && entry.kind !== 'special') ctxMenu(entry.kind, entry)(event) }}
         onSelect={(id) => onOpen(byId.get(id))}
         renderMenu={(item) => {
           const entry = byId.get(item.id)

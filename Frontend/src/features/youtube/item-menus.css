@@ -1,26 +1,27 @@
-/* Menús contextuales de canciones y tarjetas (estilo limusic: panel oscuro, filas de 40px, acento en la primera). */
+/* Menús contextuales de canciones y tarjetas (panel neutro del tema de Mysic, filas de 30px, acento en la primera). */
 .ym-menu {
-  width: 270px;
-  padding: 6px;
+  width: 212px;
+  min-width: 0;
+  padding: 4px;
   border: 1px solid oklch(1 0 0 / 0.1);
-  border-radius: 14px;
-  background: #15101c;
+  border-radius: 11px;
+  background: oklch(0.21 0.008 165);
   box-shadow: 0 16px 40px rgb(0 0 0 / 0.55);
-  color: #eceaf1;
+  color: #eceeed;
 }
 
 .ym-item {
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-height: 38px;
-  padding: 0 12px;
-  border-radius: 9px;
-  font-size: 14px;
+  gap: 10px;
+  min-height: 30px;
+  padding: 0 9px;
+  border-radius: 7px;
+  font-size: 13px;
   cursor: pointer;
 }
 
-.ym-item svg { color: #b9b4c4; }
+.ym-item svg { width: 15px; height: 15px; color: #aeb4b0; }
 .ym-item:focus, .ym-item[data-highlighted] { background: oklch(1 0 0 / 0.08); color: #fff; }
 .ym-item:focus svg, .ym-item[data-highlighted] svg { color: #fff; }
 
@@ -30,7 +31,10 @@
 .ym-item--danger, .ym-item--danger svg { color: #ff8a7a; }
 .ym-item[data-disabled] { opacity: 0.45; }
 
-.ym-separator { height: 1px; margin: 5px 6px; background: oklch(1 0 0 / 0.08); }
+/* Ancla invisible en el cursor para el menú de clic derecho. */
+.ym-anchor { position: fixed; width: 0; height: 0; pointer-events: none; }
+
+.ym-separator { height: 1px; margin: 3px 5px; background: oklch(1 0 0 / 0.08); }
 
 /* Botón "…" sobre la portada de una tarjeta: aparece al apuntar o al enfocar la tarjeta. */
 .home-shelf-card { position: relative; }
@@ -71,7 +75,7 @@
   padding: 10px 18px;
   border: 1px solid oklch(1 0 0 / 0.12);
   border-radius: 999px;
-  background: #15101c;
+  background: oklch(0.21 0.008 165);
   color: #fff;
   font-size: 13px;
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.5);

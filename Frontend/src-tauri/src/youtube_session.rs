@@ -97,6 +97,37 @@ fn capture_after_music_load(
     });
 }
 
+/// Carpeta de perfil propia y vacía para la ventana de acceso (se borra al cerrarla).
+fn login_profile_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let base = app
+        .path()
+        .app_cache_dir()
+        .map_err(|error| format!("No se pudo preparar el acceso de YouTube Music: {error}"))?
+        .join("youtube-login");
+    // Restos de accesos anteriores que no se pudieron borrar.
+    let _ = std::fs::remove_dir_all(&base);
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|value| value.as_millis())
+        .unwrap_or(0);
+    let dir = base.join(stamp.to_string());
+    std::fs::create_dir_all(&dir)
+        .map_err(|error| format!("No se pudo preparar el acceso de YouTube Music: {error}"))?;
+    Ok(dir)
+}
+
+/// WebView2 suelta los archivos unos instantes después de cerrar la ventana: se reintenta el borrado.
+fn remove_profile_later(dir: std::path::PathBuf) {
+    thread::spawn(move || {
+        for _ in 0..10 {
+            thread::sleep(Duration::from_secs(2));
+            if std::fs::remove_dir_all(&dir).is_ok() || !dir.exists() {
+                return;
+            }
+        }
+    });
+}
+
 #[tauri::command]
 pub async fn open_youtube_music_login(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(LOGIN_WINDOW_LABEL) {
@@ -112,8 +143,14 @@ pub async fn open_youtube_music_login(app: tauri::AppHandle) -> Result<(), Strin
         .parse()
         .map_err(|error| format!("Dirección de acceso no válida: {error}"))?;
 
+    // Perfil de navegador nuevo en cada acceso: con el perfil compartido de la app, Google reutilizaba la sesión
+    // anterior (la del primer dueño) y se capturaba su cookie aunque el usuario quisiera entrar con otra cuenta.
+    let profile_dir = login_profile_dir(&app)?;
+    let cleanup_dir = profile_dir.clone();
+
     let completed_on_load = capture_completed.clone();
     let window = WebviewWindowBuilder::new(&app, LOGIN_WINDOW_LABEL, WebviewUrl::External(login_url))
+        .data_directory(profile_dir)
         .title("Iniciar sesión en YouTube Music")
         .inner_size(620.0, 820.0)
         .min_inner_size(440.0, 640.0)
@@ -136,6 +173,9 @@ pub async fn open_youtube_music_login(app: tauri::AppHandle) -> Result<(), Strin
 
     let close_app = app.clone();
     window.on_window_event(move |event| {
+        if matches!(event, tauri::WindowEvent::Destroyed) {
+            remove_profile_later(cleanup_dir.clone());
+        }
         if matches!(event, tauri::WindowEvent::Destroyed)
             && !capture_completed.load(Ordering::Acquire)
         {

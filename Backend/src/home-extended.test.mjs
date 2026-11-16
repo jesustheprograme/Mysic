@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createHomeSessions, createInflight, loadHomeFirstPage, loadHomeMore } from './home-extended.mjs'
+import { createExtendedHomeHandler, createHomeMoreHandler, createHomeSessions, createInflight, loadHomeFirstPage, loadHomeMore } from './home-extended.mjs'
 
 const song = (id) => ({ item_type: 'song', id, title: `Canción ${id}`, artists: [{ name: 'Artista', channel_id: 'UC1' }] })
 const section = (title, ...ids) => ({ header: { title }, contents: ids.map(song) })
@@ -132,4 +132,81 @@ test('las peticiones idénticas simultáneas comparten una sola carga', async ()
   assert.equal(loads, 2)
   await inflight('u1:home', load)
   assert.equal(loads, 3, 'terminada la carga, la siguiente petición vuelve a cargar')
+})
+
+test('con filtro pide el Inicio filtrado de la pastilla y conserva la lista de pastillas', async () => {
+  const filtered = page([section('Deep focus', 'f1')], page([section('Mas', 'm1')]))
+  const chip = { text: 'Relax' }
+  const home = { ...page([section('A', 'a1')]), filters: [chip, { text: 'Fiesta' }], applyFilter: async (target) => (target === chip ? filtered : null) }
+  const sessions = createHomeSessions()
+  const result = await loadHomeFirstPage(withHome(home), { enrich: never, filter: 'Relax', schedule: runNow, sessions, userId: 'u1' })
+  assert.deepEqual(result.shelves.map((shelf) => shelf.title), ['Deep focus'])
+  assert.deepEqual(result.filters, ['Relax', 'Fiesta'])
+  assert.equal(typeof result.continuation, 'string', 'el Inicio filtrado tambien sigue por paginas')
+})
+
+test('un filtro que no existe falla con un codigo claro', async () => {
+  const home = { ...page([section('A', 'a1')]), filters: [{ text: 'Relax' }], applyFilter: async () => null }
+  await assert.rejects(
+    loadHomeFirstPage(withHome(home), { enrich: never, filter: 'Inventado', schedule: runNow, sessions: createHomeSessions() }),
+    (error) => error.code === 'HOME_FILTER_INVALID',
+  )
+})
+
+// El contrato HTTP del Inicio: el manejador DEBE pasar ?filter= a la carga y traducir un filtro inexistente a 400.
+function callHome(query, load) {
+  const handler = createExtendedHomeHandler({
+    anonymous: () => ({}), hasAuth: async () => false, inflight: createInflight(), load, sessions: createHomeSessions(), userClient: async () => null,
+  })[1]
+  const res = { headers: {}, status(code) { this.code = code; return this }, json(body) { this.body = body; return this }, setHeader(name, value) { this.headers[name] = value } }
+  return handler({ mysicUser: { _id: 'u1' }, query }, res, () => {}).then(() => res)
+}
+
+test('el manejador pasa ?filter= a la carga y responde 200', async () => {
+  let received
+  const res = await callHome({ filter: '  Relax  ' }, async (_youtube, options) => { received = options.filter; return { shelves: [], filters: ['Relax'] } })
+  assert.equal(received, 'Relax')
+  assert.deepEqual(res.body, { shelves: [], filters: ['Relax'] })
+})
+
+test('sin ?filter= el filtro llega como null (Inicio normal)', async () => {
+  let received = 'x'
+  await callHome({}, async (_youtube, options) => { received = options.filter; return { shelves: [] } })
+  assert.equal(received, null)
+  await callHome({ filter: ['a', 'b'] }, async (_youtube, options) => { received = options.filter; return { shelves: [] } })
+  assert.equal(received, null, 'un filtro que no es texto se ignora')
+})
+
+// /home/more: una continuación anunciada que falla es el final del Inicio (página vacía), salvo que se agote el tiempo.
+async function callMore(getContinuation) {
+  const sessions = createHomeSessions()
+  const token = sessions.create('u1', { has_continuation: true, getContinuation })
+  const handler = createHomeMoreHandler({ sessions })[1]
+  const res = { headers: {}, status(code) { this.code = code; return this }, json(body) { this.body = body; return this }, setHeader(name, value) { this.headers[name] = value } }
+  const warn = console.warn
+  console.warn = () => {}
+  try {
+    await handler({ mysicUser: { _id: 'u1' }, query: { token } }, res, () => {})
+  } finally {
+    console.warn = warn
+  }
+  return res
+}
+
+test('la continuación anunciada que falla responde como final del Inicio (200, vacía, sin token)', async () => {
+  const res = await callMore(async () => { throw new Error('Continuation not found') })
+  assert.equal(res.code, undefined, 'responde 200')
+  assert.deepEqual(res.body, { shelves: [], continuation: null })
+})
+
+test('una continuación lenta sigue respondiendo 504 HOME_TIMEOUT', async () => {
+  const res = await callMore(async () => { throw Object.assign(new Error('lento'), { code: 'HOME_TIMEOUT' }) })
+  assert.equal(res.code, 504)
+  assert.equal(res.body.code, 'HOME_TIMEOUT')
+})
+
+test('un filtro inexistente responde 400 con HOME_FILTER_INVALID', async () => {
+  const res = await callHome({ filter: 'Inventado' }, async () => { throw Object.assign(new Error('Ese filtro del Inicio no existe.'), { code: 'HOME_FILTER_INVALID' }) })
+  assert.equal(res.code, 400)
+  assert.equal(res.body.code, 'HOME_FILTER_INVALID')
 })

@@ -3,6 +3,8 @@ import { ChevronLeft, ChevronRight, ListPlus } from 'lucide-react'
 import HeartToggle from '../../components/HeartToggle.jsx'
 import PreviewIndicator from '../../components/PreviewIndicator.jsx'
 import { sizedImage } from '../../lib/imageSize.js'
+import { ctxMenu } from '../youtube/contextMenuStore.js'
+import SongMoreButton from '../youtube/SongMoreButton.jsx'
 import { getAdjacentArtworkUrls, getVisiblePages } from './paginatedArtwork.js'
 
 const SONGS_PER_PAGE = 15
@@ -53,7 +55,7 @@ export function SongRow({
   }
 
   return (
-    <div className={`song-row${showNumber ? ' song-row--numbered' : ''}${selected ? ' song-row--active' : ''}${selected && selectedSongPlaying ? ' song-row--playing' : ''}${previewStatus ? ` song-row--preview-${previewStatus}` : ''}`}>
+    <div onContextMenu={song.source === 'youtube' ? ctxMenu('song', song) : undefined} className={`song-row${showNumber ? ' song-row--numbered' : ''}${selected ? ' song-row--active' : ''}${selected && selectedSongPlaying ? ' song-row--playing' : ''}${previewStatus ? ` song-row--preview-${previewStatus}` : ''}`}>
       {showNumber && <span className="song-row__number" aria-hidden="true">{index + 1}</span>}
       <div className="song-row__main">
         <button className="song-row__artwork playback-hover" type="button" aria-label={selected && selectedSongPlaying ? `Pausar ${song.title}` : `Reproducir ${song.title}`} aria-pressed={selected && selectedSongPlaying} onClick={selectSong} onPointerEnter={() => { if (!selected) onPreviewStart?.(song) }} onPointerLeave={onPreviewStop}>
@@ -71,10 +73,11 @@ export function SongRow({
       <span className="song-row__meta">
         <span className="song-row__actions">
           <HeartToggle className="heart-container--song-row" label={`Me gusta ${song.title}`} liked={liked} onToggle={(nextLiked) => onToggleFavorite?.(song.id, nextLiked, song)} removeLabel={`Quitar ${song.title} de favoritas`} size={16} />
-          <button className="song-row__action" type="button" aria-label={`Añadir ${song.title} a una playlist`} title="Añadir a playlist" onClick={(event) => { event.stopPropagation(); onAddToPlaylist?.(song) }}><ListPlus size={16} strokeWidth={1.8} aria-hidden="true" /></button>
+          {onAddToPlaylist && <button className="song-row__action" type="button" aria-label={`Añadir ${song.title} a una playlist`} title="Añadir a playlist" onClick={(event) => { event.stopPropagation(); onAddToPlaylist(song) }}><ListPlus size={16} strokeWidth={1.8} aria-hidden="true" /></button>}
           {renderSongActions?.(song)}
         </span>
         <span className="song-row__duration">{formatDuration(song.durationSeconds)}</span>
+        <SongMoreButton song={song} />
       </span>
     </div>
   )

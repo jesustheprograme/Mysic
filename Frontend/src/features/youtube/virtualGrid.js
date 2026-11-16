@@ -6,6 +6,11 @@
 /** Separación horizontal y vertical de la cuadrícula de la biblioteca (px). */
 export const GRID_COLUMN_GAP = 18
 export const GRID_ROW_GAP = 24
+/** Dimensiones de la cuadrícula de la Biblioteca: 7 por fila (6 con el reproductor lateral abierto), tarjeta de 104 a 190 px. */
+export const LIBRARY_GRID_SIZING = { columns: 7, maxWidth: 190, minWidth: 104, playerColumns: 6 }
+/** Las tarjetas de artista son algo más anchas que las de álbum/playlist. La Biblioteca y la búsqueda usan esta misma medida. */
+export const artistGridSizing = (sizing = LIBRARY_GRID_SIZING) => ({ ...sizing, maxWidth: sizing.maxWidth + 20, minWidth: sizing.minWidth + 8 })
+
 /** Alto del texto bajo la portada: margen + título + artista + detalle (px). */
 export const CARD_META_PX = 62
 /** Filas de margen a cada lado de lo visible. */

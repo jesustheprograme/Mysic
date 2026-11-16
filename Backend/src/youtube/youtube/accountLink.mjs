@@ -319,6 +319,10 @@ export function parseBrowserAuth(requestText) {
 
 async function createBrowserClient(browserAuth) {
   return Innertube.create({
+    // Idioma solo por entorno: con lang 'es' youtubei.js no reconoce las secciones de resultados ("Songs"...) y las
+    // búsquedas por tipo salen vacías. Sin variable, el idioma lo decide la cuenta, como antes.
+    ...(process.env.YOUTUBE_LANG?.trim() ? { lang: process.env.YOUTUBE_LANG.trim() } : {}),
+    ...(process.env.YOUTUBE_LOCATION?.trim() ? { location: process.env.YOUTUBE_LOCATION.trim() } : {}),
     cookie: browserAuth.cookie,
     account_index: browserAuth.accountIndex,
     on_behalf_of_user: browserAuth.onBehalfOfUser,

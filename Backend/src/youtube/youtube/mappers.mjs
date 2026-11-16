@@ -21,14 +21,55 @@ export function plainText(value) {
   return '';
 }
 
+// --- Artistas de un elemento de Innertube ---
+// youtubei.js deja los artistas en sitios distintos según el tipo de elemento: las canciones de catálogo traen
+// `artists`; los vídeos (clips oficiales y subidos por usuarios) traen `authors` (plural) y NO `artists`; algunas
+// tarjetas traen `author`; y hay filas cuyo artista es solo texto sin enlace de canal (no llega a ninguna lista).
+// Antes solo se leía `artists`, así que todos los vídeos salían como "Artista desconocido".
+const SEPARATOR = /^[\s•·|]+$/;
+// "58K views", "9.1K plays", "3:45", "2019": son datos de la fila, no artistas.
+const METRIC = /^(\d[\d.,]*\s*[KMB]?\s*(views?|plays?|vistas|visualizaciones|reproducciones)\b|\d{1,2}(:\d{2}){1,2}|\d{4})/i;
+
+const namedEntries = (list) => (Array.isArray(list) ? list : [])
+  .map((entry) => ({ name: plainText(entry?.name).trim(), channel_id: entry?.channel_id }))
+  .filter((entry) => entry.name);
+
+/** Primer grupo de texto de la segunda columna ("Artista • 58K views • 4:39"), con su canal si lo enlaza. */
+function artistsFromColumns(item) {
+  const runs = item?.flex_columns?.[1]?.title?.runs ?? item?.subtitle?.runs ?? [];
+  const group = [];
+  for (const run of runs) {
+    const text = plainText(run?.text ?? run);
+    if (SEPARATOR.test(text)) {
+      if (group.length) break;
+      continue;
+    }
+    group.push(run);
+  }
+  const name = group.map((run) => plainText(run?.text ?? run)).join('').trim();
+  if (!name || METRIC.test(name)) return [];
+  const channelId = group.map((run) => run?.endpoint?.payload?.browseId).find((id) => typeof id === 'string' && id.startsWith('UC'));
+  return [{ name, channel_id: channelId }];
+}
+
+/** Artistas de un elemento: `artists`, si no `authors`, si no `author`, y si no el texto de la segunda columna. */
+export function artistsOf(item) {
+  for (const list of [item?.artists, item?.authors, item?.author ? [item.author] : null]) {
+    const entries = namedEntries(list);
+    if (entries.length) return entries;
+  }
+  return artistsFromColumns(item);
+}
+
 // `defaults` rellena campos que faltan en algunos contextos (pistas de álbum sin carátula ni artista).
 export function mapSong(song, defaults = {}) {
-  const artistNames = song.artists?.map((artist) => plainText(artist.name)).filter(Boolean) || [];
+  const artists = artistsOf(song);
+  const artistNames = artists.map((artist) => artist.name);
   return {
     id: song.id,
     title: plainText(song.title) || 'Canción sin título',
     artist: artistNames.join(', ') || plainText(defaults.artist) || 'Artista desconocido',
-    artistId: song.artists?.[0]?.channel_id || defaults.artistId || null,
+    artistId: artists.find((artist) => artist.channel_id)?.channel_id || defaults.artistId || null,
     album: plainText(song.album?.name) || plainText(defaults.album) || 'Sencillo',
     albumId: song.album?.id || defaults.albumId || null,
     duration: plainText(song.duration) || '--:--',

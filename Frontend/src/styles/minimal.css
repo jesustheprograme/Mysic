@@ -378,17 +378,7 @@
 @media (min-width: 761px) {
   .music-app .music-app__main { padding-right: 24px; padding-left: 24px; }
 
-  .music-app::after {
-    content: '';
-    grid-column: 2;
-    grid-row: 2;
-    justify-self: end;
-    align-self: stretch;
-    z-index: 6;
-    width: 56px;
-    pointer-events: none;
-    background: linear-gradient(to left, rgb(5 6 6 / 0.9), rgb(5 6 6 / 0));
-  }
+  /* Sin desvanecido oscuro en el borde derecho: tapaba las portadas con una franja negra. */
 }
 
 /* ==========================================================================
@@ -408,6 +398,13 @@
 }
 
 .music-app .home-page .home-shelf__rail[data-rail-cols] > .home-shelf-card { scroll-snap-align: start; }
+
+/* El carrusel llega hasta el borde del contenido (junto al reproductor): antes se recortaba unos píxeles antes y las
+   portadas se cortaban en seco contra una franja vacía que parecía un bloque negro encima. */
+.music-app .home-page .home-shelf > .home-shelf__rail[data-rail-cols]:not(.home-shelf__rail--grid):not(.home-shelf__rail--wrap) {
+  margin-right: -24px;
+  padding-right: 24px;
+}
 
 /* "Ver todo": la sección entera en una cuadrícula con el mismo número de columnas. */
 .music-app .home-page .home-shelf > .home-shelf__rail--grid[data-rail-cols] {
@@ -586,13 +583,16 @@
  * --ambient-accent lo publica el reproductor (useAmbientAccent). Registrada como <color> para que el
  * cambio de canción haga un fundido en lugar de un salto.
  * ========================================================================== */
+/* NO hereda y se anima solo en la zona de contenido: antes vivía en <html> y heredaba, así que el fundido de 700 ms
+   recalculaba los estilos de TODA la página (3.400 elementos, ~60 ms) en cada fotograma justo cuando arrancaba el
+   audio, y el hilo principal retrasaba los eventos del reproductor. Ahora solo cambia un elemento. */
 @property --ambient-accent {
   syntax: '<color>';
-  inherits: true;
+  inherits: false;
   initial-value: transparent;
 }
 
-:root { transition: --ambient-accent 700ms ease; }
+.music-app .music-app__content { transition: --ambient-accent 700ms ease; }
 
 .music-app .music-app__content {
   background-image: radial-gradient(120% 75% at 22% 0%, color-mix(in srgb, var(--ambient-accent) 34%, transparent), transparent 70%);

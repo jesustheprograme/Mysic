@@ -803,10 +803,15 @@ button.player-dock__link:focus-visible {
   pointer-events: auto;
 }
 
-.player-dock__controlled-wave > div {
-  display: flex;
-  align-items: center;
-  gap: 2px;
+/* Onda del reproductor controlado: un <canvas> que llena la barra (ver ControlledWaveform.jsx). */
+.player-dock__controlled-wave {
+  touch-action: none;
+}
+
+.player-dock__controlled-wave > canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
   pointer-events: none;
 }
 

@@ -4,6 +4,8 @@ import { GripVertical, ListPlus } from 'lucide-react'
 import HeartToggle from '../../../components/HeartToggle.jsx'
 import PreviewIndicator from '../../../components/PreviewIndicator.jsx'
 import { sizedImage } from '../../../lib/imageSize.js'
+import { ctxMenu } from '../../youtube/contextMenuStore.js'
+import SongMoreButton from '../../youtube/SongMoreButton.jsx'
 
 function formatDuration(seconds) {
   const minutes = Math.floor(seconds / 60)
@@ -38,6 +40,29 @@ function TrackPlaybackButton({ displayTrackNumber, index, isPlaying, isSelected,
   )
 }
 
+// Fecha corta en español ("23 oct 2026"). Un solo formateador para todas las filas.
+const dateFormat = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', year: 'numeric' })
+
+/**
+ * Columna "Álbum" de la tabla: solo canciones con álbum real (con id), como enlace. Sin id YouTube pone un texto de
+ * relleno ("Sencillo"), que no es un álbum: la celda queda vacía, como en limusic.
+ */
+function TrackAlbum({ albumId, albumTitle, onAlbumSelect }) {
+  if (!albumId || !albumTitle) return <span className="collection-detail__track-album" />
+  return (
+    <span className="collection-detail__track-album">
+      {onAlbumSelect
+        ? <button className="collection-detail__catalog-link" type="button" title={albumTitle} onClick={() => onAlbumSelect(albumId)}>{albumTitle}</button>
+        : <span title={albumTitle}>{albumTitle}</span>}
+    </span>
+  )
+}
+
+/** Columna "Fecha de adición": cuándo vio Mysic la canción por primera vez en la lista (YouTube no da la fecha real). */
+function TrackAddedAt({ at }) {
+  return <span className="collection-detail__track-date">{at ? <time dateTime={new Date(at).toISOString()}>{dateFormat.format(at)}</time> : null}</span>
+}
+
 function TrackMetadata({ albumId, albumTitle, artistId, onAlbumSelect, onArtistSelect, onSongSelect, song, variant }) {
   return (
     <div className="collection-detail__track-main">
@@ -45,7 +70,7 @@ function TrackMetadata({ albumId, albumTitle, artistId, onAlbumSelect, onArtistS
       {variant !== 'album' && (
         <small>
           <button className="collection-detail__catalog-link collection-detail__catalog-link--artist" type="button" disabled={!artistId} onClick={() => onArtistSelect?.(artistId)}>{song.artist}</button>
-          {albumId && albumTitle && (
+          {variant !== 'table' && albumId && albumTitle && (
             <>
               <span className="collection-detail__catalog-separator" aria-hidden="true">·</span>
               <button className="collection-detail__catalog-link collection-detail__catalog-link--album" type="button" title={albumTitle} onClick={() => onAlbumSelect?.(albumId)}>{albumTitle}</button>
@@ -57,25 +82,28 @@ function TrackMetadata({ albumId, albumTitle, artistId, onAlbumSelect, onArtistS
   )
 }
 
+// El corazón va envuelto para poder ocultarlo hasta pasar el cursor cuando la canción no es favorita (CSS).
 function TrackActions({ isLiked, onAddToPlaylist, onToggleFavorite, renderTrackActions, song }) {
   return (
     <span className="collection-detail__track-actions">
+      {renderTrackActions?.(song)}
       {onToggleFavorite && (
-        <HeartToggle
-          className="heart-container--song-row"
-          label={`Me gusta ${song.title}`}
-          liked={isLiked}
-          onToggle={(liked) => onToggleFavorite(song.id, liked, song)}
-          removeLabel={`Quitar ${song.title} de favoritas`}
-          size={17}
-        />
+        <span className="collection-detail__track-heart" data-liked={isLiked ? 'true' : 'false'}>
+          <HeartToggle
+            className="heart-container--song-row"
+            label={`Me gusta ${song.title}`}
+            liked={isLiked}
+            onToggle={(liked) => onToggleFavorite(song.id, liked, song)}
+            removeLabel={`Quitar ${song.title} de favoritas`}
+            size={17}
+          />
+        </span>
       )}
       {onAddToPlaylist && (
         <button className="collection-detail__track-action" type="button" aria-label={`Añadir ${song.title} a una playlist`} title="Añadir a playlist" onClick={() => onAddToPlaylist(song)}>
           <ListPlus size={17} strokeWidth={1.8} aria-hidden="true" />
         </button>
       )}
-      {renderTrackActions?.(song)}
     </span>
   )
 }
@@ -97,7 +125,9 @@ export default function FilaCancionOrdenable({
   status,
   variant,
 }) {
-  const { isLiked, isPlaying, isSelected } = status
+  const { addedAt, isLiked, isPlaying, isSelected } = status
+  // "table": playlist con columnas (número, carátula, título, álbum, fecha); "playlist": carátula como botón; "album": número.
+  const table = variant === 'table'
   const showsTrackArtwork = variant === 'playlist'
   const {
     attributes,
@@ -124,6 +154,8 @@ export default function FilaCancionOrdenable({
   }
   const className = [
     'collection-detail__track',
+    table && 'collection-detail__track--table',
+    song.source === 'youtube' && 'collection-detail__track--menu',
     reorderable && 'collection-detail__track--reorderable',
     isSelected && 'collection-detail__track--active',
     isDragging && 'collection-detail__track--dragging',
@@ -144,8 +176,9 @@ export default function FilaCancionOrdenable({
   return (
     <li
         className={className}
-        onFocusCapture={() => onSongIntent?.(song)}
-        onPointerDown={() => onSongIntent?.(song)}
+        onContextMenu={song.source === 'youtube' ? ctxMenu('song', song) : undefined}
+        onFocusCapture={() => onSongIntent?.(song, true)}
+        onPointerDown={() => onSongIntent?.(song, true)}
         onPointerEnter={() => onSongIntent?.(song)}
         ref={(node) => {
         setNodeRef(node)
@@ -165,10 +198,16 @@ export default function FilaCancionOrdenable({
           <GripVertical size={19} strokeWidth={2.2} aria-hidden="true" />
         </button>
       )}
-      <TrackPlaybackButton displayTrackNumber={displayTrackNumber} index={index} isPlaying={isPlaying} isSelected={isSelected} onToggle={toggleTrackPlayback} song={song} withArtwork={showsTrackArtwork} />
+      <TrackPlaybackButton displayTrackNumber={table ? index + 1 : displayTrackNumber} index={index} isPlaying={isPlaying} isSelected={isSelected} onToggle={toggleTrackPlayback} song={song} withArtwork={showsTrackArtwork} />
+      {table && (song.artwork
+        ? <img className="collection-detail__track-thumb" src={sizedImage(song.artwork, 44)} alt="" width="44" height="44" loading="lazy" decoding="async" />
+        : <i className="collection-detail__track-thumb" aria-hidden="true" />)}
       <TrackMetadata albumId={albumId} albumTitle={albumTitle} artistId={artistId} onAlbumSelect={onAlbumSelect} onArtistSelect={onArtistSelect} onSongSelect={onSongSelect} song={song} variant={variant} />
+      {table && <TrackAlbum albumId={albumId} albumTitle={albumTitle} onAlbumSelect={onAlbumSelect} />}
+      {table && <TrackAddedAt at={addedAt} />}
       <TrackActions isLiked={isLiked} onAddToPlaylist={onAddToPlaylist} onToggleFavorite={onToggleFavorite} renderTrackActions={renderTrackActions} song={song} />
       <time>{formatDuration(song.durationSeconds)}</time>
+      {song.source === 'youtube' && <SongMoreButton className="song-more--row" song={song} />}
     </li>
   )
 }

@@ -12,7 +12,7 @@ const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`
  *
  * `artist`: { artistId, artwork, title, meta }. `albumCount` es opcional: sin él solo se muestra `meta`.
  */
-export default function ArtistCard({ albumCount, artist, liked = false, onOpen, onToggleFavorite }) {
+export default function ArtistCard({ albumCount, artist, liked = false, onContextMenu, onOpen, onToggleFavorite }) {
   // El color solo se calcula cuando la tarjeta está cerca de la pantalla (no para todos los artistas a la vez).
   const [near, setNear] = useState(false)
   const cardRef = useRef(null)
@@ -32,7 +32,7 @@ export default function ArtistCard({ albumCount, artist, liked = false, onOpen, 
   const accent = useArtworkAccent(artist.artwork, { enabled: near })
   const detail = albumCount == null ? artist.meta : `${plural(albumCount, 'álbum', 'álbumes')} · ${artist.meta}`
   return (
-    <li className="artist-card" ref={cardRef} style={accent ? { '--artist-tint': accent } : undefined}>
+    <li className="artist-card" ref={cardRef} style={accent ? { '--artist-tint': accent } : undefined} onContextMenu={onContextMenu}>
       <button className="artist-card__open" type="button" aria-label={`Abrir ${artist.title}`} onClick={() => onOpen(artist.artistId)}>
         {artist.artwork ? <img src={artist.artwork} alt="" loading="lazy" decoding="async" /> : <i aria-hidden="true" />}
         <span className="artist-card__shade" aria-hidden="true" />

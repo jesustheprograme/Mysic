@@ -7,13 +7,26 @@ import CatalogSearchControls from '../discovery/CatalogSearchControls.jsx'
 import HomeRail from '../discovery/HomeRail.jsx'
 import CommunityShelf from './CommunityShelf.jsx'
 import LibraryView from './LibraryView.jsx'
-import { mergeShelves } from './homeMore.js'
+import QuickAccess from './QuickAccess.jsx'
+import { filterShelves, useBlockList } from './blockList.js'
+import { ctxMenu } from './contextMenuStore.js'
+import { shortcutKey, usePinnedShortcuts } from './quickAccessStore.js'
+import { LIKED_INDEX_ID, notePlaylistContents, useAddedAt } from './playlistIndex.js'
+import { noteCollectionPlay, readRecentListens, withListenAgain } from './recentListens.js'
+import { carryMissing, mergeShelves } from './homeMore.js'
+import useHomeMood from './useHomeMood.js'
 import { landingCache, NO_SHELVES } from './landingCache.js'
 import useHomeMore from './useHomeMore.js'
 import './landing-states.css'
 import { CardMenu } from './ItemMenus.jsx'
-import { applyHomeLayout, CARD_SIZES, chooseShelfLayout, DEFAULT_LAYOUT } from './homeLayout.js'
-import { SectionIcon, SongShelf, TileShelf } from './ShelfLayouts.jsx'
+import { applyHomeLayout, CARD_SIZES, chooseShelfLayout, DEFAULT_LAYOUT, layoutKeepingSeen } from './homeLayout.js'
+import ArtistCard from '../discovery/ArtistCard.jsx'
+import { sizedImage } from '../../lib/imageSize.js'
+import { artistMeta } from './artistMeta.js'
+import './library-view.css'
+import useVirtualGrid from './useVirtualGrid.js'
+import { artistGridSizing, GRID_ROW_GAP } from './virtualGrid.js'
+import { SectionIcon, SeeAllButton, ShelfHeading, SongShelf, TileShelf } from './ShelfLayouts.jsx'
 import { prefetchHandlers } from './prefetchDetail.js'
 import { translateShelfTitle } from './shelfTitles.js'
 import useHomeLayout from './useHomeLayout.js'
@@ -22,18 +35,18 @@ import { adaptAlbum, adaptArtist, adaptBrowseItem, adaptReleases, adaptSong } fr
 
 const HomeLayoutPanel = lazy(() => import('./HomeLayoutPanel.jsx'))
 
+const LISTEN_AGAIN_KINDS = new Set(['song', 'album', 'playlist'])
 const ignorePreview = () => {}
 const EMPTY_SONGS = []
 
 function SongResults({ controller, hasMore, loadingMore, onLoadMore, sourceSongs, title = 'Canciones' }) {
-  const { likedSongIds, onAddToPlaylist, openAlbum, openArtist, player, playSongs, renderSongActions, toggleSongFavorite } = controller
+  const { likedSongIds, openAlbum, openArtist, player, playSongs, renderSongActions, toggleSongFavorite } = controller
   return (
     <SongList
       emptyMessage="No se encontraron canciones."
       hasMore={hasMore}
       likedSongIds={likedSongIds}
       loadingMore={loadingMore}
-      onAddToPlaylist={onAddToPlaylist}
       onAlbumSelect={openAlbum}
       onArtistSelect={openArtist}
       onLoadMore={onLoadMore}
@@ -63,11 +76,41 @@ const searchRailKind = (variant) => () => (variant === 'artist' ? 'artist' : 'al
 // Los resultados usan la tarjeta por defecto (--shelf-card: 148 px).
 const SEARCH_RAIL_ARTWORK_PX = 148
 
-function SearchRail({ emptyMessage, items, onSelect, title, variant }) {
+function SearchRail({ emptyMessage, items, onItemContextMenu, onSelect, title, variant }) {
   if (!items) return null
-  return <HomeRail artworkSize={SEARCH_RAIL_ARTWORK_PX} fitColumns emptyMessage={emptyMessage} items={items} onSelect={onSelect} title={title} variant={variant} {...intentProps(searchRailKind(variant))} />
+  return <HomeRail artworkSize={SEARCH_RAIL_ARTWORK_PX} fitColumns emptyMessage={emptyMessage} items={items} onItemContextMenu={onItemContextMenu} onSelect={onSelect} title={title} variant={variant} {...intentProps(searchRailKind(variant))} />
 }
 
+// Artistas de la búsqueda: LA MISMA cuadrícula que la pestaña Artistas de la Biblioteca. Usa su misma medida
+// (useVirtualGrid + artistGridSizing: 7 por fila, 6 con el reproductor abierto, tarjeta 3:4 que reparte el ancho), su
+// mismo CSS (.lib-grid / .lib-grid__artists) y su mismo componente ArtistCard. Plegado muestra una fila; "Ver todo"
+// despliega todos los resultados. Debe montarse ya con los artistas (la medida se toma al montar).
+const SEARCH_ARTIST_PX = 220
+
+function SearchArtists({ artists, emptyMessage, onOpen }) {
+  const [expanded, setExpanded] = useState(false)
+  const { cardWidth, columns, ref, rowHeight } = useVirtualGrid({ ...artistGridSizing(), aspect: 4 / 3, metaPx: 0, total: artists.length })
+  const perRow = columns || artistGridSizing().columns
+  const canExpand = artists.length > perRow
+  return (
+    <section className="home-shelf search-artists" aria-labelledby="search-artists-title">
+      <ShelfHeading action={canExpand ? <SeeAllButton expanded={expanded} onToggle={() => setExpanded((open) => !open)} /> : undefined} id="search-artists-title" kind="artists" title="Artistas" />
+      {artists.length === 0 && <p className="collection-empty">{emptyMessage}</p>}
+      <div className="lib-grid" ref={ref} tabIndex={-1} style={{ '--lib-row': `${rowHeight}px`, '--lib-row-gap': `${GRID_ROW_GAP}px`, '--lib-card-w': `${cardWidth}px`, '--lib-cols': columns || 'auto-fill' }}>
+        <ul className="lib-grid__artists" aria-label="Artistas">
+          {(expanded ? artists : artists.slice(0, perRow)).map((artist) => (
+            <ArtistCard
+              artist={{ artistId: artist.id, artwork: sizedImage(artist.artwork, Math.max(SEARCH_ARTIST_PX, cardWidth)), meta: artistMeta(artist.meta, { short: true }), title: artist.title }}
+              key={artist.id}
+              onContextMenu={ctxMenu('artist', { id: artist.id, name: artist.title, thumbnail: artist.artwork })}
+              onOpen={onOpen}
+            />
+          ))}
+        </ul>
+      </div>
+    </section>
+  )
+}
 function getGroupedResults(results) {
   if (results.type === 'all') return { songs: results.songs, artists: results.artists, albums: results.albums }
   return {
@@ -91,8 +134,8 @@ function SearchResults({ controller }) {
     <>
       {grouped.songs && <SongResults controller={controller} sourceSongs={grouped.songs} />}
       {grouped.videos && <SongResults controller={controller} sourceSongs={grouped.videos} title="Vídeos" />}
-      <SearchRail items={grouped.artists?.map(adaptArtist)} onSelect={openArtist} title="Artistas" variant="artist" emptyMessage={browse.results.pending?.includes('artist') ? 'Cargando artistas…' : 'No se encontraron artistas.'} />
-      <SearchRail items={grouped.albums?.map(adaptAlbum)} onSelect={openAlbum} title="Álbumes" emptyMessage={browse.results.pending?.includes('album') ? 'Cargando álbumes…' : 'No se encontraron álbumes.'} />
+      {grouped.artists && <SearchArtists artists={grouped.artists.map(adaptArtist)} emptyMessage={browse.results.pending?.includes('artist') ? 'Cargando artistas…' : 'No se encontraron artistas.'} onOpen={openArtist} />}
+      <SearchRail items={grouped.albums?.map(adaptAlbum)} onItemContextMenu={(item, event) => ctxMenu('album', grouped.albums.find((album) => album.id === item.id))(event)} onSelect={openAlbum} title="Álbumes" emptyMessage={browse.results.pending?.includes('album') ? 'Cargando álbumes…' : 'No se encontraron álbumes.'} />
     </>
   )
 }
@@ -240,13 +283,13 @@ function CatalogNavigation({ controller, editingHome = false, onEditHome }) {
 const railArtworkPx = (cardSize) => (CARD_SIZES[cardSize] ?? CARD_SIZES[DEFAULT_LAYOUT.cardSize]).min
 
 function BrowseShelves({ artworkSize = railArtworkPx(DEFAULT_LAYOUT.cardSize), controller, shelves }) {
-  const { openAlbum, openArtist, openPlaylist, player, playSongs, startPlaylist } = controller
+  const { openAlbum, openArtist, openPlaylist, player, playSongRadio, playSongs, startPlaylist } = controller
   if (!shelves.length) return <div className="collection-empty">No hay recomendaciones disponibles por ahora.</div>
 
   // Misma lógica de selección para cualquier formato: una canción suena, lo demás se abre.
   const selectItem = (shelf, id) => {
     const item = shelf.items.find((entry) => entry.id === id)
-    if (item?.kind === 'song') playSongs(shelf.items.filter((entry) => entry.kind === 'song'), id)
+    if (item?.kind === 'song') playSongRadio(shelf.items.filter((entry) => entry.kind === 'song'), id)
     if (item?.kind === 'artist') openArtist(id)
     if (item?.kind === 'album') openAlbum(id)
     if (item?.kind === 'playlist') openPlaylist(id)
@@ -256,12 +299,20 @@ function BrowseShelves({ artworkSize = railArtworkPx(DEFAULT_LAYOUT.cardSize), c
     const key = `${shelf.title}-${shelf.items[0]?.id}`
     const title = translateShelfTitle(shelf.title)
     const kind = chooseShelfLayout(shelf)
+    // Clic derecho sobre cualquier tarjeta de la sección: menú según el tipo del elemento original.
+    const openItemMenu = (item, event) => {
+      const entry = shelf.items.find((candidate) => candidate.id === item.id)
+      if (entry) ctxMenu(entry.kind, entry)(event)
+    }
     if (kind === 'community') {
-      return <CommunityShelf currentSongId={player.currentSong?.id} items={shelf.items.map(adaptBrowseItem)} key={key} onOpen={openPlaylist} onPlayPlaylist={startPlaylist} onPlaySong={playSongs} title={title} />
+      return <CommunityShelf currentSongId={player.currentSong?.id} items={shelf.items.map(adaptBrowseItem)} key={key} onItemContextMenu={openItemMenu} onOpen={openPlaylist} onPlayPlaylist={startPlaylist} onPlaySong={playSongs} title={title} />
     }
     if (kind === 'songs') return <SongShelf controller={controller} items={shelf.items} key={key} title={title} />
     if (kind === 'tiles') {
-      return <TileShelf items={shelf.items.map(adaptBrowseItem)} key={key} onSelect={(item) => selectItem(shelf, item.id)} selectedId={player.currentSong?.id} title={title} />
+      // "Volver a escuchar" son tus últimas escuchas: solo canciones, álbumes y playlists (nada de artistas ni canales).
+      const listened = shelf.items.filter((entry) => LISTEN_AGAIN_KINDS.has(entry.kind))
+      if (!listened.length) return null
+      return <TileShelf items={listened.map(adaptBrowseItem)} key={key} onAlbumSelect={openAlbum} onArtistSelect={openArtist} onItemContextMenu={openItemMenu} onSelect={(item) => selectItem(shelf, item.id)} selectedId={player.currentSong?.id} title={title} />
     }
     return (
       <HomeRail
@@ -273,6 +324,7 @@ function BrowseShelves({ artworkSize = railArtworkPx(DEFAULT_LAYOUT.cardSize), c
         {...intentProps((item) => shelf.items.find((entry) => entry.id === item.id)?.kind)}
         onArtistSelect={openArtist}
         onDetailSelect={openAlbum}
+        onItemContextMenu={openItemMenu}
         onPlaybackToggle={player.togglePlay}
         onSelect={(id) => selectItem(shelf, id)}
         renderMenu={(item) => {
@@ -323,30 +375,88 @@ function HomeMoreFooter({ more, onReload }) {
   return more.hasMore ? <div className="yt-more-sentinel" ref={sentinelRef} aria-hidden="true" /> : null
 }
 
+// Orden en que el Inicio mostró sus secciones por alcance: al volver de otra sección se respeta en vez de reordenar.
+const SEEN_ORDER = new Map()
+
+/**
+ * Fila de estados de ánimo del Inicio (como limusic): "Todo" es el Inicio normal y cada pastilla pide a YouTube el
+ * Inicio filtrado por ese ánimo (`?filter=`). Volver a pulsar la activa también vuelve a "Todo". Se envía la etiqueta
+ * original de la API; solo se traduce para mostrarla.
+ */
+function MoodChips({ filters, onSelect, selected }) {
+  return (
+    <div className="yt-moods" role="group" aria-label="Estados de ánimo">
+      <button className={`yt-mood${selected ? '' : ' yt-mood--active'}`} type="button" aria-pressed={!selected} onClick={() => onSelect(null)}>Todo</button>
+      {filters.map((filter) => (
+        <button className={`yt-mood${selected === filter ? ' yt-mood--active' : ''}`} key={filter} type="button" aria-pressed={selected === filter} onClick={() => onSelect(selected === filter ? null : filter)}>{translateShelfTitle(filter)}</button>
+      ))}
+    </div>
+  )
+}
+
 function LandingView({ controller }) {
   const { browse, landing } = controller
   const isHome = browse.view.kind === 'home'
   const { layout, reset, update } = useHomeLayout()
   const [editing, setEditing] = useState(false)
   const data = browse.view.data
+  // Pastilla de estado de ánimo elegida: su Inicio filtrado reemplaza al normal (en el orden de YouTube, sin tu disposición).
+  const [mood, setMood] = useState(null)
+  const moodFeed = useHomeMood(isHome ? mood : null)
+  const feed = mood ? moodFeed.data : data
   // Las páginas siguientes solo se piden sobre datos reales de esta visita (la copia guardada no trae token válido).
-  const more = useHomeMore({ enabled: isHome && landing.source === 'live' && Boolean(data?.continuation), resetKey: data, token: data?.continuation })
+  const more = useHomeMore({
+    enabled: isHome && Boolean(feed?.continuation) && (mood ? true : landing.source === 'live'),
+    resetKey: feed,
+    token: feed?.continuation,
+  })
   // Secciones extra que ya se vieron en esta ejecución (por usuario y cuenta): al volver al Inicio desde Explorar, la
   // Biblioteca o un detalle, la primera página se vuelve a pedir, pero lo ya cargado se sigue mostrando (y se
   // actualiza al llegar páginas nuevas) en vez de desaparecer y reaparecer.
-  const extrasScope = isHome ? landing.scope : null
+  const extrasScope = isHome && !mood ? landing.scope : null
   const carriedExtras = extrasScope ? landingCache.getExtras(extrasScope) : NO_SHELVES
   const rawShelves = useMemo(() => {
+    if (mood) {
+      if (!moodFeed.data?.shelves) return undefined
+      return more.shelves.length ? mergeShelves(moodFeed.data.shelves, more.shelves) : moodFeed.data.shelves
+    }
     if (!data?.shelves) return undefined
-    const withCarried = carriedExtras.length ? mergeShelves(data.shelves, carriedExtras) : data.shelves
+    const withCarried = carriedExtras.length ? carryMissing(data.shelves, carriedExtras) : data.shelves
     return more.shelves.length ? mergeShelves(withCarried, more.shelves) : withCarried
-  }, [carriedExtras, data, more.shelves])
+  }, [carriedExtras, data, mood, moodFeed.data, more.shelves])
+  // Lo que trajo esta petición también se recuerda: YouTube reparte el Inicio distinto cada vez y no debe perderse.
+  const liveShelves = landing.source === 'live' ? data?.shelves : undefined
+  useEffect(() => {
+    if (extrasScope && liveShelves?.length) landingCache.setExtras(extrasScope, carryMissing(liveShelves, landingCache.getExtras(extrasScope)))
+  }, [extrasScope, liveShelves])
   useEffect(() => {
     if (extrasScope && more.shelves.length) landingCache.setExtras(extrasScope, mergeShelves(landingCache.getExtras(extrasScope), more.shelves))
   }, [extrasScope, more.shelves])
   // Orden y visibilidad solo en el inicio; Explorar y Recomendado muestran todo tal como llega.
-  const applied = useMemo(() => applyHomeLayout(rawShelves, isHome ? layout : DEFAULT_LAYOUT), [isHome, layout, rawShelves])
+  const seenKeys = useRef(extrasScope ? SEEN_ORDER.get(extrasScope) ?? [] : [])
+  // "Volver a escuchar" sale de tus escuchas en este equipo (se leen al llegar un Inicio nuevo, no en cada canción,
+  // para que el bloque no se reordene mientras lo miras) y nada bloqueado llega a pintarse.
+  const pinned = usePinnedShortcuts()
+  const blockList = useBlockList()
+  const recents = useMemo(() => (isHome && data ? readRecentListens() : NO_SHELVES), [data, isHome])
+  const shownShelves = useMemo(() => {
+    const personal = isHome && !mood ? withListenAgain(rawShelves, recents, pinned.map((entry) => shortcutKey(entry.kind, entry.id))) : rawShelves
+    return filterShelves(personal, blockList)
+  }, [blockList, isHome, mood, pinned, rawShelves, recents])
+  const applied = useMemo(() => {
+    if (mood) return { sections: [], visible: shownShelves ?? [] }
+    if (!isHome) return applyHomeLayout(shownShelves, DEFAULT_LAYOUT)
+    const result = applyHomeLayout(shownShelves, layoutKeepingSeen(layout, seenKeys.current))
+    seenKeys.current = result.sections.map((section) => section.key)
+    if (extrasScope) SEEN_ORDER.set(extrasScope, seenKeys.current)
+    return result
+  }, [extrasScope, isHome, layout, mood, shownShelves])
   const closePanel = useCallback(() => setEditing(false), [])
+  // Con el panel abierto se piden todas las páginas restantes (sin esperar a desplazarse): la lista debe estar completa.
+  const { autoload: canLoadMore, loadMore: loadMoreShelves } = more
+  useEffect(() => {
+    if (editing && isHome && canLoadMore) loadMoreShelves()
+  }, [editing, isHome, canLoadMore, loadMoreShelves, more.pages])
 
   return (
     <div className="home-page yt-landing" aria-busy={landing.refreshing || undefined} style={{ '--shelf-card': CARD_SIZES[layout.cardSize].css, '--shelf-card-min': `${CARD_SIZES[layout.cardSize].min}px` }}>
@@ -357,12 +467,16 @@ function LandingView({ controller }) {
         : <div className="collection-empty" role="alert">{browse.error}</div>)}
       {/* Esqueleto solo si no hay nada que mostrar: con datos (reales o guardados) se refresca por detrás sin borrarlos. */}
       {browse.loading && !data && <div className="yt-feed-skeleton" role="status" aria-label="Cargando recomendaciones"><i /><i /><i /></div>}
-      {data && <BrowseShelves artworkSize={railArtworkPx(layout.cardSize)} controller={controller} shelves={applied.visible} />}
-      {isHome && data && <HomeMoreFooter more={more} onReload={browse.showHome} />}
+      {isHome && data?.filters?.length > 0 && <MoodChips filters={data.filters} onSelect={setMood} selected={mood} />}
+      {isHome && !mood && <QuickAccess controller={controller} data={controller.libraryData} />}
+      {mood && moodFeed.status === 'loading' && <div className="yt-feed-skeleton" role="status" aria-label="Cargando recomendaciones"><i /><i /><i /></div>}
+      {mood && moodFeed.status === 'failed' && <Notice actionLabel="Reintentar" onAction={moodFeed.retry}>No se pudo cargar esta selección.</Notice>}
+      {data && (!mood || moodFeed.data) && <BrowseShelves artworkSize={railArtworkPx(layout.cardSize)} controller={controller} shelves={applied.visible} />}
+      {isHome && feed && <HomeMoreFooter more={more} onReload={mood ? moodFeed.retry : browse.showHome} />}
       {!browse.loading && !data && !browse.error && <div className="collection-empty">No hay contenido disponible por ahora.</div>}
       {editing && isHome && (
         <Suspense fallback={null}>
-          <HomeLayoutPanel layout={layout} onChange={update} onClose={closePanel} onReset={reset} sections={applied.sections} />
+          <HomeLayoutPanel layout={layout} loadingMore={more.hasMore && more.status !== 'failed'} onChange={update} onClose={closePanel} onReset={() => { seenKeys.current = []; if (extrasScope) SEEN_ORDER.delete(extrasScope); reset() }} sections={applied.sections} />
         </Suspense>
       )}
     </div>
@@ -396,14 +510,14 @@ function OfficialLibraryView({ controller }) {
 const enlargeArtistImage = (url) => (typeof url === 'string' ? url.replace(/=w\d+-h\d+/, '=w1080-h1080').replace(/=s\d+/, '=s1080') : url)
 
 function ArtistDetail({ controller }) {
-  const { browse, likedArtistIds, likedSongIds, onAddToPlaylist, openAlbum, openArtistSongs, player, playSongs, renderSongActions, toggleArtistFavorite, toggleSongFavorite } = controller
+  const { browse, likedArtistIds, likedSongIds, openAlbum, openArtistSongs, player, playSongs, renderSongActions, toggleArtistFavorite, toggleSongFavorite } = controller
   const sourceSongs = browse.view.data.topSongs
   const artistDefaults = { artist: browse.view.data.name, artistId: browse.view.data.id }
   // El fondo del encabezado rota por las portadas de sus álbumes (nítidas); la foto del artista, casi siempre pequeña, solo se usa si no hay lanzamientos.
   const releases = adaptReleases(browse.view.data.shelves)
   const covers = [...new Set(releases.map((release) => release.artwork).filter(Boolean))].slice(0, 8).map(enlargeArtistImage)
   const artistPhotos = browse.view.data.images?.map((image) => enlargeArtistImage(image.url ?? image)).filter(Boolean)
-  return <ArtistView artist={{ artistId: browse.view.data.id, artwork: covers[0] ?? enlargeArtistImage(browse.view.data.thumbnail), images: covers.length ? covers : artistPhotos, title: browse.view.data.name }} likedArtistIds={likedArtistIds} likedSongIds={likedSongIds} onAddToPlaylist={onAddToPlaylist} onAlbumSelect={openAlbum} onBack={controller.goBack} onPlaybackToggle={player.togglePlay} onReleasePlay={(release) => openAlbum(release.id)} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleArtistFavorite={toggleArtistFavorite} onToggleFavorite={toggleSongFavorite} onViewAllSongs={() => openArtistSongs(browse.view.data.id)} releases={releases} renderSongActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} songs={sourceSongs.map((song, index) => adaptSong(song, index, artistDefaults))} />
+  return <ArtistView artist={{ artistId: browse.view.data.id, artwork: covers[0] ?? enlargeArtistImage(browse.view.data.thumbnail), images: covers.length ? covers : artistPhotos, title: browse.view.data.name }} likedArtistIds={likedArtistIds} likedSongIds={likedSongIds} onAlbumSelect={openAlbum} onBack={controller.goBack} onPlaybackToggle={player.togglePlay} onReleasePlay={(release) => openAlbum(release.id)} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleArtistFavorite={toggleArtistFavorite} onToggleFavorite={toggleSongFavorite} onViewAllSongs={() => openArtistSongs(browse.view.data.id)} releases={releases} renderSongActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} songs={sourceSongs.map((song, index) => adaptSong(song, index, artistDefaults))} />
 }
 
 function ArtistSongsDetail({ controller }) {
@@ -414,39 +528,44 @@ function ArtistSongsDetail({ controller }) {
 }
 
 function AlbumDetail({ controller }) {
-  const { browse, downloads, likedAlbumIds, likedSongIds, onAddToPlaylist, openArtist, player, playSongs, renderSongActions, toggleAlbumFavorite, toggleSongFavorite } = controller
+  const { browse, downloads, likedAlbumIds, likedSongIds, openArtist, player, playSongs, renderSongActions, toggleAlbumFavorite, toggleSongFavorite } = controller
   const data = browse.view.data
   const sourceSongs = data.tracks
-  return <CollectionDetailView collection={{ albumId: data.id, artist: data.artist, artistArtwork: data.thumbnail, artistId: data.artistId, artwork: data.thumbnail, kind: 'Álbum', title: data.title, year: data.year }} collectionFavorite={likedAlbumIds.has(data.id)} likedSongIds={likedSongIds} onAddToPlaylist={onAddToPlaylist} onArtistSelect={openArtist} onBack={controller.goBack} onDownloadCollection={() => downloads.downloadMany(sourceSongs)} onPlaybackToggle={player.togglePlay} onShuffle={() => controller.playShuffled(sourceSongs)} onSongIntent={player.warmSong} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleCollectionFavorite={(liked) => toggleAlbumFavorite(data.id, liked)} onToggleFavorite={toggleSongFavorite} renderTrackActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} songs={sourceSongs.map(adaptSong)} />
+  // Reproducir desde aquí cuenta como escucha del álbum (para "Volver a escuchar"), no de cada canción suelta.
+  const noteListen = () => noteCollectionPlay('album', data, sourceSongs)
+  return <CollectionDetailView collection={{ albumId: data.id, artist: data.artist, artistArtwork: data.thumbnail, artistId: data.artistId, artwork: data.thumbnail, kind: 'Álbum', title: data.title, year: data.year }} collectionFavorite={likedAlbumIds.has(data.id)} likedSongIds={likedSongIds} onArtistSelect={openArtist} onBack={controller.goBack} onDownloadCollection={() => downloads.downloadMany(sourceSongs)} onPlaybackToggle={player.togglePlay} onShuffle={() => { noteListen(); controller.playShuffled(sourceSongs) }} onSongIntent={player.warmSong} onSongSelect={(songId) => { noteListen(); playSongs(sourceSongs, songId) }} onToggleCollectionFavorite={(liked) => toggleAlbumFavorite(data.id, liked)} onToggleFavorite={toggleSongFavorite} renderTrackActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} songs={sourceSongs.map(adaptSong)} />
 }
 
 // "Música que me gusta": una página de playlist (una canción por fila, con su artista y su álbum como enlaces), no un
-// bloque de tarjetas. La lista llega por páginas: mientras abierta la página se van pidiendo las que faltan.
+// bloque de tarjetas. La lista completa la trae la sincronización de fondo (YoutubeView: syncLikedInBackground) y
+// llega de una sola vez: la página no pide páginas ni crece mientras la miras.
 function LikedSongsDetail({ controller }) {
-  const { libraryData, libraryMeta, likedSongIds, loadMoreLibrary, onAddToPlaylist, openAlbum, openArtist, player, playSongs, renderSongActions, toggleSongFavorite } = controller
+  const { libraryData, libraryMeta, likedSongIds, openAlbum, openArtist, player, playSongs, renderSongActions, toggleSongFavorite } = controller
   const sourceSongs = libraryData?.likedSongs ?? EMPTY_SONGS
   const songs = useMemo(() => sourceSongs.map(adaptSong), [sourceSongs])
-  const hasMore = Boolean(libraryMeta?.hasMore?.['liked-songs'] && !libraryMeta?.errors?.['liked-songs'])
-  const loadingMore = Boolean(libraryMeta?.loading?.['liked-songs'])
-  useEffect(() => {
-    if (hasMore && !loadingMore) loadMoreLibrary?.('liked-songs')
-  }, [hasMore, loadMoreLibrary, loadingMore, sourceSongs.length])
+  // Solo la primera vez (sin lista completa guardada) se avisa de que la lista aún no está entera.
+  const syncing = Boolean(libraryMeta?.hasMore?.['liked-songs'] && !libraryMeta?.errors?.['liked-songs'])
   const collection = useMemo(() => ({
     artist: 'YouTube Music',
     artwork: sourceSongs[0]?.thumbnail,
-    description: hasMore ? 'Cargando el resto de tus canciones…' : undefined,
+    description: syncing ? 'Sincronizando tus canciones con YouTube Music: la lista completa aparecerá en un momento.' : undefined,
     id: 'liked',
     kind: 'Playlist',
     title: 'Música que me gusta',
-  }), [hasMore, sourceSongs])
-  return <CollectionDetailView collection={collection} likedSongIds={likedSongIds} onAddToPlaylist={onAddToPlaylist} onAlbumSelect={openAlbum} onArtistSelect={openArtist} onBack={controller.goBack} onPlaybackToggle={player.togglePlay} onShuffle={() => controller.playShuffled(sourceSongs)} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleFavorite={toggleSongFavorite} renderTrackActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} selectedSongSource="youtube" songs={songs} />
+  }), [sourceSongs, syncing])
+  const addedAt = useAddedAt(LIKED_INDEX_ID)
+  return <CollectionDetailView addedAt={addedAt ?? undefined} table collection={collection} likedSongIds={likedSongIds} onAlbumSelect={openAlbum} onArtistSelect={openArtist} onBack={controller.goBack} onPlaybackToggle={player.togglePlay} onShuffle={() => controller.playShuffled(sourceSongs)} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleFavorite={toggleSongFavorite} renderTrackActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} selectedSongSource="youtube" songs={songs} />
 }
 
 function PlaylistDetail({ controller }) {
-  const { browse, downloads, likedSongIds, onAddToPlaylist, openAlbum, openArtist, player, playSongs, renderSongActions, toggleSongFavorite } = controller
+  const { browse, downloads, likedSongIds, openAlbum, openArtist, player, playSongs, renderSongActions, toggleSongFavorite } = controller
   const data = browse.view.data
   const sourceSongs = data.songs
-  return <CollectionDetailView collection={{ artist: 'YouTube Music', artwork: data.thumbnail, description: data.description, id: data.id, kind: 'Playlist', title: data.title }} likedSongIds={likedSongIds} onAddToPlaylist={onAddToPlaylist} onAlbumSelect={openAlbum} onArtistSelect={openArtist} onBack={controller.goBack} onDownloadCollection={() => downloads.downloadMany(sourceSongs)} onPlaybackToggle={player.togglePlay} onShuffle={() => controller.playShuffled(sourceSongs)} onSongIntent={player.warmSong} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleFavorite={toggleSongFavorite} renderTrackActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} selectedSongSource="youtube" songs={sourceSongs.map(adaptSong)} />
+  const noteListen = () => noteCollectionPlay('playlist', { id: data.id, subtitle: 'Playlist', thumbnail: data.thumbnail, title: data.title }, sourceSongs)
+  // Fecha de adición (solo en tus playlists indexadas); al abrir una, su contenido actual pone al día el índice.
+  const addedAt = useAddedAt(data.id)
+  useEffect(() => { notePlaylistContents(data, sourceSongs) }, [data, sourceSongs])
+  return <CollectionDetailView addedAt={addedAt ?? undefined} table collection={{ artist: 'YouTube Music', artwork: data.thumbnail, description: data.description, id: data.id, kind: 'Playlist', title: data.title }} likedSongIds={likedSongIds} onAlbumSelect={openAlbum} onArtistSelect={openArtist} onBack={controller.goBack} onDownloadCollection={() => downloads.downloadMany(sourceSongs)} onPlaybackToggle={player.togglePlay} onShuffle={() => { noteListen(); controller.playShuffled(sourceSongs) }} onSongIntent={player.warmSong} onSongSelect={(songId) => { noteListen(); playSongs(sourceSongs, songId) }} onToggleFavorite={toggleSongFavorite} renderTrackActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} selectedSongSource="youtube" songs={sourceSongs.map(adaptSong)} />
 }
 
 // Sin cuenta vinculada la portada no muestra nada más que este botón centrado. La vinculación en

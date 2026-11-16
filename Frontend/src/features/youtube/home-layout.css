@@ -5,7 +5,7 @@
   top: 56px;
   right: 16px;
   bottom: 16px;
-  width: min(440px, calc(100vw - 32px));
+  width: min(340px, calc(100vw - 32px));
   display: flex;
   flex-direction: column;
   border: 1px solid oklch(1 0 0 / 0.12);
@@ -190,3 +190,34 @@
 }
 
 .yt-edit-home:hover, .yt-edit-home[aria-expanded='true'] { color: #fff; background: oklch(1 0 0 / 0.07); }
+
+/* Aparición: el panel entra desde su borde con un fundido corto, y una ligera oscuridad nace de él y se difumina hacia
+   el contenido. La oscuridad no captura clics (la página sigue desplazándose) y queda detrás del panel. */
+.hl-panel {
+  animation: hl-panel-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.hl-panel::before {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 70% 90% at 100% 50%, rgb(0 0 0 / 0.5), rgb(0 0 0 / 0.22) 45%, transparent 75%);
+  animation: hl-shade-in 420ms ease-out both;
+}
+
+@keyframes hl-panel-in {
+  /* Se anima right y no transform: un transform haría que la oscuridad (position: fixed) midiera solo el panel. */
+  from { opacity: 0; right: -6px; }
+  to { opacity: 1; right: 16px; }
+}
+
+@keyframes hl-shade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hl-panel, .hl-panel::before { animation: none; }
+}

@@ -66,10 +66,10 @@ async function loadClientConfig() {
   const stored = freshStoredConfig(readStorage(CLIENT_CONFIG_KEY, null))
   if (stored) return stored
   try {
-    const base = /^https?:/i.test(API_URL) ? new URL(API_URL).origin : ''
-    const response = await fetch(`${base}/client-config.json`, { cache: 'no-cache' })
-    if (!response.ok) return null
-    const config = normalizeClientConfig(await response.json())
+    if (!/^https?:/i.test(API_URL)) return null
+    // Lo pide Rust (sin CORS): el servidor no envía cabeceras CORS para este archivo y desde la página fallaba siempre.
+    const raw = await invoke('fetch_client_config', { origin: new URL(API_URL).origin })
+    const config = raw ? normalizeClientConfig(raw) : null
     if (config) writeStorage(CLIENT_CONFIG_KEY, { client: config, savedAt: Date.now() })
     return config
   } catch {
@@ -84,6 +84,10 @@ export function initDirectAudio() {
     const config = await loadClientConfig()
     if (config) await invoke('set_client_config', { config }).catch(() => {})
     await invoke('warm_resolver').catch(() => {})
+    // La canción restaurada de la última vez: se resuelve ya. Además de dejarla lista, abre las conexiones (TLS) que
+    // la primera reproducción del día pagaba entera (unos 500 ms más que las siguientes).
+    const last = readStorage('mysic:youtube:player-song', null)
+    if (last?.id) void warmDirect(last.id)
     return true
   })()
   return initPromise

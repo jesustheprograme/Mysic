@@ -25,7 +25,7 @@ export function shouldUseDirectAudio({ videoId, isLocal, streamFailed }) {
 }
 
 /** Tiempo que el puntero debe detenerse sobre una canción antes de preparar su stream. */
-export const HOVER_WARM_DELAY_MS = 150
+export const HOVER_WARM_DELAY_MS = 80
 
 /**
  * ¿El fallo de `audio.play()` se debe a que ya se eligió otra canción? Cambiar de fuente aborta el play()

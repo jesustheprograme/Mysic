@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Disc3, ListMusic, Play, RotateCcw, UserRound, UsersRound } from 'lucide-react'
 import HeartToggle from '../../components/HeartToggle.jsx'
 import { sizedImage } from '../../lib/imageSize.js'
+import { ctxMenu } from './contextMenuStore.js'
 import { SongMenu } from './ItemMenus.jsx'
 import { adaptSong } from './lib/adapters.js'
 import './shelf-layouts.css'
@@ -24,35 +25,71 @@ export function ShelfHeading({ action, id, kind, title }) {
 }
 
 /** Botón de la cabecera que despliega la sección entera y la vuelve a plegar. */
-function SeeAllButton({ expanded, onToggle }) {
+export function SeeAllButton({ expanded, onToggle }) {
   return <button className="sl-see-all" type="button" aria-expanded={expanded} onClick={onToggle}>{expanded ? 'Ver menos' : 'Ver todo'}</button>
 }
 
 const slug = (title) => `shelf-${title.toLocaleLowerCase().replace(/[^a-z0-9áéíóúñ]+/gi, '-')}`
 
-const TILES_COLLAPSED = 6
-const TILES_PER_ROW = 3
-// "Ver todo" suma 3 filas a lo que ya se ve, no toda la lista.
-const EXPANDED_EXTRA_ROWS = 3
+const TILES_COLLAPSED_ROWS = 2
+const TILES_EXPANDED_ROWS = 5
 
-/** Atajos compactos (miniatura + título + subtítulo), tres por fila: "Volver a escuchar". */
-export function TileShelf({ items, onSelect, selectedId, title }) {
+/** Cuántas columnas tiene ahora la rejilla (cambia con el ancho de la ventana). */
+function useGridColumns(ref) {
+  const [columns, setColumns] = useState(3)
+  useEffect(() => {
+    const node = ref.current
+    if (!node || typeof ResizeObserver === 'undefined') return undefined
+    const measure = () => setColumns(Math.max(1, getComputedStyle(node).gridTemplateColumns.split(' ').filter(Boolean).length))
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [ref])
+  return columns
+}
+
+/** Cuántas tarjetas mostrar: solo filas completas (sin huecos en la última), salvo que no llegue ni a una fila. */
+function tileCount(total, columns, rows) {
+  const wanted = Math.min(total, columns * rows)
+  return wanted < columns ? wanted : Math.floor(wanted / columns) * columns
+}
+
+/** Atajos compactos (miniatura + título + subtítulo): "Volver a escuchar". Siempre filas completas. */
+export function TileShelf({ items, onAlbumSelect, onArtistSelect, onItemContextMenu, onSelect, selectedId, title }) {
   const id = slug(title)
+  const gridRef = useRef(null)
+  const columns = useGridColumns(gridRef)
   const [expanded, setExpanded] = useState(false)
-  const canExpand = items.length > TILES_COLLAPSED
+  const collapsed = tileCount(items.length, columns, TILES_COLLAPSED_ROWS)
+  const shown = expanded ? tileCount(items.length, columns, TILES_EXPANDED_ROWS) : collapsed
+  const canExpand = tileCount(items.length, columns, TILES_EXPANDED_ROWS) > collapsed
   return (
     <section className="sl-shelf" aria-labelledby={id}>
       <ShelfHeading action={canExpand ? <SeeAllButton expanded={expanded} onToggle={() => setExpanded((open) => !open)} /> : undefined} id={id} kind="tiles" title={title} />
-      <ul className="sl-tiles">
-        {items.slice(0, expanded ? TILES_COLLAPSED + TILES_PER_ROW * EXPANDED_EXTRA_ROWS : TILES_COLLAPSED).map((item) => (
+      <ul className="sl-tiles" ref={gridRef}>
+        {items.slice(0, shown).map((item) => (
           <li key={item.id}>
-            <button className={`sl-tile${selectedId === item.id ? ' sl-tile--active' : ''}`} type="button" onClick={() => onSelect(item)}>
-              {item.artwork ? <img src={sizedImage(item.artwork, 48)} alt="" width="48" height="48" loading="lazy" decoding="async" /> : <i aria-hidden="true" />}
-              <span>
-                <strong>{item.title}</strong>
-                <small>{item.artist ?? item.meta}</small>
+            <div className={`sl-tile${selectedId === item.id ? ' sl-tile--active' : ''}`} onContextMenu={onItemContextMenu ? (event) => onItemContextMenu(item, event) : undefined}>
+              <button className="sl-tile__cover" type="button" aria-label={`Abrir ${item.title}`} onClick={() => onSelect(item)}>
+                {item.artwork ? <img src={sizedImage(item.artwork, 48)} alt="" width="48" height="48" loading="lazy" decoding="async" /> : <i aria-hidden="true" />}
+              </button>
+              <span className="sl-song__text">
+                <strong><button type="button" title={item.title} onClick={() => onSelect(item)}>{item.title}</button></strong>
+                <small>
+                  {/* El artista y, en las canciones con álbum, el álbum son enlaces; lo demás (p. ej. "50 tracks") es texto. */}
+                  {item.artistId && onArtistSelect
+                    ? <button className="sl-song__link" type="button" title={item.artist} onClick={() => onArtistSelect(item.artistId)}>{item.artist}</button>
+                    : <span>{item.artist ?? item.meta}</span>}
+                  {item.detailId && item.detail && onAlbumSelect && (
+                    <>
+                      <span aria-hidden="true"> · </span>
+                      <button className="sl-song__link" type="button" title={item.detail} onClick={() => onAlbumSelect(item.detailId)}>{item.detail}</button>
+                    </>
+                  )}
+                </small>
               </span>
-            </button>
+            </div>
           </li>
         ))}
       </ul>
@@ -61,6 +98,8 @@ export function TileShelf({ items, onSelect, selectedId, title }) {
 }
 
 const SONGS_PER_COLUMN = 4
+// "Ver todo" en las secciones de canciones suma 3 filas por columna, no toda la lista.
+const EXPANDED_EXTRA_ROWS = 3
 
 function SongRow({ ctx, onPlay, selected, song }) {
   const adapted = adaptSong(song)
@@ -68,8 +107,9 @@ function SongRow({ ctx, onPlay, selected, song }) {
   return (
     <li
       className={`sl-song${selected ? ' sl-song--active' : ''}${liked ? ' sl-song--liked' : ''}`}
-      onFocusCapture={() => ctx.player.warmSong(song)}
-      onPointerDown={() => ctx.player.warmSong(song)}
+      onContextMenu={ctxMenu('song', song)}
+      onFocusCapture={() => ctx.player.warmSong(song, true)}
+      onPointerDown={() => ctx.player.warmSong(song, true)}
       onPointerEnter={() => ctx.player.warmSong(song)}
     >
       <div className="sl-song__main">
@@ -97,7 +137,7 @@ function SongRow({ ctx, onPlay, selected, song }) {
  * Con 8 o más se numeran y usan tres columnas; con menos, son filas simples de dos por columna.
  */
 export function SongShelf({ controller, items, title }) {
-  const { player, playSongs } = controller
+  const { player, playSongRadio, playSongs } = controller
   const id = slug(title)
   const [expanded, setExpanded] = useState(false)
   const numbered = items.length >= SONGS_PER_COLUMN * 2
@@ -119,7 +159,7 @@ export function SongShelf({ controller, items, title }) {
           <SongRow
             ctx={controller}
             key={song.id}
-            onPlay={() => playSongs(items, song.id)}
+            onPlay={() => playSongRadio(items, song.id)}
             selected={player.currentSong?.id === song.id}
             song={song}
           />

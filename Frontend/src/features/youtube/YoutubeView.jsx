@@ -1,4 +1,3 @@
-import { Download, LoaderCircle, Radio, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import PlayerDock from '../../components/PlayerDock.jsx'
@@ -10,11 +9,18 @@ import { useYoutubeFavorites } from './hooks/useYoutubeFavorites.js'
 import { adaptSong } from './lib/adapters.js'
 import { captureYoutubeMusicSession, desktopSessionAvailable } from './lib/desktopSession.js'
 import { persistedCache } from '../../lib/persistedCache.js'
-import { api, clearDetailScope, setDetailScope } from './lib/api.js'
+import { api, clearDetailScope, fetchJson, setDetailScope } from './lib/api.js'
 import { writeStorage } from './lib/storage.js'
 import { ACCOUNT_STATUS, SERVER_DEGRADED_NOTICE_MS, accountForView, accountRetryDelay, initialAccountState, readAccountSnapshot, reduceAccount, shouldShowAccountNotice, writeAccountSnapshot } from './accountState.js'
 import { fetchLibraryOverview, fetchLibraryPage, isUnsupportedLibraryRoute } from './libraryApi.js'
-import { chooseLibrary, compactLibrary, LIBRARY_CACHE_KEY, libraryCacheKey } from './libraryCache.js'
+import { allowedSongs } from './blockList.js'
+import { ContextMenuHost } from './ItemMenus.jsx'
+import { noteCollectionPlay } from './recentListens.js'
+import { readLiked, removeLiked, writeLiked } from './likedDb.js'
+import { loadPlaylistIndex, setLikedAdded, syncPlaylistIndex } from './playlistIndex.js'
+import SavedInPlaylists from './SavedInPlaylists.jsx'
+import { dedupeById, MAX_LIKED_PAGES, mergeLikedHead, needsFullSync, pageIsKnown } from './likedSync.js'
+import { chooseLibrary, LIBRARY_CACHE_KEY, libraryCacheKey, persistLibrary, withoutTrimMark } from './libraryCache.js'
 import { applyOverview, applyPage, canLoadMore, emptyLibrary, emptyMeta, legacyMeta, withError, withLoading } from './libraryPages.js'
 import { LIKED_NAV_ID, publishLibrarySummary, summarizeLibrary } from './librarySummary.js'
 import { isEmptyLanding, isLandingKind, landingCache, landingScope, pickLandingView, shouldKeepLanding } from './landingCache.js'
@@ -24,6 +30,8 @@ import YoutubeCatalogContent from './YoutubeCatalogContent.jsx'
 import { setAccountMenu } from './accountMenuBridge.js'
 import { shuffled } from './queueOps.js'
 import { showToast } from './toast.js'
+import { trackQuery } from './ytLink.js'
+import { AUTOPLAY_EVENT, freshSongs, needsTopUp, readAutoplay } from './autoplay.js'
 import ToastHost from './ToastHost.jsx'
 
 // Clave que useBrowse (generado) usa para recordar la última vista. La app siempre arranca en Inicio: lo último
@@ -114,7 +122,7 @@ function YoutubeView({
   const [libraryOpening, setLibraryOpening] = useState(false)
   const [libraryStatus, setLibraryStatus] = useState({ error: '', lastUpdated: null, loading: false, refreshing: false })
   const [actionError, setActionError] = useState('')
-  const [queueLoadingKey, setQueueLoadingKey] = useState(null)
+  const [, setQueueLoadingKey] = useState(null)
   const player = usePlayer({
     enabled: active,
     isDownloaded: downloads.isDownloaded,
@@ -139,6 +147,10 @@ function YoutubeView({
   const libraryPersistRef = useRef(null)
   const libraryAbortRef = useRef(null)
   const libraryKey = libraryCacheKey(favoriteStoragePrefix)
+  // "Me gusta" completos: guardados en IndexedDB y sincronizados por detrás (ver likedSync.js). `likedCompleteRef`
+  // indica que la lista en pantalla ya es la completa; `likedSyncRef` evita dos sincronizaciones a la vez.
+  const likedCompleteRef = useRef(false)
+  const likedSyncRef = useRef(null)
   const reportPlaybackState = useEffectEvent(() => onPlaybackStateChange?.({
     currentSong: player.currentSong,
     isPlaying: player.isPlaying,
@@ -307,6 +319,55 @@ function YoutubeView({
     if (index >= 0) playFrom(sourceSongs, index)
   }
 
+  // Una canción pulsada en un bloque (Selección rápida, Tu descubrimiento diario...) suena ella sola y la reproducción
+  // automática le pone su radio detrás; antes sonaba "la siguiente del bloque", que no tiene relación con ella.
+  // Con la reproducción automática apagada se mantiene el comportamiento anterior.
+  function playSongRadio(sourceSongs, songId) {
+    const song = sourceSongs.find((entry) => entry.id === songId)
+    if (!song) return
+    if (autoplay) playFrom([song], 0)
+    else playSongs(sourceSongs, songId)
+  }
+
+  // Reproducción automática: al quedar poco por delante se pide la radio de la última canción de la cola y se añaden
+  // las que no estén ya. Una petición por canción final (si la radio no trae nada nuevo no se insiste) y solo se aplica
+  // si la cola no cambió mientras tanto (el usuario pudo elegir otra cosa): nunca pisa una cola nueva.
+  const [autoplay, setAutoplay] = useState(readAutoplay)
+  useEffect(() => {
+    const onChange = (event) => setAutoplay(Boolean(event.detail))
+    window.addEventListener(AUTOPLAY_EVENT, onChange)
+    return () => window.removeEventListener(AUTOPLAY_EVENT, onChange)
+  }, [])
+  const latestPlayerRef = useRef(player)
+  const topUpSeedRef = useRef(null)
+  useEffect(() => {
+    latestPlayerRef.current = player
+  })
+  const queueForTopUp = player.queue
+  const indexForTopUp = player.currentIndex
+  useEffect(() => {
+    if (!autoplay || !active || !needsTopUp({ currentIndex: indexForTopUp, queueLength: queueForTopUp.length })) return undefined
+    const seed = queueForTopUp[queueForTopUp.length - 1]
+    if (!seed?.id || seed.isLocal || topUpSeedRef.current === seed.id) return undefined
+    topUpSeedRef.current = seed.id
+    const controller = new AbortController()
+    let finished = false
+    api.radio(seed.id, controller.signal).then((radio) => {
+      finished = true
+      if (controller.signal.aborted || latestPlayerRef.current.queue !== queueForTopUp) return
+      const more = allowedSongs(freshSongs(radio.songs, queueForTopUp))
+      if (more.length) latestPlayerRef.current.enqueue(more)
+    }).catch(() => {
+      // Sin radio: se reintentará al cambiar la canción final (el seguro de arriba evita bucles).
+      if (topUpSeedRef.current === seed.id) topUpSeedRef.current = null
+    })
+    return () => {
+      controller.abort()
+      // Una petición cortada por un cambio de cola (no terminada) debe poder repetirse.
+      if (!finished && topUpSeedRef.current === seed.id) topUpSeedRef.current = null
+    }
+  }, [active, autoplay, indexForTopUp, queueForTopUp])
+
   function toggleDownload(song) {
     if (downloads.downloadedIds.has(song.id)) downloads.deleteDownload(song.id)
     else if (!account?.connected) {
@@ -350,30 +411,75 @@ function YoutubeView({
     if (songs.length) playFrom(shuffled(songs), 0)
   }
 
+  // La radio nunca trae artistas bloqueados ni canciones con "No me gusta" (la canción elegida sí suena).
   function startRadio(song) {
-    void loadQueue(`radio:${song.id}`, (signal) => api.radio(song.id, signal))
+    void loadQueue(`radio:${song.id}`, async (signal) => {
+      const radio = await api.radio(song.id, signal)
+      return { ...radio, songs: (radio.songs ?? []).filter((entry, index) => index === 0 || allowedSongs([entry]).length) }
+    })
   }
   function startPlaylist(playlistId) {
-    void loadQueue(`playlist:${playlistId}`, (signal) => api.playlist(playlistId, signal))
+    void loadQueue(`playlist:${playlistId}`, async (signal) => {
+      const playlist = await api.playlist(playlistId, signal)
+      // Cuenta como escucha de la playlist (para "Volver a escuchar"), no de cada canción suelta.
+      if (playlist.songs?.length) noteCollectionPlay('playlist', { id: playlistId, subtitle: 'Playlist', thumbnail: playlist.thumbnail, title: playlist.title }, playlist.songs)
+      return playlist
+    })
   }
 
+  // Primer resultado de YouTube Music para un texto, con los métodos de búsqueda de siempre (api.search por tipo).
+  async function firstMatch(query, type) {
+    const result = await api.search(query, type)
+    return result.items?.find((item) => item.id) ?? null
+  }
+
+  // "Abrir enlace": una canción suena con su radio detrás (como al pulsar cualquier canción); lo demás se abre.
+  // Los enlaces de Spotify se buscan en YouTube Music por título y artista.
+  async function openLinkTarget(target) {
+    try {
+      if (target?.kind === 'song') startRadio({ id: target.id })
+      else if (target?.kind === 'playlist') openPlaylist(target.id)
+      else if (target?.kind === 'album') openAlbum(target.id)
+      else if (target?.kind === 'artist') openArtist(target.id)
+      else if (target?.kind === 'spotify') await openSpotifyTarget(target)
+    } catch (error) {
+      showToast(error?.message || 'No se pudo abrir el enlace.')
+    }
+  }
+
+  async function openSpotifyTarget({ name, owner, tracks, type }) {
+    const notFound = () => showToast('No se encontró en YouTube Music.')
+    if (type === 'track') {
+      const found = await firstMatch(trackQuery(tracks[0] ?? { title: name }), 'song')
+      if (!found) return notFound()
+      // Suena exactamente esa canción y detrás su radio (la radio no siempre empieza por la canción de origen).
+      const radio = await api.radio(found.id).catch(() => null)
+      return playFrom([found, ...(radio?.songs ?? []).filter((song) => song.id !== found.id)], 0)
+    }
+    if (type === 'artist') {
+      const found = await firstMatch(name, 'artist')
+      return found ? openArtist(found.id) : notFound()
+    }
+    if (type === 'album') {
+      const found = await firstMatch([name, owner].filter(Boolean).join(' '), 'album')
+      return found ? openAlbum(found.id) : notFound()
+    }
+    // Playlist: se buscan sus primeras canciones (de pocas en pocas) y suenan en el orden de la lista.
+    showToast(`Buscando «${name}» en YouTube Music…`)
+    const found = []
+    for (let start = 0; start < tracks.length; start += 4) {
+      const batch = await Promise.all(tracks.slice(start, start + 4).map((track) => firstMatch(trackQuery(track), 'song').catch(() => null)))
+      found.push(...batch.filter(Boolean))
+    }
+    if (!found.length) return notFound()
+    playFrom(found, 0)
+    showToast(`Sonando ${found.length} de ${tracks.length} canciones de «${name}»`)
+  }
+
+  // Acción de cada fila de canción: solo el ✓ de las que ya están en una playlist tuya (como limusic). Radio, descarga
+  // y añadir a playlist siguen en el menú (clic derecho o "…").
   function renderSongActions(song) {
-    const job = downloads.downloads.jobs[song.id]
-    const downloaded = downloads.downloadedIds.has(song.id)
-    const busy = job?.status === 'downloading'
-    const Icon = busy ? LoaderCircle : downloaded ? Trash2 : Download
-    const label = downloaded ? `Eliminar descarga de ${song.title}` : `Descargar ${song.title}`
-    const startingRadio = queueLoadingKey === `radio:${song.id}`
-    return (
-      <>
-        <button className="song-row__action collection-detail__track-action" type="button" aria-label={`Iniciar radio de ${song.title}`} title="Iniciar radio" disabled={startingRadio} onClick={() => startRadio(song)}>
-          {startingRadio ? <LoaderCircle className="yt-spin" size={16} aria-hidden="true" /> : <Radio size={16} strokeWidth={1.8} aria-hidden="true" />}
-        </button>
-        <button className="song-row__action collection-detail__track-action" type="button" aria-label={label} title={label} disabled={busy || (!downloads.online && !downloaded)} onClick={() => toggleDownload(song)}>
-          <Icon className={busy ? 'yt-spin' : undefined} size={16} strokeWidth={1.8} aria-hidden="true" />
-        </button>
-      </>
-    )
+    return <SavedInPlaylists onOpen={openPlaylist} songId={song.id} />
   }
 
   const workspaceKey = showLiked ? 'liked' : browse.view.data?.id
@@ -422,7 +528,7 @@ function YoutubeView({
   function openLiked() {
     saveCurrentScrollPosition()
     setLikedAnchor(browse.view)
-    if (!libraryCacheRef.current && accountConnected) void syncOfficialLibrary({ show: false, silent: true })
+    if ((!libraryCacheRef.current || libraryCacheRef.current.likedTotal != null) && accountConnected) void syncOfficialLibrary({ show: false, silent: true })
   }
 
   // La posición se guarda mientras se desplaza (no solo al abrir un detalle): al cambiar de sección esta vista queda
@@ -544,10 +650,11 @@ function YoutubeView({
   // incluso tras reiniciar, es instantánea. Cada página nueva no reescribe el disco: se agrupan. El estado de React
   // alimenta la Biblioteca para que se actualice en el sitio, sin cambiar de vista.
   function rememberLibrary(library) {
-    libraryCacheRef.current = library
-    setLibraryData(library)
+    const real = withoutTrimMark(library)
+    libraryCacheRef.current = real
+    setLibraryData(real)
     clearTimeout(libraryPersistRef.current)
-    libraryPersistRef.current = setTimeout(() => persistedCache.write(libraryKey, compactLibrary(libraryCacheRef.current ?? library)), 1000)
+    libraryPersistRef.current = setTimeout(() => persistLibrary(persistedCache, libraryKey, libraryCacheRef.current ?? real), 1000)
   }
   function updateLibraryMeta(meta) {
     libraryMetaRef.current = meta
@@ -556,25 +663,64 @@ function YoutubeView({
   function forgetLibrary() {
     libraryRequestRef.current += 1 // cualquier respuesta en vuelo de la cuenta anterior se descarta
     libraryAbortRef.current?.abort()
+    likedSyncRef.current?.controller.abort()
+    likedSyncRef.current = null
+    likedCompleteRef.current = false
     clearTimeout(libraryPersistRef.current)
     libraryCacheRef.current = null
     setLibraryData(null)
     updateLibraryMeta(emptyMeta())
     setLibraryStatus({ error: '', lastUpdated: null, loading: false, refreshing: false })
     persistedCache.remove(libraryKey)
+    void removeLiked(libraryKey)
   }
-  useEffect(() => () => clearTimeout(libraryPersistRef.current), [])
+  useEffect(() => () => {
+    clearTimeout(libraryPersistRef.current)
+    likedSyncRef.current?.controller.abort()
+  }, [])
+
+  // Pone en pantalla la lista completa de Me gusta (una sola vez, no página a página) y marca la categoría como
+  // terminada: nada más que pedir, sin "+" en el contador y sin "Cargando…" en la página.
+  function showCompleteLiked(songs) {
+    likedCompleteRef.current = true
+    rememberLibrary({ ...(libraryCacheRef.current ?? emptyLibrary()), likedSongs: songs })
+    const meta = libraryMetaRef.current
+    updateLibraryMeta({ ...meta, cursors: { ...meta.cursors, 'liked-songs': null }, hasMore: { ...meta.hasMore, 'liked-songs': false } })
+  }
 
   // La biblioteca guardada se carga al montar: la barra lateral muestra tus playlists y Me gusta desde el primer
-  // momento, sin visitar la Biblioteca ni esperar a la red (la sincronización la actualiza por detrás).
+  // momento, sin visitar la Biblioteca ni esperar a la red (la sincronización la actualiza por detrás). Los Me gusta
+  // completos llegan justo después desde IndexedDB (lectura asíncrona de pocos milisegundos).
   useEffect(() => {
-    if (libraryCacheRef.current) return
-    const cached = persistedCache.read(libraryKey)
-    if (cached) {
-      libraryCacheRef.current = cached
-      setLibraryData((current) => current ?? cached)
+    likedCompleteRef.current = false
+    if (!libraryCacheRef.current) {
+      const cached = persistedCache.read(libraryKey)
+      if (cached) {
+        libraryCacheRef.current = cached
+        setLibraryData((current) => current ?? cached)
+      }
     }
+    let cancelled = false
+    void loadPlaylistIndex(libraryKey)
+    readLiked(libraryKey).then((stored) => {
+      // Si una sincronización ya puso la lista completa, lo guardado (más viejo) no la pisa.
+      if (cancelled || !stored?.complete || likedCompleteRef.current) return
+      setLikedAdded(stored.addedAt)
+      showCompleteLiked(stored.songs)
+    })
+    return () => { cancelled = true }
+    // showCompleteLiked solo usa refs y setters estables.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [libraryKey])
+  // Índice de playlists personales (✓ "Guardada en" y fecha de adición): se pone al día por detrás cuando llega la
+  // lista de playlists. Solo pide las listas nuevas o cambiadas; sin cambios no hace ninguna petición. Se pide sin la
+  // caché de detalle (api.playlist), que podría devolver una copia vieja.
+  const libraryPlaylists = libraryData?.playlists
+  const indexAllowed = Boolean(account?.connected)
+  useEffect(() => {
+    if (!libraryPlaylists?.length || !indexAllowed) return
+    void syncPlaylistIndex(libraryPlaylists, async (id) => (await fetchJson(`/playlist/${encodeURIComponent(id)}`)).songs ?? [])
+  }, [indexAllowed, libraryPlaylists])
   // Resumen para la barra lateral (playlists de la cuenta y Me gusta): se publica solo si cambia.
   useEffect(() => {
     publishLibrarySummary(summarizeLibrary(libraryData, { likedHasMore: Boolean(libraryMeta.hasMore?.['liked-songs']) }))
@@ -602,12 +748,56 @@ function YoutubeView({
     }
   }
 
-  // Los Me gusta se completan por detrás (sin bloquear nada) para que los corazones de todas las listas estén al día.
-  async function completeLikedSongsInBackground(requestId) {
-    for (let page = 0; page < 20; page += 1) {
-      if (requestId !== libraryRequestRef.current || !canLoadMore(libraryMetaRef.current, 'liked-songs')) return
-      if (!(await loadMoreLibrary('liked-songs'))) return
-      await new Promise((resolve) => setTimeout(resolve, 250))
+  /**
+   * Sincroniza los Me gusta "en secreto": junta las páginas sin pintarlas y cambia la lista de una sola vez al terminar.
+   * Con una lista completa guardada solo pide la cabecera nueva (normalmente 0 páginas extra: la primera ya llegó con
+   * la vista general); una vez al día hace la carga completa para notar canciones quitadas en otro dispositivo.
+   * No depende de cada sincronización de la biblioteca (abrir la Biblioteca no la corta): solo una a la vez por cuenta.
+   */
+  async function syncLikedInBackground(firstPage, cursor) {
+    if (likedSyncRef.current?.key === libraryKey) return
+    const key = libraryKey
+    const controller = new AbortController()
+    likedSyncRef.current = { controller, key }
+    try {
+      const stored = await readLiked(key)
+      const full = needsFullSync(stored)
+      const knownIds = new Set(full ? [] : stored.songs.map((song) => song.id))
+      const fetched = [...firstPage]
+      let lastPage = firstPage
+      let next = cursor
+      for (let page = 0; next && page < MAX_LIKED_PAGES; page += 1) {
+        if (!full && pageIsKnown(lastPage, knownIds)) break
+        await new Promise((resolve) => setTimeout(resolve, 120)) // a ritmo tranquilo: es trabajo de fondo
+        if (controller.signal.aborted) return
+        const result = await fetchLibraryPage('liked-songs', next, controller.signal)
+        lastPage = result.items ?? []
+        fetched.push(...lastPage)
+        next = result.hasMore ? result.continuation : null
+      }
+      if (controller.signal.aborted || likedSyncRef.current?.controller !== controller) return
+      const songs = full ? dedupeById(fetched) : mergeLikedHead(fetched, stored.songs)
+      // Solo es "completa" una lista que llegó hasta el final o que enlazó con lo guardado.
+      const complete = !next || (!full && pageIsKnown(lastPage, knownIds))
+      if (!songs.length || !complete) return
+      // Fecha de adición: lo que no estaba en la lista guardada se vio hoy por primera vez; lo de antes conserva su
+      // fecha. La primera sincronización (sin lista guardada) no fecha nada: no se sabe cuándo se añadió.
+      const now = Date.now()
+      const known = stored ? new Set(stored.songs.map((song) => song.id)) : null
+      const addedAt = {}
+      for (const song of songs) {
+        if (stored?.addedAt?.[song.id]) addedAt[song.id] = stored.addedAt[song.id]
+        else if (known && !known.has(song.id)) addedAt[song.id] = now
+      }
+      onAddSongFavorites(songs.map((song) => adaptSong(song)))
+      setLikedAdded(addedAt)
+      showCompleteLiked(songs)
+      await writeLiked(key, { addedAt, complete: true, fullAt: full ? now : stored.fullAt, songs })
+      perfMark('liked-sync-done', { full, pages: Math.ceil(fetched.length / 100), songs: songs.length })
+    } catch {
+      // Sin red o servidor caído: se queda la lista que había; se reintentará en la próxima sincronización.
+    } finally {
+      if (likedSyncRef.current?.controller === controller) likedSyncRef.current = null
     }
   }
 
@@ -638,11 +828,19 @@ function YoutubeView({
       let fetched
       let meta
       let favorites
+      let likedCursor = null
       if (overview) {
         const applied = applyOverview(previous ?? emptyLibrary(), overview)
         fetched = applied.library
         meta = applied.meta
         favorites = overview.sections?.likedSongs?.items ?? []
+        // Los Me gusta siguientes los pide la sincronización de fondo, no la página: con la lista completa en pantalla
+        // la categoría queda como terminada (sin "Cargando…" ni contador que crece).
+        likedCursor = meta.cursors['liked-songs'] ?? null
+        if (likedCompleteRef.current) {
+          meta = { ...meta, cursors: { ...meta.cursors, 'liked-songs': null }, hasMore: { ...meta.hasMore, 'liked-songs': false } }
+          fetched = { ...fetched, likedSongs: libraryCacheRef.current?.likedSongs ?? fetched.likedSongs }
+        }
       } else {
         fetched = await api.sessionLibrary({ fresh, signal: controller.signal })
         if (requestId !== libraryRequestRef.current) return false
@@ -658,7 +856,7 @@ function YoutubeView({
       setLibraryStatus({ error: '', lastUpdated: Date.now(), loading: false, refreshing: false })
       if (show) browse.showOfficialLibrary(library)
       if (show) setAccountHelpOpen(false)
-      void completeLikedSongsInBackground(requestId)
+      if (overview) void syncLikedInBackground(favorites, likedCursor)
       return true
     } catch (error) {
       if (error.name === 'AbortError' || requestId !== libraryRequestRef.current) return false
@@ -692,6 +890,7 @@ function YoutubeView({
     if (view && typeof view === 'object') {
       if (view.type === 'playlist' && view.id) openPlaylist(view.id)
       else if (view.type === 'liked') openLiked()
+      else if (view.type === 'link') void openLinkTarget(view.target)
       return
     }
     const kind = view === 'explore' ? 'explore' : view === 'library' ? null : 'home'
@@ -809,7 +1008,7 @@ function YoutubeView({
     accountNotice, landing: { refreshing: browse.loading && !isEmptyLanding(shownView.data), scope: landingReadScope, source: landingSource },
     libraryData, libraryMeta, libraryOpening, libraryStatus, loadMoreLibrary, retryAccount: () => accountLoadRef.current?.(),    downloadedIds: downloads.downloadedIds, enqueueSongs, playShuffled: playShuffledSongs, startRadio, toggleDownload,
     account, accountBusy, accountError, accountHelpOpen, actionError, browse: shownBrowse, changeTab, connectDesktopSession, connectMusicSession, desktopSessionAvailable, disconnectAccount, downloads, goBack, likedAlbumIds, openLiked,
-    likedArtistIds, likedSongIds, onAddToPlaylist, openAlbum, openArtist, openArtistSongs, openPlaylist, player, playSongs,
+    likedArtistIds, likedSongIds, onAddToPlaylist, openAlbum, openArtist, openArtistSongs, openPlaylist, player, playSongRadio, playSongs,
     renderSongActions, searchType: browse.searchType, selectSearchEntity, setAccountHelpOpen, startAccountLink,
     officialLibraryBusy, showDownloads, startPlaylist, syncOfficialLibrary, toggleAlbumFavorite, toggleArtistFavorite, toggleSongFavorite: onToggleSongFavorite,
   }
@@ -835,6 +1034,7 @@ function YoutubeView({
   return (
     <div className="youtube-catalog">
       <ToastHost />
+      <ContextMenuHost ctx={controller} />
       <main className="music-app__main">
         <div className="music-workspace" key={workspaceKey} ref={workspaceRef}>
           <YoutubeCatalogContent controller={controller} />

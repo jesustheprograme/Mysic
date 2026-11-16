@@ -2,6 +2,8 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
+import { loadLightTheme } from './features/theme/lightSheet.js'
+import { readStoredTheme } from './features/theme/themeModel.js'
 import { API_URL } from './lib/api.js'
 import { startWarmup } from './lib/warmup.js'
 
@@ -20,11 +22,14 @@ if (isMainApp) {
   import('./features/youtube/YoutubeView.jsx').catch(() => {})
 }
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+// Con el tema claro guardado se espera a su hoja (unas decenas de ms) para no pintar un instante en oscuro.
+(readStoredTheme() === 'light' ? loadLightTheme() : Promise.resolve()).finally(() => {
+  createRoot(document.getElementById('root')).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+})
 
 if (isMainApp) {
   startWarmup({

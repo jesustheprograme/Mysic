@@ -28,7 +28,8 @@ import { useDownloads } from '../youtube/hooks/useDownloads.js'
 import { useYoutubeFavorites } from '../youtube/hooks/useYoutubeFavorites.js'
 import { adaptSong } from '../youtube/lib/adapters.js'
 import { libraryCacheKey } from '../youtube/libraryCache.js'
-import { recordPlayInStorage } from '../youtube/playHistory.js'
+import { recordPlayInStorage, setPlayHistoryOwner } from '../youtube/playHistory.js'
+import { noteSongPlay } from '../youtube/recentListens.js'
 import { sidebarViewFor } from './utilidades/sidebarView.js'
 import { EMPTY_LIBRARY_SUMMARY, LIBRARY_SUMMARY_EVENT, readLibrarySummary } from '../youtube/librarySummary.js'
 
@@ -443,6 +444,8 @@ function useDiscoveryPage({
   const downloads = useLocalDownloads(useDownloads())
   const userStorageId = user?.id ?? user?.email ?? user?.username
   const youtubeFavoriteStoragePrefix = `mysic:user:${userStorageId}:youtube`
+  // Antes que los hijos lean "En repetición": el historial de reproducciones es de cada usuario.
+  setPlayHistoryOwner(userStorageId)
   const youtubeSongFavorites = useYoutubeFavorites(
     `${youtubeFavoriteStoragePrefix}:favorite-songs`,
     'mysic:youtube:favorite-songs',
@@ -750,6 +753,17 @@ function useDiscoveryPage({
     window.dispatchEvent(new CustomEvent('mysic:youtube-nav', { detail: { view } }))
   }
 
+  // "Abrir enlace" (barra de título): lleva a la sección de YouTube Music y allí se abre/reproduce lo pegado.
+  const openLinkRef = useRef(null)
+  useEffect(() => {
+    openLinkRef.current = (target) => openYoutubeView({ type: 'link', target })
+  })
+  useEffect(() => {
+    const onOpenLink = (event) => openLinkRef.current?.(event.detail)
+    window.addEventListener('mysic:open-link', onOpenLink)
+    return () => window.removeEventListener('mysic:open-link', onOpenLink)
+  }, [])
+
   function changeGlobalSearch(query) {
     if (query.trim()) setYoutubeVisited(true)
     setYoutubeSearchRequest((current) => ({ ...current, query }))
@@ -840,6 +854,8 @@ function useDiscoveryPage({
     if (playingSong && playingSong.id !== lastRecordedPlayRef.current) {
       lastRecordedPlayRef.current = playingSong.id
       recordPlayInStorage(playingSong)
+      // Últimas escuchas ("Volver a escuchar"): la canción suelta o el álbum/playlist del que forma parte.
+      noteSongPlay(playingSong)
     } else if (!nextState.currentSong) {
       lastRecordedPlayRef.current = null
     }

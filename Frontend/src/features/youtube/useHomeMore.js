@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
-import { canAutoload, initialMoreState, moreReducer } from './homeMore.js'
+import { canAutoload, initialMoreState, isEndOfFeed, isTransientFailure, moreReducer } from './homeMore.js'
 import { API_BASE } from './lib/api.js'
 
 async function fetchHomeMore(token, signal) {
@@ -33,13 +33,25 @@ export default function useHomeMore({ enabled, resetKey, token }) {
     dispatch({ type: 'start' })
     const controller = new AbortController()
     abortRef.current = controller
+    const pages = current.pages
     try {
-      const body = await fetchHomeMore(current.token, controller.signal)
+      // Un fallo pasajero (servidor ocupado o lento) se repite una vez con el mismo token (idempotente) antes de avisar.
+      // El 502 tras páginas ya cargadas no se repite: es el final del Inicio (ver isEndOfFeed).
+      let body
+      try {
+        body = await fetchHomeMore(current.token, controller.signal)
+      } catch (error) {
+        if (error.name === 'AbortError' || !isTransientFailure({ pages, status: error.status })) throw error
+        await new Promise((resolve) => setTimeout(resolve, 1200))
+        if (controller.signal.aborted) return
+        body = await fetchHomeMore(current.token, controller.signal)
+      }
       if (controller.signal.aborted) return
       dispatch({ type: 'success', shelves: body.shelves ?? [], continuation: body.continuation })
     } catch (error) {
       if (error.name === 'AbortError' || controller.signal.aborted) return
-      dispatch({ type: 'failure', reason: error.status === 410 ? 'expired' : 'error' })
+      if (isEndOfFeed({ pages, status: error.status })) dispatch({ type: 'end' })
+      else dispatch({ type: 'failure', reason: error.status === 410 ? 'expired' : 'error' })
     }
   }, [])
 

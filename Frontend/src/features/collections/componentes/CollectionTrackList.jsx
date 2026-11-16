@@ -6,11 +6,12 @@ import { useEffect, useRef, useState } from 'react'
 import useWindowedRows, { findScrollParent } from '../hooks/useWindowedRows.js'
 import { shouldWindow } from '../hooks/windowMath.js'
 import FilaCancionOrdenable from './FilaCancionOrdenable.jsx'
+import './track-table.css'
 
 const dragModifiers = [restrictToFirstScrollableAncestor, restrictToVerticalAxis]
 
 export default function CollectionTrackList({
-  activeTrackRef, albumTrackNumbers, emptyState, likedSongIds, metricsRef, onAddToPlaylist, onAlbumSelect, onArtistSelect,
+  addedAt, table = false, activeTrackRef, albumTrackNumbers, emptyState, likedSongIds, metricsRef, onAddToPlaylist, onAlbumSelect, onArtistSelect,
   onMoveSong, onPlaybackToggle, onSongIntent, onSongSelect, onToggleFavorite, renderTrackActions, selectedSongAlbumId,
   selectedSongId, selectedSongPlaying, selectedSongSource, showsDiscHeadings, showsTrackArtwork, songs, trackGroups, tracksRef,
 }) {
@@ -64,8 +65,8 @@ export default function CollectionTrackList({
         reorderable={Boolean(onMoveSong)}
         renderTrackActions={renderTrackActions}
         song={song}
-        status={{ isLiked: likedSongIds?.has(song.id), isPlaying: selected && selectedSongPlaying, isSelected: selected }}
-        variant={showsTrackArtwork ? 'playlist' : 'album'}
+        status={{ addedAt: table ? addedAt?.(song.id) ?? null : null, isLiked: likedSongIds?.has(song.id), isPlaying: selected && selectedSongPlaying, isSelected: selected }}
+        variant={table ? 'table' : showsTrackArtwork ? 'playlist' : 'album'}
       />
     )
   }
@@ -98,15 +99,26 @@ export default function CollectionTrackList({
     <div className="collection-detail__empty"><ListPlus size={25} strokeWidth={1.6} aria-hidden="true" /><strong>{emptyState?.title ?? 'Todavía no hay canciones'}</strong><span>{emptyState?.text ?? 'Añade canciones para comenzar esta selección.'}</span></div>
   )
 
-  // Cabecera de la tabla (solo álbumes: las filas de playlist tienen otras columnas y pueden ser arrastrables).
-  const tableHead = !showsTrackArtwork && !onMoveSong && songs.length > 0 && (
+  // Cabecera de la tabla: en álbumes (número, título, duración) y en playlists en modo tabla (con álbum y fecha).
+  const playlistHead = table && songs.length > 0 && (
+    <div className="collection-detail__table-head collection-detail__table-head--table" aria-hidden="true">
+      <span>#</span>
+      <span />
+      <span>Título</span>
+      <span className="collection-detail__track-album">Álbum</span>
+      <span className="collection-detail__track-date" title="Desde que Mysic empezó a seguir esta lista: YouTube no da la fecha real">Fecha de adición</span>
+      <span />
+      <Clock3 size={15} strokeWidth={1.8} />
+    </div>
+  )
+  const tableHead = playlistHead || (!showsTrackArtwork && !onMoveSong && songs.length > 0 && (
     <div className="collection-detail__table-head" aria-hidden="true">
       <span>#</span>
       <span>Título</span>
       <span />
       <Clock3 size={15} strokeWidth={1.8} />
     </div>
-  )
+  ))
 
   return <div className="collection-detail__tracks" ref={tracksRef}>{tableHead}{content}</div>
 }

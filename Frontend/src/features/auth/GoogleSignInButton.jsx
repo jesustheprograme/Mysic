@@ -5,6 +5,8 @@ import { cancel, onUrl, start } from '@fabianlars/tauri-plugin-oauth'
 import googleLogo from '../../assets/brand/google-g.png'
 import { loadGoogleScript } from './googleIdentity.js'
 
+const CALLBACK_PORT = 14523
+
 function isDesktopRuntime() {
   return isTauri() || Boolean(window.__TAURI_INTERNALS__)
 }
@@ -25,7 +27,10 @@ function GoogleSignInButton({ disabled, onCredential, onError, onInteraction }) 
     let timeoutId
 
     try {
-      port = await start({ ports: [14523] })
+      // La página de acceso solo acepta este puerto. Si un intento anterior dejó el servidor local escuchando
+      // (se cerró la pestaña del navegador, o hubo un doble clic), se libera antes de abrir otro: si no, "os error 10048".
+      await cancel(CALLBACK_PORT).catch(() => {})
+      port = await start({ ports: [CALLBACK_PORT] })
       const state = crypto.randomUUID()
       const callbackUrl = `http://127.0.0.1:${port}`
       const authorizationUrl = new URL(desktopAuthUrl)

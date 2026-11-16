@@ -11,6 +11,8 @@ import useActiveTrackArrow from './hooks/useActiveTrackArrow.js'
 
 function CollectionDetailView({
   collection,
+  addedAt,
+  table = false,
   collectionFavorite = false,
   likedSongIds,
   onAddToPlaylist,
@@ -148,6 +150,8 @@ function CollectionDetailView({
         </label>
       )}
       <CollectionTrackList
+        addedAt={addedAt}
+        table={table}
         activeTrackRef={activeTrack.activeTrackRef}
         albumTrackNumbers={albumTrackNumbers}
         likedSongIds={likedSongIds}

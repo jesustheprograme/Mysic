@@ -1,0 +1,44 @@
+/* "…" de opciones al final de una fila de canción: aparece al pasar el cursor por la fila (o con el foco). */
+.song-more {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  padding: 0;
+  border-radius: 7px;
+  color: #d8dcda;
+  background: transparent;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.song-more:hover,
+.song-more:focus-visible,
+.song-more[aria-expanded='true'] {
+  color: #fff;
+  background: color-mix(in srgb, var(--m-accent, #ff6542) 30%, transparent);
+}
+
+.song-more:focus-visible { opacity: 1; }
+
+@media (hover: none) { .song-more { opacity: 1; } }
+
+/* Filas de playlists y álbumes: el botón va en el borde derecho de la fila, fuera de la cuadrícula de columnas
+   (así no cambia ninguna de sus plantillas), y la fila deja ese hueco libre. */
+.collection-detail .collection-detail__tracks .collection-detail__track.collection-detail__track--menu,
+.collection-detail .collection-detail__tracks:has(.collection-detail__track--menu) .collection-detail__table-head { padding-right: 48px; }
+
+.collection-detail__track .song-more--row {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+}
+
+.collection-detail__track:hover .song-more,
+.collection-detail__track:focus-within .song-more,
+.sl-song:hover .song-more,
+.sl-song:focus-within .song-more,
+.song-row:hover .song-more,
+.song-row:focus-within .song-more { opacity: 1; }

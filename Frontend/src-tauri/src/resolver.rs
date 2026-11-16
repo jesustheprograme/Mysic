@@ -288,6 +288,12 @@ impl Resolver {
         let http = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(8))
             .timeout(Duration::from_secs(20))
+            // Conexiones reutilizadas: la primera canción de cada servidor de YouTube paga el apretón de manos TLS y las
+            // siguientes no (HTTP/2 multiplexa los tramos sobre la misma conexión).
+            .pool_idle_timeout(Duration::from_secs(300))
+            .pool_max_idle_per_host(4)
+            .tcp_nodelay(true)
+            .tcp_keepalive(Duration::from_secs(30))
             .build()
             .expect("cliente HTTP del resolvedor");
         Self { http, config: Mutex::new(ClientConfig::default()), visitor: Mutex::new(None), cache: Mutex::new(HashMap::new()), heads: Mutex::new(HashMap::new()), heads_pending: Mutex::new(HashSet::new()) }
@@ -600,6 +606,38 @@ pub async fn resolve_audio(
 #[tauri::command]
 pub fn set_client_config(resolver: tauri::State<'_, Arc<Resolver>>, config: Value) -> bool {
     serde_json::from_value::<ClientConfig>(config).map(|parsed| resolver.set_config(parsed)).unwrap_or(false)
+}
+
+/// Descarga `client-config.json` del servidor de la app. Se pide aquí y no desde la página porque el servidor no
+/// envía cabeceras CORS para ese archivo (y, sin publicarlo, responde con su página HTML): desde la página cada
+/// arranque dejaba un error en la consola. Solo acepta un origen https (o http local en desarrollo), una respuesta
+/// JSON y como mucho 16 KiB. Devuelve None si no hay archivo publicado: entonces se usa el perfil por defecto.
+#[tauri::command]
+pub async fn fetch_client_config(resolver: tauri::State<'_, Arc<Resolver>>, origin: String) -> Result<Option<Value>, String> {
+    const MAX_BYTES: usize = 16 * 1024;
+    let base = reqwest::Url::parse(&origin).map_err(|_| "ORIGIN_INVALID".to_string())?;
+    let local = matches!(base.host_str(), Some("localhost") | Some("127.0.0.1"));
+    if !(base.scheme() == "https" || (base.scheme() == "http" && local)) {
+        return Err("ORIGIN_INVALID".into());
+    }
+    let url = base.join("/client-config.json").map_err(|_| "ORIGIN_INVALID".to_string())?;
+    let response = match resolver.http.get(url).timeout(Duration::from_secs(6)).send().await {
+        Ok(response) => response,
+        Err(_) => return Ok(None), // sin red: perfil por defecto
+    };
+    let is_json = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.contains("json"));
+    if !response.status().is_success() || !is_json || response.content_length().is_some_and(|length| length as usize > MAX_BYTES) {
+        return Ok(None);
+    }
+    let body = response.bytes().await.map_err(|_| "CONFIG_READ".to_string())?;
+    if body.len() > MAX_BYTES {
+        return Ok(None);
+    }
+    Ok(serde_json::from_slice::<Value>(&body).ok())
 }
 
 /// Obtiene el visitante de YouTube por adelantado (al abrir la aplicación) para que la primera canción no lo espere.

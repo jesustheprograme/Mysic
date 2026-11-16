@@ -22,9 +22,9 @@ export function summarizeLibrary(library, { likedHasMore = false } = {}) {
       thumbnail: playlist.thumbnail ?? null,
       title: playlist.title || 'Playlist',
     }))
-  if (!likedSongs.length && !playlists.length) return EMPTY_LIBRARY_SUMMARY
+  if (!likedSongs.length && !library?.likedTotal && !playlists.length) return EMPTY_LIBRARY_SUMMARY
   return {
-    liked: { count: likedSongs.length, hasMore: Boolean(likedHasMore), thumbnail: likedSongs[0]?.thumbnail ?? null },
+    liked: { count: library?.likedTotal ?? likedSongs.length, hasMore: Boolean(likedHasMore), thumbnail: likedSongs[0]?.thumbnail ?? null },
     playlists,
   }
 }

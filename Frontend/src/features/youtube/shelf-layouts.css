@@ -59,10 +59,11 @@
   text-align: left;
 }
 
-.sl-tile:hover { background: oklch(1 0 0 / 0.06); }
+.sl-tile:hover, .sl-tile:focus-within { background: oklch(1 0 0 / 0.06); }
 .sl-tile--active strong { color: var(--m-accent, #ff6542); }
+.sl-tile__cover { padding: 0; border-radius: 7px; line-height: 0; }
 
-.sl-tile img, .sl-tile > i {
+.sl-tile img, .sl-tile i {
   width: 48px;
   height: 48px;
   display: block;
@@ -71,16 +72,16 @@
   background: #1a1f1e;
 }
 
-.sl-tile > span, .sl-song__text { min-width: 0; display: grid; gap: 1px; }
+.sl-song__text { min-width: 0; display: grid; gap: 1px; }
 
-.sl-tile strong, .sl-tile small, .sl-song__text strong, .sl-song__text small {
+.sl-song__text strong, .sl-song__text small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.sl-tile strong, .sl-song__text strong { font-size: 14px; font-weight: 600; color: #f1f3f0; }
-.sl-tile small, .sl-song__text small { color: var(--m-text-dim, #98a19d); font-size: 12px; }
+.sl-song__text strong { font-size: 14px; font-weight: 600; color: #f1f3f0; }
+.sl-song__text small { color: var(--m-text-dim, #98a19d); font-size: 12px; }
 
 /* Canciones: se llenan por columnas */
 .sl-songs {
@@ -174,3 +175,29 @@
 @media (max-width: 1100px) {
   .sl-songs { grid-auto-flow: row; grid-template-rows: none; grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Fila de estados de ánimo del Inicio: chips en una línea que se desplaza sin barra. */
+.yt-moods {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.yt-mood {
+  flex: none;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  color: #e7e9e5;
+  background: rgb(255 255 255 / 0.08);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.yt-mood:hover { background: rgb(255 255 255 / 0.14); }
+.yt-mood--active { color: #fff; background: var(--m-accent, #ff6542); }
+.yt-mood--active:hover { background: var(--m-accent, #ff6542); }

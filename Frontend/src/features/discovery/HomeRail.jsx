@@ -14,6 +14,8 @@ function HomeRail({
   items,
   onIntent,
   onIntentEnd,
+  // Clic derecho sobre una tarjeta: (item, event). Quien lo usa abre su menú contextual.
+  onItemContextMenu,
   onPlaybackToggle,
   onArtistSelect,
   onDetailSelect,
@@ -83,7 +85,7 @@ function HomeRail({
           }
 
           return (
-            <article className={`home-shelf-card${isSelected ? ' home-shelf-card--active' : ''}${isSelected && selectedItemPlaying ? ' home-shelf-card--playing' : ''}`} key={item.id}>
+            <article className={`home-shelf-card${isSelected ? ' home-shelf-card--active' : ''}${isSelected && selectedItemPlaying ? ' home-shelf-card--playing' : ''}`} key={item.id} onContextMenu={onItemContextMenu ? (event) => onItemContextMenu(item, event) : undefined}>
               <button
                 className={`home-shelf-card__button${item.audioUrl ? ' playback-hover' : ''}`}
                 type="button"
