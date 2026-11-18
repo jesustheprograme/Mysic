@@ -50,13 +50,21 @@
   width: 100%;
   min-width: 0;
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
+  /* Portada, texto y acciones (corazón y "…"), como las filas de canciones. */
+  grid-template-columns: 48px minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  padding: 6px 10px 6px 6px;
+  padding: 6px 4px 6px 6px;
   border-radius: 10px;
   color: inherit;
   text-align: left;
+}
+
+/* Igual que en las filas: el corazón solo se ve si ya es favorita o al apuntar a la ficha. */
+@media (hover: hover) {
+  .sl-tile:not(.sl-tile--liked) .sl-song__actions .heart-container { opacity: 0; transition: opacity 120ms ease; }
+  .sl-tile:hover .sl-song__actions .heart-container,
+  .sl-tile:focus-within .sl-song__actions .heart-container { opacity: 1; }
 }
 
 .sl-tile:hover, .sl-tile:focus-within { background: oklch(1 0 0 / 0.06); }

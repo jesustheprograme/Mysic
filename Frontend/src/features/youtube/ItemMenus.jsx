@@ -185,13 +185,13 @@ export function SongMenu({ className = 'sl-song__more', ctx, song }) {
 }
 
 /** Botón "…" de una tarjeta (canción, álbum, playlist o artista). `entry` es el elemento original de la sección. */
-export function CardMenu({ ctx, entry, title }) {
+export function CardMenu({ align = 'start', className = 'home-shelf-card__menu', ctx, entry, title }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="home-shelf-card__menu" type="button" aria-label={`Más opciones de ${title}`}><MoreHorizontal size={16} aria-hidden="true" /></button>
+        <button className={className} type="button" aria-label={`Más opciones de ${title}`}><MoreHorizontal size={16} aria-hidden="true" /></button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="ym-menu" collisionPadding={8} sideOffset={6}>
+      <DropdownMenuContent align={align} className="ym-menu" collisionPadding={8} sideOffset={6}>
         <ItemMenuEntries ctx={ctx} entry={entry} />
       </DropdownMenuContent>
     </DropdownMenu>

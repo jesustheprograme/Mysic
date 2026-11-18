@@ -314,7 +314,7 @@ function BrowseShelves({ artworkSize = railArtworkPx(DEFAULT_LAYOUT.cardSize), c
       // "Volver a escuchar" son tus últimas escuchas: solo canciones, álbumes y playlists (nada de artistas ni canales).
       const listened = shelf.items.filter((entry) => LISTEN_AGAIN_KINDS.has(entry.kind))
       if (!listened.length) return null
-      return <TileShelf items={listened.map(adaptBrowseItem)} key={key} onAlbumSelect={openAlbum} onArtistSelect={openArtist} onItemContextMenu={openItemMenu} onSelect={(item) => selectItem(shelf, item.id)} selectedId={player.currentSong?.id} title={title} />
+      return <TileShelf controller={controller} entries={listened} items={listened.map(adaptBrowseItem)} key={key} onAlbumSelect={openAlbum} onArtistSelect={openArtist} onItemContextMenu={openItemMenu} onSelect={(item) => selectItem(shelf, item.id)} selectedId={player.currentSong?.id} title={title} />
     }
     return (
       <HomeRail

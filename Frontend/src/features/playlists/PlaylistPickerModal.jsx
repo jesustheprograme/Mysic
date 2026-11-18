@@ -4,7 +4,7 @@ import VerticalSpectrum from '../../components/VerticalSpectrum.jsx'
 import { sizedImage } from '../../lib/imageSize.js'
 import { api } from '../youtube/lib/api.js'
 import { getPlaylistTrackCount, playlistHasTrack } from './playlistTracks.js'
-import { targetChanges, targetsErrorMessage, withLibraryArt, youtubeVideoIdOf } from './youtubeTargets.js'
+import { rememberSaved, targetChanges, targetsErrorMessage, withLibraryArt, withRemembered, youtubeVideoIdOf } from './youtubeTargets.js'
 
 const plural = (count) => (count == null ? null : `${count.toLocaleString('es-ES')} ${count === 1 ? 'canción' : 'canciones'}`)
 
@@ -18,7 +18,7 @@ function useYoutubeTargets(videoId, libraryPlaylists) {
     if (!videoId) return undefined
     const controller = new AbortController()
     api.playlistTargets(videoId, controller.signal)
-      .then((data) => setState({ status: 'ready', playlists: withLibraryArt(data?.playlists ?? [], libraryPlaylists), error: null }))
+      .then((data) => setState({ status: 'ready', playlists: withRemembered(withLibraryArt(data?.playlists ?? [], libraryPlaylists), videoId), error: null }))
       .catch((error) => { if (!controller.signal.aborted) setState({ status: 'error', playlists: [], error: targetsErrorMessage(error) }) })
     return () => controller.abort()
     // La biblioteca solo aporta portadas: no hace falta volver a pedir si cambia mientras está abierto.
@@ -71,6 +71,8 @@ function PlaylistPickerModal({ analyser, libraryPlaylists = [], onAdd, onClose, 
     // YouTube primero: si falla, el diálogo sigue abierto con el motivo y nada local cambió todavía.
     const changes = targetChanges(youtube.playlists, checkedOnYoutube)
     const results = await Promise.allSettled(changes.map((change) => api.setInPlaylist(change.id, videoId, change.add)))
+    // Lo que sí se guardó se recuerda aunque otro cambio falle: al reabrir el diálogo sale como quedó en YouTube.
+    results.forEach((result, index) => { if (result.status === 'fulfilled') rememberSaved(videoId, changes[index].id, changes[index].add) })
     const failed = results.find((result) => result.status === 'rejected')
     if (failed) {
       setSaving(false)

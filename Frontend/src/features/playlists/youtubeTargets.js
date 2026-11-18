@@ -23,6 +23,23 @@ export function withLibraryArt(targets, libraryPlaylists = []) {
   })
 }
 
+// YouTube Music no dice si una playlist ya tiene la canción (`contains` llega siempre a false; comprobado con 87
+// playlists reales, incluida la de Me gusta). Lo que se guarda desde aquí se recuerda durante la sesión para que el
+// diálogo lo muestre marcado al reabrirlo y se pueda quitar desmarcándolo.
+const saved = new Set()
+const savedKey = (videoId, playlistId) => `${videoId}|${bareId(playlistId)}`
+
+/** Anota que `videoId` quedó guardado (o quitado) en una playlist. */
+export function rememberSaved(videoId, playlistId, contains) {
+  if (contains) saved.add(savedKey(videoId, playlistId))
+  else saved.delete(savedKey(videoId, playlistId))
+}
+
+/** Marca como contenidas las playlists donde esta sesión guardó la canción. */
+export function withRemembered(targets, videoId) {
+  return targets.map((target) => (saved.has(savedKey(videoId, target.id)) && !target.contains ? { ...target, contains: true } : target))
+}
+
 /** Qué hay que cambiar en YouTube: solo las playlists cuya marca cambió respecto a lo que ya tenían. */
 export function targetChanges(targets, selectedIds) {
   return targets

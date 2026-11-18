@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { targetChanges, targetsErrorMessage, withLibraryArt, youtubeVideoIdOf } from './youtubeTargets.js'
+import { rememberSaved, targetChanges, targetsErrorMessage, withLibraryArt, withRemembered, youtubeVideoIdOf } from './youtubeTargets.js'
 
 test('youtubeVideoIdOf: canciones de YouTube sí, del catálogo propio no', () => {
   assert.equal(youtubeVideoIdOf({ id: 'dQw4w9WgXcQ', source: 'youtube' }), 'dQw4w9WgXcQ')
@@ -25,6 +25,19 @@ test('targetChanges: solo lo que cambió (añadir lo marcado nuevo, quitar lo de
   assert.deepEqual(targetChanges(targets, new Set(['A', 'C'])), [{ id: 'C', add: true }])
   assert.deepEqual(targetChanges(targets, new Set(['B'])), [{ id: 'A', add: false }, { id: 'B', add: true }])
   assert.deepEqual(targetChanges(targets, new Set(['A'])), [], 'sin cambios no se llama a YouTube')
+})
+
+test('rememberSaved: lo guardado en la sesión sale marcado al reabrir y se puede quitar', () => {
+  const targets = [{ id: 'PLa', contains: false }, { id: 'PLb', contains: false }]
+  assert.deepEqual(withRemembered(targets, 'video000001'), targets, 'sin nada guardado no cambia')
+  rememberSaved('video000001', 'VLPLa', true)
+  const reopened = withRemembered(targets, 'video000001')
+  assert.deepEqual(reopened.map((target) => target.contains), [true, false])
+  assert.deepEqual(withRemembered(targets, 'video000002').map((target) => target.contains), [false, false], 'es por canción')
+  // Desmarcarla ahora genera un "quitar"; tras quitarla vuelve a salir sin marcar.
+  assert.deepEqual(targetChanges(reopened, new Set()), [{ id: 'PLa', add: false }])
+  rememberSaved('video000001', 'PLa', false)
+  assert.deepEqual(withRemembered(targets, 'video000001').map((target) => target.contains), [false, false])
 })
 
 test('targetsErrorMessage: sin cuenta, servidor sin la ruta, playlist ajena y otros', () => {

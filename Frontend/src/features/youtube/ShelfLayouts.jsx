@@ -3,7 +3,7 @@ import { Disc3, ListMusic, Play, RotateCcw, UserRound, UsersRound } from 'lucide
 import HeartToggle from '../../components/HeartToggle.jsx'
 import { sizedImage } from '../../lib/imageSize.js'
 import { ctxMenu } from './contextMenuStore.js'
-import { SongMenu } from './ItemMenus.jsx'
+import { CardMenu, SongMenu } from './ItemMenus.jsx'
 import { adaptSong } from './lib/adapters.js'
 import './shelf-layouts.css'
 
@@ -56,7 +56,28 @@ function tileCount(total, columns, rows) {
 }
 
 /** Atajos compactos (miniatura + título + subtítulo): "Volver a escuchar". Siempre filas completas. */
-export function TileShelf({ items, onAlbumSelect, onArtistSelect, onItemContextMenu, onSelect, selectedId, title }) {
+/**
+ * Acciones de una ficha, como las de las filas de canciones: corazón y menú en las canciones; solo el menú (el de
+ * álbum o playlist) en lo demás. `entry` es el elemento original de la sección.
+ */
+function TileActions({ ctx, entry }) {
+  if (entry.kind === 'song') {
+    const liked = ctx.likedSongIds.has(entry.id)
+    return (
+      <span className="sl-song__actions">
+        <HeartToggle className="heart-container--song-row" label={`Me gusta ${entry.title}`} liked={liked} onToggle={(next) => ctx.toggleSongFavorite(entry.id, next, adaptSong(entry))} removeLabel={`Quitar ${entry.title} de favoritas`} size={16} />
+        <SongMenu ctx={ctx} song={entry} />
+      </span>
+    )
+  }
+  return (
+    <span className="sl-song__actions">
+      <CardMenu align="end" className="sl-song__more" ctx={ctx} entry={entry} title={entry.title} />
+    </span>
+  )
+}
+
+export function TileShelf({ controller, entries, items, onAlbumSelect, onArtistSelect, onItemContextMenu, onSelect, selectedId, title }) {
   const id = slug(title)
   const gridRef = useRef(null)
   const columns = useGridColumns(gridRef)
@@ -68,9 +89,12 @@ export function TileShelf({ items, onAlbumSelect, onArtistSelect, onItemContextM
     <section className="sl-shelf" aria-labelledby={id}>
       <ShelfHeading action={canExpand ? <SeeAllButton expanded={expanded} onToggle={() => setExpanded((open) => !open)} /> : undefined} id={id} kind="tiles" title={title} />
       <ul className="sl-tiles" ref={gridRef}>
-        {items.slice(0, shown).map((item) => (
+        {items.slice(0, shown).map((item, index) => {
+          const entry = entries?.[index]
+          const liked = entry?.kind === 'song' && controller?.likedSongIds.has(entry.id)
+          return (
           <li key={item.id}>
-            <div className={`sl-tile${selectedId === item.id ? ' sl-tile--active' : ''}`} onContextMenu={onItemContextMenu ? (event) => onItemContextMenu(item, event) : undefined}>
+            <div className={`sl-tile${selectedId === item.id ? ' sl-tile--active' : ''}${liked ? ' sl-tile--liked' : ''}`} onContextMenu={onItemContextMenu ? (event) => onItemContextMenu(item, event) : undefined}>
               <button className="sl-tile__cover" type="button" aria-label={`Abrir ${item.title}`} onClick={() => onSelect(item)}>
                 {item.artwork ? <img src={sizedImage(item.artwork, 48)} alt="" width="48" height="48" loading="lazy" decoding="async" /> : <i aria-hidden="true" />}
               </button>
@@ -89,9 +113,11 @@ export function TileShelf({ items, onAlbumSelect, onArtistSelect, onItemContextM
                   )}
                 </small>
               </span>
+              {controller && entry && <TileActions ctx={controller} entry={entry} />}
             </div>
           </li>
-        ))}
+          )
+        })}
       </ul>
     </section>
   )
