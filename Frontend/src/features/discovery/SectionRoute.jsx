@@ -38,7 +38,8 @@ function SectionRoute({
   selectedSongId,
   selectedSongPlaying,
   songs,
-  youtubeLibraryKey,
+  onPlayYoutubeSongs,
+  onYoutubeNavigate,
 }) {
   const [songQuery, setSongQuery] = useState('')
   const [albumQuery, setAlbumQuery] = useState('')
@@ -154,12 +155,8 @@ function SectionRoute({
   if (section === 'stats') {
     return (
       <StatsPage
-        albumItems={albumItems}
-        artistItems={artistItems}
-        likedSongIds={likedSongIds}
-        onArtistSelect={onArtistSelect}
-        songs={songs}
-        youtubeLibraryKey={youtubeLibraryKey}
+        onNavigate={onYoutubeNavigate}
+        onPlaySongs={onPlayYoutubeSongs}
       />
     )
   }

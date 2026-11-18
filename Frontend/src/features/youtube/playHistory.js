@@ -88,3 +88,6 @@ export function recordPlayInStorage(song) {
 }
 
 export const readTopPlays = (options) => topPlays(read(), options)
+
+/** Historial antiguo completo (para importarlo una vez a Estadísticas). */
+export const readPlayHistory = () => read()
