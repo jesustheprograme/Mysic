@@ -6,9 +6,11 @@
 export const AUTOPLAY_KEY = 'mysic:autoplay'
 export const AUTOPLAY_EVENT = 'mysic:autoplay'
 /** Cuántas canciones por delante bastan: por debajo se pide más. */
-export const TOP_UP_REMAINING = 2
+// La cola se mantiene con al menos 10 canciones por delante (antes 2: con una canción suelta la cola mostraba 3-4
+// canciones hasta casi el final). Como Limusic, que enseña la radio completa desde el principio.
+export const TOP_UP_REMAINING = 10
 /** Máximo de canciones nuevas por petición y tamaño máximo de la cola (una cola sin fin no debe crecer sin límite). */
-export const TOP_UP_BATCH = 20
+export const TOP_UP_BATCH = 25
 export const MAX_QUEUE = 300
 
 export function readAutoplay(storage = globalThis.localStorage) {

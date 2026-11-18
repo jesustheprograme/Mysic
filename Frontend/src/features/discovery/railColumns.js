@@ -20,13 +20,14 @@ export function columnsFor(width, min = DEFAULT_CARD_MIN, gap = RAIL_GAP) {
  * Las medidas se agrupan en un fotograma (varios cambios de tamaño seguidos miden una sola vez) y el
  * estado solo cambia cuando el número de columnas cambia de verdad.
  */
-export default function useRailColumns(ref) {
+export default function useRailColumns(ref, enabled = true) {
   const [columns, setColumns] = useState(0)
 
   useLayoutEffect(() => {
     const node = ref.current
-    if (!node) return undefined
+    if (!node || !enabled) return undefined
     let frame = 0
+    let lastWidth = -1
     const measure = () => {
       frame = 0
       const min = parseFloat(getComputedStyle(node).getPropertyValue('--shelf-card-min')) || DEFAULT_CARD_MIN
@@ -34,7 +35,12 @@ export default function useRailColumns(ref) {
     }
     measure()
     if (typeof ResizeObserver === 'undefined') return undefined
-    const observer = new ResizeObserver(() => {
+    // Solo importa el ancho. En la cuadrícula ventaneada de la Biblioteca el alto cambia con cada fila que se monta al
+    // hacer scroll: medir entonces (getComputedStyle + clientWidth en el fotograma) forzaba un recálculo del diseño.
+    const observer = new ResizeObserver(([entry]) => {
+      const width = Math.round(entry.contentRect.width)
+      if (width === lastWidth) return
+      lastWidth = width
       if (!frame) frame = requestAnimationFrame(measure)
     })
     observer.observe(node)
@@ -42,7 +48,7 @@ export default function useRailColumns(ref) {
       observer.disconnect()
       if (frame) cancelAnimationFrame(frame)
     }
-  }, [ref])
+  }, [ref, enabled])
 
   return columns
 }

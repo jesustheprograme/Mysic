@@ -57,6 +57,14 @@ test('usa álbumes, artistas, suscripciones y subidos del servidor cuando existe
   assert.equal(library.playlists.length, 0)
 })
 
+test('sin suscripciones (aún cargan artistas) no se cuelan los artistas deducidos de los Me gusta', () => {
+  const data = { artists: [{ id: 'UC1', name: 'Ado' }], likedSongs, playlists: [], subscriptions: [{ id: 'UC9', name: 'Canal' }] }
+  assert.deepEqual(buildLibrary(data).artists.map((a) => a.id), ['UC1', 'UC9'])
+  assert.deepEqual(buildLibrary(data, { withSubscriptions: false }).artists.map((a) => a.id), ['UC1'])
+  // Solo suscripciones (sin artistas): ocultarlas no debe caer a los artistas deducidos de las canciones.
+  assert.deepEqual(buildLibrary({ ...data, artists: [] }, { withSubscriptions: false }).artists, [])
+})
+
 test('En repetición aparece primero solo si hay canciones', () => {
   assert.equal(buildLibrary({ likedSongs, playlists }).pinned[0].id, LIKED_ID)
   const withRepeat = buildLibrary({ likedSongs, playlists }, { repeat: [likedSongs[0], likedSongs[1]] })

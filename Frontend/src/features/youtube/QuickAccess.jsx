@@ -1,12 +1,12 @@
 import { Heart, ListRestart, Music2, PinOff, X } from 'lucide-react'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { LIKED_ID, REPEAT_ID } from './libraryModel.js'
 import { readTopPlays } from './playHistory.js'
 import { prefetchHandlers } from './prefetchDetail.js'
 import { CursorMenu } from './ItemMenus.jsx'
 import { buildQuickAccess, moveKey } from './quickAccessModel.js'
-import { dismissShortcut, setShortcutOrder, shortcutKey, useHiddenShortcuts, usePinnedShortcuts, useShortcutOrder } from './quickAccessStore.js'
+import { dismissShortcut, setShortcutOrder, setVisibleShortcuts, shortcutKey, useShortcutsManaged, useHiddenShortcuts, usePinnedShortcuts, useShortcutOrder } from './quickAccessStore.js'
 import './quick-access.css'
 
 const ICONS = { heart: Heart, repeat: ListRestart }
@@ -34,7 +34,10 @@ export default function QuickAccess({ controller, data }) {
   const [menu, setMenu] = useState(null)
   // "En repetición" sale del historial local: se lee al montar el Inicio, igual que en la biblioteca.
   const repeat = useMemo(() => readTopPlays(), [])
-  const entries = useMemo(() => buildQuickAccess(data, { hidden, order, pinned, repeat }), [data, hidden, order, pinned, repeat])
+  const managed = useShortcutsManaged()
+  const entries = useMemo(() => buildQuickAccess(data, { hidden, managed, order, pinned, repeat }), [data, hidden, managed, order, pinned, repeat])
+  // Lo que se ve ahora: al fijar un acceso nuevo (desde cualquier menú) estos no se desplazan (ver planPin).
+  useEffect(() => { setVisibleShortcuts(entries) }, [entries])
 
   // Arrastre con el puntero (el arrastrar y soltar nativo no llega a la página en la ventana de escritorio): mientras
   // se arrastra solo cambia un orden provisional; al soltar se guarda una vez.

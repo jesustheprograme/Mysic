@@ -1,7 +1,9 @@
 import { useCallback } from 'react'
+import { FADE_MS } from '../../features/youtube/fadeModel.js'
 
-const PAUSE_FADE_DURATION_MS = 400
-const START_FADE_DURATION_MS = 1200
+// Mismo segundo que el reproductor de YouTube Music (fadeModel): pausar baja en 1 s y cada pista entra en 1 s.
+const PAUSE_FADE_DURATION_MS = FADE_MS
+const START_FADE_DURATION_MS = FADE_MS
 
 /**
  * Fundidos de volumen: entrada al empezar una pista y salida al pausar. Los refs (adeInFrameRef,

@@ -24,6 +24,23 @@ export const emptyMeta = () => ({ cursors: {}, errors: {}, hasMore: {}, legacy: 
 /** Todo llegó de una vez (servidor sin biblioteca por páginas): no hay nada más que pedir. */
 export const legacyMeta = () => ({ ...emptyMeta(), legacy: true })
 
+/** ¿Ya no llegarán más páginas de esta categoría? (terminó, o falló y la carga automática se detuvo) */
+export const isKindComplete = (meta, kind) => !meta?.hasMore?.[kind] || Boolean(meta?.errors?.[kind])
+
+/**
+ * Cuántas secciones de `sections` (en orden) se pueden mostrar seguidas en una sola cuadrícula sin que lo que llegue
+ * después entre por encima de lo visible: todas las completas y la primera que aún carga (lo nuevo de esa va al final).
+ * Cada sección es la lista de categorías del servidor que la alimentan. Función pura.
+ */
+export function revealedSections(meta, sections) {
+  let shown = 0
+  for (const kinds of sections) {
+    shown += 1
+    if (!kinds.every((kind) => isKindComplete(meta, kind))) break
+  }
+  return shown
+}
+
 /** Añade lo nuevo al final, sin repetir ids y conservando el orden. */
 export function mergeById(existing, incoming) {
   const seen = new Set(existing.map((item) => item.id))

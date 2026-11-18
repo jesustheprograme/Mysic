@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { setItemSafe } from '../../lib/storage.js'
+import { planPin } from './quickAccessModel.js'
 
 // Accesos directos que el usuario fija a mano desde el menú de una canción, álbum, playlist o artista.
 const STORAGE_KEY = 'mysic:quick-access:v1'
@@ -69,17 +70,61 @@ function commitHidden(next) {
 }
 
 export const isPinned = (kind, id) => pinned.some((entry) => entry.kind === kind && entry.id === id)
-// Fijar algo que se había quitado lo devuelve a la lista.
-export const pinShortcut = (entry) => {
+// Lo que el inicio muestra ahora mismo (lo publica QuickAccess en cada cálculo): al fijar, lo que ya se ve se queda.
+let visible = []
+export const setVisibleShortcuts = (entries) => { visible = entries }
+
+/**
+ * Fija un acceso sin reemplazar ninguno de los que se ven (ver planPin): devuelve false si ya hay 10 y no cabe.
+ * Fijar algo que se había quitado con la "x" lo devuelve a la lista.
+ */
+export function pinShortcut(entry) {
+  const plan = planPin({ entry, pinned, visible })
+  if (!plan.ok) return false
   if (hidden.includes(shortcutKey(entry.kind, entry.id))) commitHidden(hidden.filter((key) => key !== shortcutKey(entry.kind, entry.id)))
-  if (!isPinned(entry.kind, entry.id)) commit([...pinned, entry])
+  if (plan.pinned !== pinned) commit(plan.pinned)
+  setManaged()
+  return true
 }
 export const unpinShortcut = (kind, id) => commit(pinned.filter((entry) => !(entry.kind === kind && entry.id === id)))
+
+/** Los automáticos que se ven ahora, como fijados (en su orden), sin `except`. */
+const visibleAutos = (except) => visible
+  .filter((item) => item.kind !== 'special' && !item.pinned && shortcutKey(item.kind, item.id) !== except)
+  .map(({ id, kind, subtitle, thumbnail, title }) => ({ id, kind, subtitle, thumbnail, title }))
+
 // La "x": quita el acceso (fijado o automático) y evita que vuelva a salir solo; volver a fijarlo lo recupera.
+// La primera vez que se personaliza, los demás accesos que se veían pasan a ser de la lista del usuario: así el hueco
+// que deja la "x" queda libre para fijar otro, en vez de ocuparlo al instante otra playlist automática.
 export function dismissShortcut(kind, id) {
-  if (isPinned(kind, id)) commit(pinned.filter((entry) => !(entry.kind === kind && entry.id === id)))
-  commitHidden([...hidden, shortcutKey(kind, id)])
+  const key = shortcutKey(kind, id)
+  const kept = pinned.filter((entry) => !(entry.kind === kind && entry.id === id))
+  commit(managed ? kept : [...kept, ...visibleAutos(key)])
+  commitHidden([...hidden, key])
+  setManaged()
 }
+
+// ¿Ya personalizó el usuario sus accesos? Desde entonces lo automático no rellena huecos (ver buildQuickAccess).
+const MANAGED_KEY = 'mysic:quick-access-managed:v1'
+let managed = (() => {
+  try {
+    return window.localStorage.getItem(MANAGED_KEY) === '1'
+  } catch {
+    return false
+  }
+})()
+function setManaged() {
+  if (managed) return
+  managed = true
+  try {
+    setItemSafe(MANAGED_KEY, '1', window.localStorage)
+  } catch {
+    // Sin almacenamiento: vale durante la sesión.
+  }
+  notify()
+}
+/** ¿Lista de accesos personalizada por el usuario? */
+export const useShortcutsManaged = () => useSyncExternalStore(subscribe, () => managed)
 
 const subscribe = (listener) => {
   listeners.add(listener)

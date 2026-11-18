@@ -257,7 +257,8 @@ function CatalogTabs({ browse }) {
   )
 }
 
-function CatalogNavigation({ controller, editingHome = false, onEditHome }) {
+// `children` va en la misma fila que el botón de editar (en el Inicio, las pastillas de estado de ánimo).
+function CatalogNavigation({ children, controller, editingHome = false, onEditHome }) {
   const { account, accountError, accountNotice, actionError, browse, changeTab, downloads, retryAccount, searchType, showDownloads } = controller
   const showingDownloads = browse.view.kind === 'downloads'
   const heading = getCatalogHeading(browse.view.kind, account?.personalized)
@@ -270,6 +271,7 @@ function CatalogNavigation({ controller, editingHome = false, onEditHome }) {
       <div className="yt-hub__tabs-row">
         {onEditHome && <button className="yt-edit-home" type="button" aria-label="Editar inicio" aria-expanded={editingHome} title="Editar inicio" onClick={onEditHome}><LayoutGrid size={16} aria-hidden="true" /></button>}
         <CatalogTabs browse={browse} />
+        {children}
       </div>
       {actionError && <div className="collection-empty" role="alert">{actionError}</div>}
       {(browse.view.kind === 'search' || showingDownloads) && (
@@ -460,14 +462,15 @@ function LandingView({ controller }) {
 
   return (
     <div className="home-page yt-landing" aria-busy={landing.refreshing || undefined} style={{ '--shelf-card': CARD_SIZES[layout.cardSize].css, '--shelf-card-min': `${CARD_SIZES[layout.cardSize].min}px` }}>
-      <CatalogNavigation controller={controller} onEditHome={isHome ? () => setEditing((open) => !open) : undefined} editingHome={editing} />
+      <CatalogNavigation controller={controller} onEditHome={isHome ? () => setEditing((open) => !open) : undefined} editingHome={editing}>
+        {isHome && data?.filters?.length > 0 && <MoodChips filters={data.filters} onSelect={setMood} selected={mood} />}
+      </CatalogNavigation>
       {/* Con contenido a la vista, un fallo al refrescar es un aviso con reintento; sin contenido, un error normal. */}
       {browse.error && (data
         ? <Notice onAction={isHome ? browse.showHome : browse.view.kind === 'explore' ? browse.showExplore : undefined}>{browse.error}</Notice>
         : <div className="collection-empty" role="alert">{browse.error}</div>)}
       {/* Esqueleto solo si no hay nada que mostrar: con datos (reales o guardados) se refresca por detrás sin borrarlos. */}
       {browse.loading && !data && <div className="yt-feed-skeleton" role="status" aria-label="Cargando recomendaciones"><i /><i /><i /></div>}
-      {isHome && data?.filters?.length > 0 && <MoodChips filters={data.filters} onSelect={setMood} selected={mood} />}
       {isHome && !mood && <QuickAccess controller={controller} data={controller.libraryData} />}
       {mood && moodFeed.status === 'loading' && <div className="yt-feed-skeleton" role="status" aria-label="Cargando recomendaciones"><i /><i /><i /></div>}
       {mood && moodFeed.status === 'failed' && <Notice actionLabel="Reintentar" onAction={moodFeed.retry}>No se pudo cargar esta selección.</Notice>}

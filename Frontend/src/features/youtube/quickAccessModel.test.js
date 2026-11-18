@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildQuickAccess, moveKey } from './quickAccessModel.js'
+import { buildQuickAccess, moveKey, planPin, QUICK_ACCESS_LIMIT } from './quickAccessModel.js'
 
 const data = {
   albums: [{ id: 'MP1', title: 'Alba', artist: 'Ado' }],
@@ -41,6 +41,46 @@ test('el orden arrastrado manda; lo no colocado conserva su orden detrás', () =
   assert.deepEqual(moveKey(['a', 'b', 'c', 'd'], 'd', 'b'), ['a', 'd', 'b', 'c'])
   const keys = ['a', 'b']
   assert.equal(moveKey(keys, 'a', 'zz'), keys)
+})
+
+test('hasta 10 accesos: lo automático rellena hasta 10, no hasta 8', () => {
+  const playlists = Array.from({ length: 15 }, (_, i) => ({ id: `PL${i}`, title: `Lista ${i}`, itemCount: 3 }))
+  const entries = buildQuickAccess({ likedSongs: [{ id: 's1' }], playlists }, { repeat: [{ id: 'r1' }, { id: 'r2' }] })
+  assert.equal(entries.length, QUICK_ACCESS_LIMIT)
+  assert.equal(QUICK_ACCESS_LIMIT, 10)
+})
+
+test('lista personalizada: lo automático deja de rellenar huecos (la "x" deja el sitio libre)', () => {
+  const playlists = Array.from({ length: 15 }, (_, i) => ({ id: `PL${i}`, title: `Lista ${i}`, itemCount: 3 }))
+  const pinned = [{ id: 'PL0', kind: 'playlist', title: 'Lista 0' }, { id: 'X', kind: 'song', title: 'X' }]
+  const auto = buildQuickAccess({ likedSongs: [{ id: 's1' }], playlists }, { pinned })
+  assert.equal(auto.length, QUICK_ACCESS_LIMIT, 'sin personalizar, lo automático llena hasta 10')
+  const own = buildQuickAccess({ likedSongs: [{ id: 's1' }], playlists }, { managed: true, pinned })
+  assert.deepEqual(own.map((e) => e.id), ['liked', 'PL0', 'X'], 'personalizada: solo Me gusta y lo fijado')
+})
+
+test('fijar no reemplaza lo que se ve: los automáticos visibles pasan a fijados y el nuevo va al final', () => {
+  const visible = [
+    { id: 'repeat', kind: 'special' }, { id: 'liked', kind: 'special' },
+    { id: 'A', kind: 'song', pinned: true, title: 'A' },
+    { id: 'PL1', kind: 'playlist', title: 'Uno' }, { id: 'PL2', kind: 'playlist', title: 'Dos' },
+  ]
+  const plan = planPin({ entry: { id: 'NEW', kind: 'album', title: 'Nuevo' }, pinned: [{ id: 'A', kind: 'song', title: 'A' }], visible })
+  assert.equal(plan.ok, true)
+  assert.deepEqual(plan.pinned.map((item) => item.id), ['A', 'PL1', 'PL2', 'NEW'])
+})
+
+test('con 10 en el inicio no se fija nada (nunca se reemplaza uno existente)', () => {
+  const visible = [{ id: 'repeat', kind: 'special' }, { id: 'liked', kind: 'special' }, ...Array.from({ length: 8 }, (_, i) => ({ id: `PL${i}`, kind: 'playlist', title: `L${i}` }))]
+  const pinned = []
+  const plan = planPin({ entry: { id: 'NEW', kind: 'album', title: 'Nuevo' }, pinned, visible })
+  assert.equal(plan.ok, false)
+  assert.equal(plan.pinned, pinned, 'no cambia nada')
+  // Con 9 sí cabe: el nuevo es el décimo.
+  assert.equal(planPin({ entry: { id: 'NEW', kind: 'album', title: 'Nuevo' }, pinned, visible: visible.slice(0, 9) }).ok, true)
+  // Fijar algo ya fijado no cuenta como nuevo.
+  const already = [{ id: 'X', kind: 'song', title: 'X' }]
+  assert.deepEqual(planPin({ entry: already[0], pinned: already, visible }), { ok: true, pinned: already })
 })
 
 test('los fijados a mano caben aunque superen el límite de los automáticos', () => {

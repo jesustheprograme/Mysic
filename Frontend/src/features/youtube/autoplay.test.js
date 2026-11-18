@@ -6,9 +6,10 @@ const song = (id, title = `T${id}`, artist = 'A') => ({ id, title, artist })
 
 test('pide más canciones solo cuando queda poco por delante', () => {
   assert.equal(needsTopUp({ currentIndex: 0, queueLength: 1 }), true, 'una sola canción: radio inmediata')
-  assert.equal(needsTopUp({ currentIndex: 0, queueLength: 3 }), true)
-  assert.equal(needsTopUp({ currentIndex: 0, queueLength: 4 }), false)
-  assert.equal(needsTopUp({ currentIndex: 7, queueLength: 10 }), true)
+  assert.equal(needsTopUp({ currentIndex: 0, queueLength: 4 }), true, '3 por delante: se rellena')
+  assert.equal(needsTopUp({ currentIndex: 0, queueLength: 11 }), true, '10 por delante: aún se rellena')
+  assert.equal(needsTopUp({ currentIndex: 0, queueLength: 12 }), false, '11 por delante: basta')
+  assert.equal(needsTopUp({ currentIndex: 40, queueLength: 50 }), true)
   assert.equal(needsTopUp({ currentIndex: -1, queueLength: 5 }), false, 'sin nada sonando no se pide')
   assert.equal(needsTopUp({ currentIndex: 0, queueLength: 0 }), false)
   assert.equal(needsTopUp({ currentIndex: MAX_QUEUE - 1, queueLength: MAX_QUEUE }), false, 'la cola tiene tope')

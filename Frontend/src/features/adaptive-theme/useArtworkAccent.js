@@ -17,6 +17,9 @@ function remember(url, accent) {
   cache.set(url, accent)
 }
 
+/** Ejecuta `task` en un momento libre del navegador (como mucho 500 ms después). */
+const whenIdle = (task) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(task, { timeout: 500 }) : setTimeout(task, 0))
+
 function getContext() {
   if (!sharedContext) {
     const canvas = document.createElement('canvas')
@@ -39,7 +42,9 @@ function sample(url) {
       image.src = '' // libera la imagen decodificada
       resolve(accent)
     }
-    image.onload = () => {
+    // Dibujar y leer los píxeles se hace cuando el navegador está libre (no en mitad de un fotograma de scroll): en la
+    // pestaña Artistas cada tarjeta que aparece calculaba su color dentro del scroll.
+    image.onload = () => whenIdle(() => {
       try {
         const context = getContext()
         context.clearRect(0, 0, SAMPLE_SIZE, SAMPLE_SIZE)
@@ -48,7 +53,7 @@ function sample(url) {
       } catch {
         finish(null)
       }
-    }
+    })
     image.onerror = () => finish(null)
     image.src = url
   })

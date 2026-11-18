@@ -1,0 +1,22 @@
+/* Franja superior del área de contenido: fija, de borde a borde, bajo el buscador. Su opacidad la pone el scroll
+   (ContentTopbar.jsx): 0 arriba del todo, 1 tras bajar 96 px. Solo en la ventana de escritorio. */
+.content-topbar { display: none; }
+
+@media (min-width: 761px) {
+  /* Solo donde está el buscador fijo (Inicio y resultados de búsqueda). */
+  .music-app--search-bar:has(> .app-header--desktop-shell) .content-topbar {
+    position: fixed;
+    z-index: 20;
+    top: var(--content-top, 36px);
+    left: var(--content-left, 220px);
+    width: var(--content-width, 0px);
+    height: 62px;
+    display: block;
+    border-bottom: 1px solid rgb(255 255 255 / 0.06);
+    background: rgb(8 10 10 / 0.86);
+    backdrop-filter: blur(14px) saturate(1.2);
+    opacity: 0;
+    pointer-events: none;
+    will-change: opacity;
+  }
+}

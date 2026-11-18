@@ -255,7 +255,7 @@
   align-items: center;
   justify-content: flex-start;
   gap: 7px;
-  padding: 18px 0 4px;
+  padding: 18px 0 14px;
   overflow: hidden;
   color: #fff;
 }
@@ -278,12 +278,13 @@
   transform: rotate(180deg);
 }
 
+/* Ocupa todo el alto que queda bajo el título, hasta el borde inferior de la ventana (antes, 140-280 px fijos). */
 .player-dock__compact-spectrum {
   width: 28px;
-  height: clamp(140px, 32vh, 280px);
-  min-height: 0;
+  height: auto;
+  min-height: 120px;
   display: flex;
-  flex: 0 1 clamp(140px, 32vh, 280px);
+  flex: 1 1 0;
   align-items: stretch;
   justify-content: center;
   overflow: hidden;
@@ -564,6 +565,12 @@
   transition: color 160ms ease, background-color 160ms ease, transform 160ms ease;
 }
 
+/* Menú de tres puntos de la cabecera: con el desplegable abierto se queda resaltado. */
+.player-dock__menu[data-state='open'] {
+  color: #f4f3ef;
+  background: rgb(255 255 255 / 0.08);
+}
+
 .player-dock__close:hover,
 .player-dock__action:hover {
   color: #f4f3ef;
@@ -599,6 +606,23 @@
   display: block;
   overflow: hidden;
   border-radius: 7px;
+}
+
+/* La portada abre "Reproduciendo ahora" a pantalla completa: se nota que se puede pulsar. */
+.player-dock__artwork--button {
+  padding: 0;
+  border: 0;
+  cursor: zoom-in;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.player-dock__artwork--button:hover {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  transform: scale(1.02);
+}
+
+.player-dock__artwork--button:active {
+  transform: scale(0.98);
 }
 
 .player-dock__artwork-backdrop {
@@ -881,6 +905,17 @@ button.player-dock__link:focus-visible {
   height: 30px;
 }
 
+/* Micrófono de la letra junto al mini reproductor (a la izquierda); el volumen queda solo a la derecha. */
+.player-dock__actions > .player-dock__action--lyrics {
+  margin-right: auto;
+  margin-left: 6px;
+}
+
+.player-dock__action--active {
+  color: #f4f3ef;
+  background: rgba(255, 255, 255, 0.09);
+}
+
 .player-dock__queue {
   width: 100%;
   margin-top: 9px;
@@ -1010,23 +1045,39 @@ button.player-dock__link:focus-visible {
   color: #7f8986;
 }
 
-.player-dock__clear {
-  width: 100%;
-  min-height: 34px;
-  margin-top: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 5px;
-  color: #b7bfbc;
-  background: transparent;
-  font-size: 11px;
-  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+/* Pestañas Artistas y Álbumes: portada + nombre + "N canciones en la cola"; abren su página. */
+.player-dock__queue-item--group {
+  grid-template-columns: 36px minmax(0, 1fr);
 }
 
-.player-dock__clear:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-  color: #fff;
-  background: rgba(255, 255, 255, 0.04);
+.player-dock__queue-item--group > i {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
 }
+
+.player-dock__queue-item--artist img,
+.player-dock__queue-item--artist > i {
+  border-radius: 50%;
+}
+
+.player-dock__queue-item--group:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.player-dock__queue-item--group:disabled:hover {
+  background: transparent;
+}
+
+.player-dock__queue-empty {
+  margin: 0;
+  padding: 14px 2px;
+  color: #7f8986;
+  font-size: 12px;
+}
+
 
 @keyframes player-drawer-enter {
   from {
@@ -1463,3 +1514,30 @@ button.player-dock__link:focus-visible {
   background-image: linear-gradient(180deg, color-mix(in srgb, var(--player-accent, transparent) 32%, transparent) 0%, transparent 55%);
 }
 
+
+/* Escritorio: el panel del reproductor no se desplaza; solo la cola. Carátula, controles y letra conservan su alto y
+   la cola ocupa lo que sobra hasta abajo (antes tenía 193 px fijos y el panel entero hacía scroll). Si la ventana es
+   tan baja que la cola se quedaría con menos de 120 px, vuelve a desplazarse el panel para no ocultar nada. */
+@media (min-width: 761px) {
+  .player-dock:not(.player-dock--collapsed) .player-dock__scroller {
+    display: flex;
+    flex-direction: column;
+    /* Sin franja vacía abajo: la cola llega al borde de la ventana y su aire final va dentro de la lista. */
+    padding-bottom: 0;
+  }
+  .player-dock:not(.player-dock--collapsed) .player-dock__scroller > * { flex: none; }
+  .player-dock:not(.player-dock--collapsed) .player-dock__scroller > .player-dock__queue {
+    flex: 1 1 0;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+  }
+  .player-dock:not(.player-dock--collapsed) .player-dock__queue > * { flex: none; }
+  .player-dock:not(.player-dock--collapsed) .player-dock__queue > .player-dock__queue-list {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+    align-content: start;
+    padding-bottom: 14px;
+  }
+}

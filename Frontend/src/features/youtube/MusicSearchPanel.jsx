@@ -4,6 +4,8 @@ import { api } from './lib/api.js'
 import SearchPopover from './SearchPopover.jsx'
 import { buildSearchModel } from './searchModel.js'
 
+// Búsquedas recientes que muestra el panel (el historial guarda hasta 10).
+const RECENT_SHOWN = 6
 const SUGGEST_DEBOUNCE_MS = 180
 // La búsqueda completa es más pesada para YouTube que las sugerencias: se pide con menos prisa.
 const SEARCH_DEBOUNCE_MS = 320
@@ -116,7 +118,8 @@ export default function MusicSearchPanel({
   const hasQuery = Boolean(query.trim())
   const currentKey = normalizeKey(query)
   const search = isRelevantSearch(searchResult.key, currentKey) ? searchResult.data : null
-  const { featured, rows, sections } = buildSearchModel({ hasQuery, history, search, suggestions })
+  // Solo las búsquedas más recientes: el panel es un atajo, no un listado (el historial guarda hasta 10).
+  const { featured, rows, sections } = buildSearchModel({ hasQuery, history: history.slice(0, RECENT_SHOWN), search, suggestions })
 
   function choose(row) {
     setActiveIndex(-1)
@@ -166,6 +169,13 @@ export default function MusicSearchPanel({
   function removeHistory(title) {
     setActiveIndex(-1)
     onHistoryRemove(title)
+  }
+
+  // "Borrar": vacía todo el historial de búsquedas (no solo las que se ven).
+  function clearHistory() {
+    setActiveIndex(-1)
+    for (const title of history) onHistoryRemove(title)
+    inputRef.current?.focus()
   }
 
   return (
@@ -223,6 +233,7 @@ export default function MusicSearchPanel({
         hasQuery={hasQuery}
         listboxId={listboxId}
         onChoose={choose}
+        onHistoryClear={clearHistory}
         onHistoryRemove={removeHistory}
         onViewAll={viewAll}
         open={open}

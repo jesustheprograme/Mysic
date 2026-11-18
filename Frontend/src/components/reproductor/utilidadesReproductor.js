@@ -1,3 +1,7 @@
+// Rellenos del servidor para "sin artista" y "sin álbum": no son enlaces ni se muestran como álbum.
+export const UNKNOWN_ARTIST = 'Artista desconocido'
+export const isRealAlbum = (album, albumId) => Boolean(album) && !(album === 'Sencillo' && !albumId)
+
 export function formatTime(seconds) {
   const safeSeconds = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0
   const minutes = Math.floor(safeSeconds / 60)

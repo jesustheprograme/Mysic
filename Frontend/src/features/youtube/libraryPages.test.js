@@ -1,6 +1,17 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { applyOverview, applyPage, canLoadMore, countLabel, emptyLibrary, emptyMeta, legacyMeta, mergeById, mergeFirstPage, nextKindToLoad, pendingKinds, withError, withLoading } from './libraryPages.js'
+import { applyOverview, applyPage, canLoadMore, countLabel, emptyLibrary, emptyMeta, isKindComplete, legacyMeta, mergeById, mergeFirstPage, nextKindToLoad, pendingKinds, revealedSections, withError, withLoading } from './libraryPages.js'
+
+test('"Todo" muestra cada tipo solo cuando el anterior está completo (lo nuevo nunca entra por encima)', () => {
+  const sections = [['playlists'], ['albums'], ['artists', 'subscriptions'], ['uploads']]
+  const meta = (hasMore, errors = {}) => ({ ...emptyMeta(), errors, hasMore })
+  assert.equal(revealedSections(meta({ playlists: true, albums: true }), sections), 1, 'cargando playlists: solo playlists')
+  assert.equal(revealedSections(meta({ albums: true }), sections), 2, 'playlists completas: se ven y los álbumes van cargando al final')
+  assert.equal(revealedSections(meta({ subscriptions: true }), sections), 3, 'artistas con suscripciones pendientes: aún sin subidos')
+  assert.equal(revealedSections(meta({}), sections), 4, 'todo completo')
+  assert.equal(revealedSections(meta({ playlists: true }, { playlists: 'LIBRARY_TIMEOUT' }), sections), 4, 'una categoría que falló no bloquea las demás')
+  assert.equal(isKindComplete(emptyMeta(), 'artists'), true, 'sin datos de páginas (servidor antiguo o caché): completo')
+})
 
 const items = (...ids) => ids.map((id) => ({ id }))
 const section = (ids, continuation = null) => ({ items: items(...ids), continuation, hasMore: Boolean(continuation) })

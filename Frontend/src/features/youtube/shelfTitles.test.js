@@ -14,6 +14,16 @@ test('traduce los títulos con nombre propio conservándolo', () => {
   assert.equal(translateShelfTitle('Because you listened to Queen'), 'Porque escuchaste Queen')
 })
 
+test('traduce los títulos del Inicio que quedaban en inglés', () => {
+  assert.equal(translateShelfTitle('Your daily discover'), 'Tu descubrimiento diario')
+  assert.equal(translateShelfTitle('Song mixes'), 'Mixes de canciones')
+  assert.equal(translateShelfTitle('Artist mixes'), 'Mixes de artistas')
+  assert.equal(translateShelfTitle('Mixed for you'), 'Mixes para ti')
+  assert.equal(translateShelfTitle('Heard in Shorts'), 'Escuchado en Shorts')
+  assert.equal(translateShelfTitle('Soundtracks & musicals'), 'Bandas sonoras y musicales')
+  assert.equal(translateShelfTitle('Fresh finds, old favorites'), 'Nuevos hallazgos y viejos favoritos')
+})
+
 test('lo desconocido o que no es texto queda igual', () => {
   assert.equal(translateShelfTitle('Mis favoritos de 2024'), 'Mis favoritos de 2024')
   assert.equal(translateShelfTitle(undefined), undefined)

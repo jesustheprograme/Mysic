@@ -8,6 +8,7 @@ import { readStorage, writeStorage } from '../lib/storage.js';
 import { insertIntoQueue } from '../queueOps.js';
 import { HOVER_WARM_DELAY_MS, clampSeek, engineReleaseDelay, isCurrentStreamSource, isSupersededPlay, resumePosition, shouldCreateEngine, shouldUseDirectAudio } from '../playerEngine.js';
 import { perfMark } from '../perfMarks.js';
+import { fadeGain, pauseFadeGain } from '../fadeModel.js';
 
 export const PLAY_EVENT = 'yotubei:play';
 export const PAUSE_EVENT = 'yotubei:pause';
@@ -105,6 +106,43 @@ export function usePlayer({ isDownloaded, enabled = true, onQueueEnd, onQueueSta
   const usesAudioRef = useRef(usesAudio);
   usesAudioRef.current = usesAudio;
   const volumeRef = useRef(volume);
+  // Pausa con fundido: factor (1 → 0 en 1 s) que se multiplica al volumen mientras se está pausando.
+  const pauseGainRef = useRef(1);
+  const pauseFadeRef = useRef(null);
+  const appliedGainRef = useRef(-1);
+  // Cancela una pausa en curso (reanudar, otra canción): el volumen vuelve al instante, sin fundido.
+  const cancelPauseFade = useCallback(() => {
+    if (!pauseFadeRef.current) return false;
+    clearInterval(pauseFadeRef.current);
+    pauseFadeRef.current = null;
+    pauseGainRef.current = 1;
+    appliedGainRef.current = -1;
+    return true;
+  }, []);
+  // applyFade se define más abajo (necesita el estado del motor); la pausa la llama a través de este ref.
+  const applyFadeRef = useRef(() => {});
+  // Baja el volumen a 0 en 1 s y entonces pausa. El botón pasa a "reproducir" al momento. Calcula el factor por el
+  // tiempo transcurrido: si el temporizador se ralentiza (ventana minimizada) la pausa no se alarga.
+  const startPauseFade = useCallback((pauseNow) => {
+    if (pauseFadeRef.current) return;
+    const startedAt = performance.now();
+    const step = () => {
+      const gain = pauseFadeGain(performance.now() - startedAt);
+      pauseGainRef.current = gain;
+      applyFadeRef.current();
+      if (gain > 0) return;
+      clearInterval(pauseFadeRef.current);
+      pauseFadeRef.current = null;
+      pauseNow();
+      // Ya en pausa: al reanudar se aplica el volumen completo de inmediato (sin fundido de entrada).
+      pauseGainRef.current = 1;
+      appliedGainRef.current = -1;
+    };
+    pauseFadeRef.current = setInterval(step, 30);
+    setIsPlaying(false);
+    step();
+  }, []);
+  useEffect(() => () => clearInterval(pauseFadeRef.current), []);
   const progressMax = duration || currentSong?.durationSeconds || 0;
   const engineNeeded = shouldCreateEngine({ videoId, usesAudio, armed: engineArmed });
   const releaseDelay = engineReleaseDelay({ hasSong: Boolean(videoId), usesAudio, isPlaying, isBuffering });
@@ -145,6 +183,7 @@ export function usePlayer({ isDownloaded, enabled = true, onQueueEnd, onQueueSta
   const playFrom = useCallback((list, index) => {
     if (!list || index < 0 || index >= list.length) return;
     perfMark('playback-intent', { id: list[index]?.id });
+    cancelPauseFade();
     clearTimeout(hoverWarmRef.current);
     warmNow(list[index]);
     if (list[index + 1]) warmNow(list[index + 1]);
@@ -158,7 +197,7 @@ export function usePlayer({ isDownloaded, enabled = true, onQueueEnd, onQueueSta
     setCurrentTime(0);
     setDuration(list[index].durationSeconds || 0);
     setIsBuffering(true);
-  }, [warmNow]);
+  }, [warmNow, cancelPauseFade]);
 
   // Primera intención de reproducir la canción actual sin motor: lo crea (con autoplay).
   const wakeEngine = useCallback(() => {
@@ -220,8 +259,14 @@ export function usePlayer({ isDownloaded, enabled = true, onQueueEnd, onQueueSta
         setAudioArmed(true);
         return;
       }
-      if (audio.paused) audio.play().catch(() => setPlayerError('No se pudo iniciar la reproducción.'));
-      else audio.pause();
+      // Pulsar durante el fundido de pausa la cancela: sigue sonando, con el volumen completo al instante.
+      if (cancelPauseFade()) { applyFadeRef.current(); setIsPlaying(true); return; }
+      if (audio.paused) {
+        // Reanudar no tiene fundido: el volumen completo se pone antes de que suene.
+        appliedGainRef.current = -1;
+        applyFadeRef.current();
+        audio.play().catch(() => setPlayerError('No se pudo iniciar la reproducción.'));
+      } else startPauseFade(() => audio.pause());
       return;
     }
     const player = youtubeRef.current;
@@ -230,9 +275,14 @@ export function usePlayer({ isDownloaded, enabled = true, onQueueEnd, onQueueSta
       wakeEngine();
       return;
     }
-    if (player.getPlayerState?.() === window.YT?.PlayerState?.PLAYING) player.pauseVideo();
-    else player.playVideo();
-  }, [audioArmed, currentSong, usesAudio, wakeEngine]);
+    if (cancelPauseFade()) { applyFadeRef.current(); setIsPlaying(true); return; }
+    if (player.getPlayerState?.() === window.YT?.PlayerState?.PLAYING) startPauseFade(() => player.pauseVideo());
+    else {
+      appliedGainRef.current = -1;
+      applyFadeRef.current();
+      player.playVideo();
+    }
+  }, [audioArmed, cancelPauseFade, currentSong, startPauseFade, usesAudio, wakeEngine]);
 
   const playPrev = useCallback(() => {
     const position = usesAudio
@@ -252,6 +302,7 @@ export function usePlayer({ isDownloaded, enabled = true, onQueueEnd, onQueueSta
   }, [currentIndex, queue, playFrom, usesAudio]);
 
   const closePlayer = useCallback(() => {
+    cancelPauseFade();
     audioRef.current?.pause();
     youtubeRef.current?.pauseVideo?.();
     pendingVideoIdRef.current = null;
@@ -263,7 +314,7 @@ export function usePlayer({ isDownloaded, enabled = true, onQueueEnd, onQueueSta
     setIsPlaying(false);
     setIsBuffering(false);
     setPlayerError('');
-  }, []);
+  }, [cancelPauseFade]);
 
   useEffect(() => {
     writeStorage(PLAYER_STORAGE_KEY, currentSong?.id ? currentSong : null);
@@ -416,12 +467,50 @@ export function usePlayer({ isDownloaded, enabled = true, onQueueEnd, onQueueSta
     });
   }, [videoId, usesAudio, isLocal, audioArmed, directFailedIds]);
 
+  // Fundido de 1 s al empezar y al terminar cada canción (fadeModel). Se aplica sobre el volumen elegido: en <audio>
+  // con `volume` y en el iframe con setVolume, y solo se escribe cuando cambia. Se recalcula con un temporizador corto
+  // mientras suena y en cada `timeupdate`, que el navegador sigue emitiendo con la ventana minimizada (los
+  // temporizadores sí se ralentizan en segundo plano).
+  const progressMaxRef = useRef(progressMax);
+  progressMaxRef.current = progressMax;
+  const applyFade = useCallback(() => {
+    if (usesAudioRef.current) {
+      const audio = audioRef.current;
+      if (!audio) return;
+      const total = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : progressMaxRef.current;
+      const level = volumeRef.current * fadeGain(audio.currentTime, total) * pauseGainRef.current;
+      if (Math.abs(level - appliedGainRef.current) < 0.004) return;
+      appliedGainRef.current = level;
+      audio.volume = Math.min(1, Math.max(0, level));
+      return;
+    }
+    const player = youtubeRef.current;
+    if (!player?.getCurrentTime || !player.setVolume) return;
+    const total = player.getDuration?.() || progressMaxRef.current;
+    const level = Math.round(volumeRef.current * 100 * fadeGain(player.getCurrentTime(), total) * pauseGainRef.current);
+    if (level === appliedGainRef.current) return;
+    appliedGainRef.current = level;
+    player.setVolume(level);
+  }, []);
+  applyFadeRef.current = applyFade;
+
   useEffect(() => {
     volumeRef.current = volume;
+    appliedGainRef.current = -1;
     if (audioRef.current) audioRef.current.volume = volume;
     youtubeRef.current?.setVolume?.(Math.round(volume * 100));
+    // Con la canción sonando, el nivel nuevo respeta el fundido en curso.
+    applyFade();
     writeStorage('volume', volume);
-  }, [volume]);
+  }, [volume, applyFade]);
+
+  useEffect(() => {
+    appliedGainRef.current = -1;
+    if (!isPlaying) return undefined;
+    applyFade();
+    const timer = setInterval(applyFade, usesAudio ? 30 : 100);
+    return () => clearInterval(timer);
+  }, [isPlaying, usesAudio, videoId, applyFade]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -443,15 +532,16 @@ export function usePlayer({ isDownloaded, enabled = true, onQueueEnd, onQueueSta
       artwork: currentSong.thumbnail ? [{ src: currentSong.thumbnail }] : [],
     });
     navigator.mediaSession.setActionHandler('play', () => {
+      if (cancelPauseFade()) { applyFadeRef.current(); setIsPlaying(true); return; }
       if (usesAudio && !audioArmed) setAudioArmed(true);
       else if (usesAudio) audioRef.current?.play();
       else if (youtubeRef.current?.playVideo) youtubeRef.current.playVideo();
       else wakeEngine();
     });
-    navigator.mediaSession.setActionHandler('pause', () => usesAudio ? audioRef.current?.pause() : youtubeRef.current?.pauseVideo?.());
+    navigator.mediaSession.setActionHandler('pause', () => startPauseFade(() => (usesAudio ? audioRef.current?.pause() : youtubeRef.current?.pauseVideo?.())));
     navigator.mediaSession.setActionHandler('previoustrack', playPrev);
     navigator.mediaSession.setActionHandler('nexttrack', playNext);
-  }, [audioArmed, currentSong, usesAudio, playPrev, playNext, wakeEngine]);
+  }, [audioArmed, cancelPauseFade, currentSong, startPauseFade, usesAudio, playPrev, playNext, wakeEngine]);
 
   useEffect(() => {
     const pause = () => {
@@ -512,7 +602,7 @@ export function usePlayer({ isDownloaded, enabled = true, onQueueEnd, onQueueSta
     onPlaying: () => { setIsBuffering(false); perfMark('audio-playing', { id: videoIdRef.current }); },
     // Un stream sin longitud conocida informa Infinity: se conserva la duración del catálogo.
     onLoadedMetadata: (event) => { if (Number.isFinite(event.currentTarget.duration)) setDuration(event.currentTarget.duration); },
-    onTimeUpdate: (event) => { if (!seeking) setCurrentTime(event.currentTarget.currentTime); },
+    onTimeUpdate: (event) => { applyFade(); if (!seeking) setCurrentTime(event.currentTarget.currentTime); },
     onEnded: playNext,
     onError: (event) => {
       // Un error tardío de la fuente anterior (ya se eligió otra canción) no debe marcar la actual como fallida.

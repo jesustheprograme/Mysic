@@ -27,12 +27,12 @@
 /* Filas de playlists y álbumes: el botón va en el borde derecho de la fila, fuera de la cuadrícula de columnas
    (así no cambia ninguna de sus plantillas), y la fila deja ese hueco libre. */
 .collection-detail .collection-detail__tracks .collection-detail__track.collection-detail__track--menu,
-.collection-detail .collection-detail__tracks:has(.collection-detail__track--menu) .collection-detail__table-head { padding-right: 48px; }
+.collection-detail .collection-detail__tracks:has(.collection-detail__track--menu) .collection-detail__table-head { padding-right: 36px; }
 
 .collection-detail__track .song-more--row {
   position: absolute;
   top: 50%;
-  right: 10px;
+  right: 4px;
   transform: translateY(-50%);
 }
 

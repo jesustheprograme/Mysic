@@ -7,7 +7,7 @@ import { ctxMenu } from './contextMenuStore.js'
 import { CardMenu } from './ItemMenus.jsx'
 import { adaptBrowseItem } from './lib/adapters.js'
 import { buildLibrary, LIBRARY_TABS, LIKED_ID, REPEAT_ID } from './libraryModel.js'
-import { emptyMeta, nextKindToLoad } from './libraryPages.js'
+import { emptyMeta, isKindComplete, nextKindToLoad, revealedSections } from './libraryPages.js'
 import { readTopPlays } from './playHistory.js'
 import { prefetchHandlers } from './prefetchDetail.js'
 import useVirtualGrid from './useVirtualGrid.js'
@@ -130,7 +130,8 @@ function VirtualGrid({ artistCounts, controller, entries, loading = false, onNee
  */
 // Categorías del servidor que alimentan cada pestaña, en el orden en que se piden.
 const TAB_KINDS = {
-  all: ['playlists', 'albums', 'artists', 'uploads', 'subscriptions'],
+  // Mismo orden que en pantalla: se carga lo que va justo debajo de lo que ya se ve.
+  all: ['playlists', 'albums', 'artists', 'subscriptions', 'uploads'],
   albums: ['albums'],
   artists: ['artists', 'subscriptions'],
   playlists: ['playlists'],
@@ -149,7 +150,10 @@ export default function LibraryView({ controller, data, renderSongs }) {
   const [sortAZ, setSortAZ] = useState(false)
   // "En repetición": lo más escuchado en los últimos 30 días, del historial local (se lee al abrir la biblioteca).
   const repeat = useMemo(() => readTopPlays(), [])
-  const library = useMemo(() => buildLibrary(data, { query, repeat, sort: sortAZ ? 'az' : 'recent' }), [data, query, repeat, sortAZ])
+  // Las suscripciones van detrás de los artistas: solo aparecen cuando ya no llegarán más páginas de artistas (si no,
+  // cada página nueva de artistas se insertaría por encima de lo que se está viendo y el scroll saltaría).
+  const withSubscriptions = isKindComplete(meta, 'artists')
+  const library = useMemo(() => buildLibrary(data, { query, repeat, sort: sortAZ ? 'az' : 'recent', withSubscriptions }), [data, query, repeat, sortAZ, withSubscriptions])
   const downloaded = downloads.downloads.items
   const tabs = LIBRARY_TABS.filter((item) => item.id !== 'uploads' || library.totals.uploads > 0)
   const activeTab = tabs.some((item) => item.id === tab) ? tab : 'all'
@@ -184,7 +188,20 @@ export default function LibraryView({ controller, data, renderSongs }) {
     { entries: library.artists, key: 'artists', title: 'Artistas', variant: 'artist' },
     { entries: library.uploads, key: 'uploads', title: 'Subidos' },
   ]
-  const everything = { entries: [...playlistEntries, ...library.albums, ...library.artists, ...library.uploads], key: 'all', title: 'Biblioteca' }
+  // "Todo" muestra cada tipo solo cuando el anterior está completo: lo que llega siempre se añade al final, nunca por
+  // encima de lo que se está viendo. Antes las páginas de álbumes se insertaban encima de los artistas mientras se
+  // bajaba y el scroll se recolocaba solo (30 compensaciones de 1.728 px medidas en una sola bajada).
+  const allSections = [
+    { entries: playlistEntries, kinds: ['playlists'] },
+    { entries: library.albums, kinds: ['albums'] },
+    { entries: library.artists, kinds: ['artists', 'subscriptions'] },
+    { entries: library.uploads, kinds: ['uploads'] },
+  ]
+  const everything = {
+    entries: allSections.slice(0, revealedSections(meta, allSections.map((section) => section.kinds))).flatMap((section) => section.entries),
+    key: 'all',
+    title: 'Biblioteca',
+  }
   const visibleSections = activeTab === 'all' ? [everything] : sections.filter((section) => section.key === activeTab)
   const nothingFound = searchable && visibleSections.every((section) => section.entries.length === 0)
   const sizing = GRID_SIZING

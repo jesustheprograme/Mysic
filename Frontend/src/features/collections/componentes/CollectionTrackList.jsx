@@ -2,7 +2,7 @@ import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, us
 import { restrictToFirstScrollableAncestor, restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Clock3, ListPlus } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import useWindowedRows, { findScrollParent } from '../hooks/useWindowedRows.js'
 import { shouldWindow } from '../hooks/windowMath.js'
 import FilaCancionOrdenable from './FilaCancionOrdenable.jsx'
@@ -27,6 +27,9 @@ export default function CollectionTrackList({
   const windowed = shouldWindow({ count: songs.length, hasDiscHeadings: showsDiscHeadings })
   const rows = useWindowedRows({ count: songs.length, enabled: windowed, frozen: dragging, listRef })
   const visibleSongs = rows.isWindowed ? songs.slice(rows.start, rows.end) : songs
+  // Sin ninguna fecha conocida (lista recién vista por Mysic) la columna "Fecha de adición" solo ocuparía sitio vacío:
+  // se quita y su ancho pasa al título y al álbum.
+  const hasDates = useMemo(() => Boolean(table && addedAt && songs.some((song) => addedAt(song.id))), [table, addedAt, songs])
 
   const isSelected = (song) => {
     const songSource = song.source === 'youtube' ? 'youtube' : 'local'
@@ -120,5 +123,5 @@ export default function CollectionTrackList({
     </div>
   ))
 
-  return <div className="collection-detail__tracks" ref={tracksRef}>{tableHead}{content}</div>
+  return <div className={`collection-detail__tracks${playlistHead && !hasDates ? ' collection-detail__tracks--no-dates' : ''}`} ref={tracksRef}>{tableHead}{content}</div>
 }

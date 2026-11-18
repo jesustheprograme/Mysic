@@ -35,7 +35,8 @@ function HomeRail({
   const [expanded, setExpanded] = useState(false)
   // Con `fitColumns` las tarjetas se reparten el ancho exacto (sin un trozo de la siguiente asomando)
   // y "Ver todo" despliega la sección entera en una cuadrícula.
-  const measuredColumns = useRailColumns(railRef)
+  // Sin `fitColumns` (p. ej. la cuadrícula de la Biblioteca) el número de columnas no se usa: no se mide.
+  const measuredColumns = useRailColumns(railRef, fitColumns)
   const columns = fitColumns ? measuredColumns : 0
   const overflowing = !fitColumns || columns === 0 || items.length > columns
   // Desplegada, la sección suma como mucho 3 filas más a la que ya se ve, no toda la lista.

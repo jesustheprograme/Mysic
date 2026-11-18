@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import {
   Album,
-  CircleUserRound,
   Clock3,
   Compass,
   Download,
@@ -28,6 +27,7 @@ import {
 import { getPlaylistTrackCount } from '../features/playlists/playlistTracks.js'
 import { countText, EMPTY_LIBRARY_SUMMARY } from '../features/youtube/librarySummary.js'
 import { sizedImage } from '../lib/imageSize.js'
+import { createOverlayScrollbarRef } from '../lib/overlayScrollbar.js'
 import { readStorage, writeStorage } from '../lib/storage.js'
 
 // Opciones principales: Inicio es la portada de YouTube Music; todo el catálogo propio de Mysic
@@ -38,6 +38,9 @@ const mainNavigationItems = [
   { id: 'youtube-library', label: 'Biblioteca', icon: Library, youtubeView: 'library' },
   { id: 'stats', label: 'Estadísticas', icon: ChartColumn },
 ]
+
+// La barra de la lista de playlists va en el margen derecho de la barra lateral (10 px), fuera de las filas.
+const playlistScrollbarRef = createOverlayScrollbarRef({ inset: -8 })
 
 const GROUP_STORAGE_KEY = 'mysic:sidebar:mysic-open'
 const MYSIC_SECTIONS = ['home', 'explore', 'for-you', 'import', 'recent', 'albums', 'album', 'artists', 'artist', 'playlists', 'playlist', 'downloads']
@@ -176,6 +179,9 @@ function AppSidebar({
               <Plus size={17} strokeWidth={1.8} aria-hidden="true" />
             </button>
           </div>
+          {/* Solo esta lista hace scroll (con su barra superpuesta): la navegación de arriba, el título "Playlists" y
+              su botón "+" se quedan quietos. */}
+          <div className="app-sidebar__playlist-list" ref={playlistScrollbarRef}>
           {youtubeLibrary.liked && (
             <div className={`app-sidebar__playlist${activeSection === 'youtube' && youtubeActive?.type === 'liked' ? ' app-sidebar__playlist--active' : ''}`}>
               <button className="app-sidebar__playlist-main" type="button" onClick={() => onYoutubeNavigate?.({ type: 'liked' })}>
@@ -260,10 +266,7 @@ function AppSidebar({
                 </DropdownMenu>
               </div>
           ))}
-          <button className="app-sidebar__create" type="button" onClick={onCreatePlaylist}>
-            <CircleUserRound size={18} strokeWidth={1.7} aria-hidden="true" />
-            <span>Crear playlist</span>
-          </button>
+          </div>
           </div>
         )}
       </aside>

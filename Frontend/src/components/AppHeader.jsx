@@ -26,6 +26,9 @@ function AppHeader({
   const [helpOpen, setHelpOpen] = useState(false)
   const menuRef = useRef(null)
   const searchInputRef = useRef(null)
+  // El atajo de teclado vive en un efecto que se registra una vez: lee siempre la última versión de onHome.
+  const onHomeRef = useRef(onHome)
+  useEffect(() => { onHomeRef.current = onHome })
   // En escritorio el usuario y su menú viven en la barra de título (TitleBar), no aquí.
   const desktopShell = isDesktopShell()
 
@@ -39,12 +42,19 @@ function AppHeader({
       if (shortcut === 'search') {
         event.preventDefault()
         setSearchOpen(true)
-        // Espera al render: en móvil el campo solo existe con la búsqueda abierta.
-        requestAnimationFrame(() => {
+        // En escritorio el buscador solo se ve en el Inicio: desde otro apartado el atajo lleva al Inicio y lo enfoca.
+        const root = document.getElementById('global-header-search-root')
+        const hidden = root && getComputedStyle(root).display === 'none'
+        if (hidden) onHomeRef.current?.()
+        const focusInput = () => {
           const input = document.querySelector('#global-header-search-root .yt-music-search input')
           input?.focus()
           input?.select?.()
-        })
+        }
+        // Espera al render: en móvil el campo solo existe con la búsqueda abierta; al venir de otro apartado, a que
+        // el Inicio esté en pantalla y el buscador vuelva a mostrarse.
+        if (hidden) setTimeout(focusInput, 160)
+        else requestAnimationFrame(focusInput)
         return
       }
       if (shortcut === 'help') {
@@ -126,6 +136,8 @@ function AppHeader({
               }}
             >
               <BrandLogo className="app-header__logo" tone="light" />
+              {/* En la ventana de escritorio se muestra solo el nombre, sin el icono (ver minimal.css). */}
+              <span className="app-header__wordmark" aria-hidden="true">Mysic</span>
             </a>
             <strong className="app-header__context-title" aria-hidden={!mobileBrandHidden}>
               {mobileContextTitle}

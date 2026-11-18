@@ -47,10 +47,16 @@ function collectAlbums(data) {
   return [...albums.values()]
 }
 
-/** Artistas: biblioteca y suscripciones del servidor o, si no los hay, los deducidos de los Me gusta. */
-function collectArtists(data) {
-  const fromServer = [...(data.artists ?? []), ...(data.subscriptions ?? [])]
-  if (fromServer.length) return uniqueById(fromServer.map(toArtist))
+/**
+ * Artistas: biblioteca y suscripciones del servidor o, si no los hay, los deducidos de los Me gusta.
+ * Con `withSubscriptions: false` las suscripciones aún no se muestran (ver LibraryView: van detrás de los artistas y,
+ * mientras lleguen páginas de artistas, se insertarían por encima de lo que se está viendo).
+ */
+function collectArtists(data, withSubscriptions = true) {
+  const subscriptions = data.subscriptions ?? []
+  if ((data.artists ?? []).length || subscriptions.length) {
+    return uniqueById([...(data.artists ?? []), ...(withSubscriptions ? subscriptions : [])].map(toArtist))
+  }
   const artists = new Map()
   ;(data.likedSongs ?? []).forEach((song) => {
     if (!song.artistId) return
@@ -66,7 +72,7 @@ function collectArtists(data) {
  * artistas, suscripciones y subidos del servidor y, mientras no existan, deduce álbumes y artistas de los Me gusta.
  * `repeat` son las canciones más reproducidas ("En repetición"); las dos tarjetas especiales llevan kind 'special'.
  */
-export function buildLibrary(data, { query = '', repeat = [], sort = 'recent' } = {}) {
+export function buildLibrary(data, { query = '', repeat = [], sort = 'recent', withSubscriptions = true } = {}) {
   const likedSongs = data.likedSongs ?? []
   const playlists = (data.playlists ?? []).filter((playlist) => !isYoutubeLikedList(playlist))
   const needle = query.trim().toLocaleLowerCase()
@@ -74,7 +80,7 @@ export function buildLibrary(data, { query = '', repeat = [], sort = 'recent' } 
   const order = (entries) => (sort === 'az' ? [...entries].sort((a, b) => labelOf(a).localeCompare(labelOf(b))) : entries)
 
   const allAlbums = collectAlbums(data)
-  const allArtists = collectArtists(data)
+  const allArtists = collectArtists(data, withSubscriptions)
   const allUploads = uniqueById((data.uploads ?? []).map(toAlbum))
 
   const liked = { kind: 'special', id: LIKED_ID, title: 'Música que me gusta', thumbnail: thumb(likedSongs[0]?.thumbnail), subtitle: plural(likedSongs.length, 'canción', 'canciones') }

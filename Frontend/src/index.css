@@ -35,6 +35,34 @@
   height: 0 !important;
   display: none !important;
 }
+
+/* Barra superpuesta (src/lib/overlayScrollbar.js): oscura, sin ocupar espacio, visible al pasar el ratón o al
+   desplazarse. Se ensancha un poco bajo el ratón para que sea fácil de arrastrar. */
+.overlay-scrollbar {
+  position: fixed;
+  /* Por encima de "Reproduciendo ahora" a pantalla completa (120), que también usa la cola con esta barra. */
+  z-index: 130;
+  top: 0;
+  left: 0;
+  width: 6px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.13);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease, background-color 150ms ease, width 150ms ease;
+  will-change: transform;
+}
+.overlay-scrollbar--visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.overlay-scrollbar:hover,
+.overlay-scrollbar--dragging {
+  background: rgb(255 255 255 / 0.24);
+}
+:root[data-theme='light'] .overlay-scrollbar { background: rgb(0 0 0 / 0.16); }
+:root[data-theme='light'] .overlay-scrollbar:hover,
+:root[data-theme='light'] .overlay-scrollbar--dragging { background: rgb(0 0 0 / 0.3); }
 @custom-variant dark (&:is(.dark *));
 
 :root {

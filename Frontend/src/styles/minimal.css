@@ -54,6 +54,50 @@
   background: var(--m-active);
 }
 
+/* Nombre "Mysic" en texto: solo lo muestra la cabecera de escritorio (más abajo); en el resto se usa el logo. */
+.app-header__wordmark { display: none; }
+
+/* Barra lateral pegada a la izquierda: el borde de cada opción (y del buscador) en x=8 y su contenido en x=16 (iconos,
+   portadas de playlists y la etiqueta "Playlists", alineados entre sí). Antes: borde en 17 e iconos en 30.
+   Solo en escritorio: por debajo de 760 px la barra cambia de diseño y conserva el suyo. */
+@media (min-width: 761px) {
+  .music-app .app-sidebar:not(.app-sidebar--collapsed) {
+    padding-right: 10px;
+    padding-left: 8px;
+  }
+
+  .music-app .app-sidebar:not(.app-sidebar--collapsed) .app-sidebar__item,
+  .music-app .app-sidebar:not(.app-sidebar--collapsed) .app-sidebar__group-toggle {
+    padding-right: 10px;
+    padding-left: 8px;
+  }
+
+  .music-app .app-sidebar:not(.app-sidebar--collapsed) .app-sidebar__playlist { padding-left: 8px; }
+  .music-app .app-sidebar:not(.app-sidebar--collapsed) .app-sidebar__label-row { margin-left: 8px; }
+  .music-app .app-sidebar:not(.app-sidebar--collapsed) > .app-sidebar__label { margin-left: 8px; }
+
+  /* Solo el bloque de playlists hace scroll: ocupa el alto que queda bajo la navegación y su lista se desplaza por
+     dentro; el título "Playlists" y "Crear playlist" quedan fijos. Con el grupo "Mysic" desplegado en una ventana muy
+     baja la lista conserva al menos 140 px y, si aun así no cabe, la barra entera vuelve a desplazarse. */
+  .music-app .app-sidebar:not(.app-sidebar--collapsed) .app-sidebar__playlists {
+    flex: 1 1 0;
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+  }
+  .music-app .app-sidebar__playlist-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* El aire del final va dentro de la lista: al desplazarse, las filas llegan hasta el borde de la ventana en vez
+       de cortarse en seco contra una franja vacía. */
+    padding-bottom: 16px;
+  }
+  .music-app .app-sidebar:not(.app-sidebar--collapsed) { padding-bottom: 0; }
+}
+
 /* Listas: sin divisores; el hover y el activo marcan la fila. */
 .music-app .track-row {
   border-bottom-color: transparent;
@@ -322,19 +366,57 @@
     justify-content: center;
   }
 
-  /* Sin logo: Inicio ya está en el sidebar. El botón de plegar va a la derecha del buscador. */
+  /* Arriba de la barra lateral va el logo de Mysic (donde antes estaba el buscador), alineado con los iconos (x=16).
+     El botón de plegar sigue a su derecha. */
+  .music-app .app-header--desktop-shell { z-index: 30; }
   .music-app .app-header--desktop-shell .app-header__toggle { width: 34px; height: 34px; }
-  .music-app .app-header--desktop-shell .app-header__identity,
   .music-app .app-header--desktop-shell .app-header__context-title,
   .music-app .app-header--desktop-shell .app-header__actions { display: none; }
 
+  /* Fijo (no absoluto): va dentro del contenedor del botón de plegar, que está posicionado más a la derecha. */
+  .music-app .app-header--desktop-shell .app-header__identity {
+    position: fixed;
+    top: calc(var(--content-top, 36px) + 17px);
+    left: 16px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Solo el nombre, sin el icono: texto en vez de la imagen del logo. */
+  .music-app .app-header--desktop-shell .app-header__brand { width: auto; min-height: 0; text-decoration: none; }
+  .music-app .app-header--desktop-shell .app-header__logo { display: none; }
+  .music-app .app-header--desktop-shell .app-header__wordmark {
+    display: block;
+    color: #fff;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+
+  /* El buscador fijo de arriba solo existe en el Inicio y en sus resultados de búsqueda (.music-app--search-bar, lo pone
+     DiscoveryView según la vista). En playlists, artistas, álbumes, Me gusta y el resto de apartados no hay buscador ni
+     hueco: esas páginas conservan su diseño. */
+  .music-app:not(.music-app--search-bar) .app-header--desktop-shell .music-search { display: none; }
+
+  /* El contenido empieza bajo la franja del buscador (y=98): nada queda tapado arriba del todo. */
+  .music-app--search-bar:has(> .app-header--desktop-shell) > .music-app__content {
+    padding-top: 50px;
+    scroll-padding-top: 70px;
+  }
+
+  /* Buscador fijo en la parte superior del área de contenido, centrado en ella (ContentTopbar.jsx mide el área y
+     publica --content-left/--content-top/--content-width): no se va al hacer scroll y sigue centrado al plegar la
+     barra lateral o el reproductor. Va sobre la franja que se oscurece al bajar. */
   .music-app .app-header--desktop-shell .music-search {
-    position: absolute;
-    top: 17px;
-    left: 14px;
-    width: calc(var(--sidebar-width, 220px) - 28px - 42px);
+    position: fixed;
+    z-index: 31;
+    top: calc(var(--content-top, 36px) + 17px);
+    left: calc(var(--content-left, 220px) + var(--content-width, 900px) / 2);
+    width: min(400px, calc(var(--content-width, 900px) - 180px));
     margin: 0;
-    transform: none;
+    transform: translateX(-50%);
   }
 
   .music-app .app-header--desktop-shell .sx-bar {
@@ -346,16 +428,30 @@
 
   .music-app .app-header--desktop-shell .sx-bar input { font-size: 13px; }
 
-  /* El panel de resultados sale hacia la derecha, sobre el contenido, no centrado en la barra. */
+  /* El panel de resultados sale centrado bajo el buscador: algo más ancho que la barra (440 px como mucho), sin salirse
+     del área de contenido. */
   .music-app .app-header--desktop-shell .sx-popover {
-    left: 0;
-    width: min(560px, calc(100vw - var(--sidebar-width, 220px) - 32px));
-    transform: translateY(-6px);
+    left: 50%;
+    width: max(100%, min(440px, calc(var(--content-width, 900px) - 32px)));
+    transform: translate(-50%, -6px);
   }
 
-  .music-app .app-header--desktop-shell .yt-music-search--open .sx-popover { transform: none; }
+  .music-app .app-header--desktop-shell .yt-music-search--open .sx-popover { transform: translateX(-50%); }
 
   .music-app:has(> .app-header--desktop-shell) .app-sidebar { padding-top: 70px; }
+
+  /* Franja con el fondo de la barra lateral bajo "Mysic" y el botón de plegar: al hacer scroll, las playlists pasan
+     por debajo y no se mezclan con el nombre. */
+  .music-app .app-header--desktop-shell .app-header__inner::before {
+    content: '';
+    position: fixed;
+    top: var(--content-top, 36px);
+    left: 0;
+    width: calc(var(--sidebar-width, 220px) - 1px);
+    height: 62px;
+    background: var(--mysic-header-surface, #050606);
+    pointer-events: none;
+  }
 
   /* Sidebar plegado: solo el botón de plegar; el buscador sigue en Ctrl+K. */
   .music-app--sidebar-collapsed .app-header--desktop-shell .app-header__leading {
@@ -364,8 +460,8 @@
     justify-content: center;
   }
 
-  .music-app--sidebar-collapsed .app-header--desktop-shell .app-header__identity,
-  .music-app--sidebar-collapsed .app-header--desktop-shell .music-search { display: none; }
+  /* Con la barra plegada no cabe el logo; el buscador sigue arriba, centrado sobre el contenido. */
+  .music-app--sidebar-collapsed .app-header--desktop-shell .app-header__identity { display: none; }
 
   .music-app--sidebar-collapsed:has(> .app-header--desktop-shell) .app-sidebar { padding-top: 64px; }
 }
@@ -451,7 +547,9 @@
 
 /* Sin pastillas de navegación el encabezado es solo el botón de editar: contenido más arriba. */
 .music-app .home-page > .yt-hub { gap: 0; margin-bottom: 14px; }
-.music-app .home-page > .yt-hub .yt-edit-home { width: 30px; height: 30px; }
+.music-app .home-page > .yt-hub .yt-edit-home { width: 32px; height: 32px; flex: none; }
+/* Las pastillas de ánimo comparten fila con el botón de editar y se desplazan en horizontal dentro del resto del ancho. */
+.music-app .yt-hub__tabs-row > .yt-moods { flex: 1 1 auto; min-width: 0; margin: 0; padding-bottom: 0; }
 
 .music-app .home-page .home-shelf__heading h2 {
   display: inline-flex;

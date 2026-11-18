@@ -1,9 +1,10 @@
-import { ListMusic, X } from 'lucide-react'
+import { ListMusic } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import ControlledWaveform from '../reproductor/ControlledWaveform.jsx'
+import PlayerDockMenu from '../reproductor/PlayerDockMenu.jsx'
 import { useArtworkAccent } from '../../features/adaptive-theme/useArtworkAccent.js'
 import useAmbientAccent from '../../features/adaptive-theme/useAmbientAccent.js'
-import LyricsSection from '../../features/lyrics/LyricsSection.jsx'
+import LyricsSection, { LyricsToggleButton } from '../../features/lyrics/LyricsSection.jsx'
 import useTaskbarControls from '../../features/taskbar/useTaskbarControls.js'
 import HeartToggle from '../HeartToggle.jsx'
 import { sizedImage } from '../../lib/imageSize.js'
@@ -22,8 +23,9 @@ import {
 const DOCK_ARTWORK_PX = 220
 const playerArtworkUrl = (url) => sizedImage(url, DOCK_ARTWORK_PX)
 
-function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = false, onAlbumSelect, onArtistSelect, onClose, onNext, onOpenMiniPlayer, onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, queue, suppressed = false, track }) {
+function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = false, onAlbumSelect, onArtistSelect, onClose, onNext, onOpenMiniPlayer, onOpenNowPlaying, onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, queue, suppressed = false, track }) {
   const [volumeExpanded, setVolumeExpanded] = useState(false)
+  const [lyricsOpen, setLyricsOpen] = useState(false)
   // Referencia estable: con una función nueva en cada tick, `memo` de PlayerQueue no serviría.
   const handleQueueSelect = useCallback((_item, index) => onQueueSelect(index), [onQueueSelect])
   const {
@@ -102,9 +104,7 @@ function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = fal
         <div className="player-dock__header">
           <strong>Reproduciendo ahora</strong>
           <div className="player-dock__header-actions">
-            <button className="player-dock__close" type="button" aria-label="Cerrar reproductor" title="Cerrar reproductor" onClick={onClose}>
-              <X size={18} aria-hidden="true" />
-            </button>
+            <PlayerDockMenu onClose={onClose} onExpand={onOpenNowPlaying} />
           </div>
         </div>
 
@@ -116,6 +116,8 @@ function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = fal
           artistId={track.artistId}
           onAlbumSelect={onAlbumSelect}
           onArtistSelect={onArtistSelect}
+          onArtworkClick={onOpenNowPlaying}
+          linkByName
           currentTime={currentTime}
           duration={duration}
           error={error}
@@ -154,6 +156,7 @@ function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = fal
             aria-label="Abrir mini reproductor" title="Abrir mini reproductor" onClick={onOpenMiniPlayer}>
             <ListMusic size={17} aria-hidden="true" />
           </button>
+          <LyricsToggleButton open={lyricsOpen} onToggle={() => setLyricsOpen((open) => !open)} />
           <div className="player-dock__volume">
             <VolumeControl
               expanded={volumeExpanded}
@@ -167,6 +170,7 @@ function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = fal
         <LyricsSection
           currentTime={currentTime}
           duration={duration}
+          open={lyricsOpen}
           onSeek={(time) => {
             const event = { target: { value: time } }
             handleSeek(event)
@@ -177,6 +181,8 @@ function ControlledPlayerDock({ collapsed = false, externalPlayback, liked = fal
 
         <PlayerQueue
           activeIndex={currentIndex}
+          onAlbumSelect={onAlbumSelect}
+          onArtistSelect={onArtistSelect}
           onQueueSelect={handleQueueSelect}
           queue={queue}
         />

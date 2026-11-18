@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import PlayerDock from '../../components/PlayerDock.jsx'
+import NowPlayingOverlay from '../now-playing/NowPlayingOverlay.jsx'
+import useListenTracker from '../stats/useListenTracker.js'
 import { connectAudioAnalyser, disconnectAudioAnalyser, resumeAudioContext } from '../../lib/audioAnalyser.js'
 import useGlobalMiniPlayer from '../mini-player/useGlobalMiniPlayer.js'
 import { useBrowse } from './hooks/useBrowse.js'
@@ -45,6 +47,7 @@ function clearBrowseRestoreOnce() {
 }
 
 const ACCOUNT_REQUEST_TIMEOUT_MS = 15_000
+const ANALYSER_DELAY_MS = 3000
 // Un /account que no responde se corta a los 15 s y cuenta como fallo transitorio, nunca como cuenta desconectada.
 function accountRequestSignal(signal) {
   return typeof AbortSignal.any === 'function' && typeof AbortSignal.timeout === 'function'
@@ -129,11 +132,17 @@ function YoutubeView({
     onQueueEnd,
     onQueueStart,
   })
-  const playRequestedSong = useEffectEvent((song) => playFrom([song], 0, { preserveContext: true }))
+  // Petición desde otra sección: una canción, o una lista desde una posición (p. ej. el top de Estadísticas).
+  const playRequestedSong = useEffectEvent((song, songs, index = 0) => {
+    if (Array.isArray(songs) && songs.length) playFrom(songs, Math.max(0, Math.min(songs.length - 1, index)))
+    else playFrom([song], 0, { preserveContext: true })
+  })
   const closeRequestedPlayer = useEffectEvent(() => player.closePlayer())
   const playerAudioRef = player.audioProps.ref
   const playerSongId = player.currentSong?.id
-  const playerUsesLocalAudio = player.isLocal
+  // El espectro escucha el <audio>: canciones descargadas y también las de streaming (directo por mysicstream:// o por el
+  // servidor), que llegan con cabeceras CORS y Web Audio puede leer. Solo el iframe de respaldo no se puede analizar.
+  const playerUsesElementAudio = player.isLocal || player.isStreamed
   const [playerAnalyser, setPlayerAnalyser] = useState(null)
   const openMiniPlayer = useGlobalMiniPlayer(player, browse)
   // Una vinculación (iniciada aquí o confirmada por polling) renueva el Inicio y trae la biblioteca por detrás.
@@ -269,20 +278,32 @@ function YoutubeView({
 
   useEffect(() => {
     const audio = playerAudioRef.current
-    if (!playerUsesLocalAudio || !audio) {
+    if (!playerUsesElementAudio || !audio) {
       setPlayerAnalyser(null)
       return undefined
     }
-    const analyser = connectAudioAnalyser(audio)
-    const resumeAnalyser = () => resumeAudioContext().catch(() => {})
-    audio.addEventListener('play', resumeAnalyser)
-    setPlayerAnalyser(analyser)
+    // Crear el AudioContext bloquea el hilo principal (232 ms medidos en el arranque). Con la canción restaurada en
+    // pausa no hace falta todavía: se conecta pasados 3 s, con el Inicio ya pintado, o al reproducir si llega antes.
+    let connected = false
+    const connect = () => {
+      if (connected) return
+      connected = true
+      setPlayerAnalyser(connectAudioAnalyser(audio))
+    }
+    const onPlay = () => {
+      connect()
+      resumeAudioContext().catch(() => {})
+    }
+    audio.addEventListener('play', onPlay)
+    const timer = audio.paused ? setTimeout(connect, ANALYSER_DELAY_MS) : 0
+    if (!audio.paused) connect()
     return () => {
-      audio.removeEventListener('play', resumeAnalyser)
-      disconnectAudioAnalyser(audio)
+      clearTimeout(timer)
+      audio.removeEventListener('play', onPlay)
+      if (connected) disconnectAudioAnalyser(audio)
       setPlayerAnalyser(null)
     }
-  }, [playerAudioRef, playerSongId, playerUsesLocalAudio])
+  }, [playerAudioRef, playerSongId, playerUsesElementAudio])
 
   const { loadSection } = browse
   const { results } = browse
@@ -293,8 +314,8 @@ function YoutubeView({
   }, [loadSection, results?.pending, results?.query, results?.type])
 
   useEffect(() => {
-    if (playbackRequest?.song?.id) playRequestedSong(playbackRequest.song)
-  }, [playbackRequest?.nonce, playbackRequest?.song, playbackRequest?.song?.id])
+    if (playbackRequest?.song?.id) playRequestedSong(playbackRequest.song, playbackRequest.songs, playbackRequest.index)
+  }, [playbackRequest?.nonce, playbackRequest?.song, playbackRequest?.song?.id, playbackRequest?.songs, playbackRequest?.index])
 
   useEffect(() => {
     reportPlaybackState()
@@ -345,8 +366,10 @@ function YoutubeView({
   })
   const queueForTopUp = player.queue
   const indexForTopUp = player.currentIndex
+  // Con YouTube Music al mando (no `suppressed`), esté o no visible su sección: la música sigue sonando aunque se
+  // navegue a otra parte (antes dependía de `active` y la cola dejaba de rellenarse).
   useEffect(() => {
-    if (!autoplay || !active || !needsTopUp({ currentIndex: indexForTopUp, queueLength: queueForTopUp.length })) return undefined
+    if (!autoplay || suppressed || !needsTopUp({ currentIndex: indexForTopUp, queueLength: queueForTopUp.length })) return undefined
     const seed = queueForTopUp[queueForTopUp.length - 1]
     if (!seed?.id || seed.isLocal || topUpSeedRef.current === seed.id) return undefined
     topUpSeedRef.current = seed.id
@@ -366,7 +389,7 @@ function YoutubeView({
       // Una petición cortada por un cambio de cola (no terminada) debe poder repetirse.
       if (!finished && topUpSeedRef.current === seed.id) topUpSeedRef.current = null
     }
-  }, [active, autoplay, indexForTopUp, queueForTopUp])
+  }, [autoplay, indexForTopUp, queueForTopUp, suppressed])
 
   function toggleDownload(song) {
     if (downloads.downloadedIds.has(song.id)) downloads.deleteDownload(song.id)
@@ -536,23 +559,37 @@ function YoutubeView({
   // en el mismo commit que oculta la sección (layout effect), antes de que el reinicio del scroll lo sobrescriba.
   const workspaceKeyRef = useRef(workspaceKey)
   workspaceKeyRef.current = workspaceKey
+  //
+  // Rendimiento (medido con el perfil de CPU de un scroll rápido en la Biblioteca): antes se guardaba en cada fotograma
+  // comprobando la visibilidad con `offsetParent`, que obliga al navegador a recalcular el diseño justo después de que
+  // la cuadrícula monte filas nuevas (447 ms de 13,6 s de perfil, lo más costoso del código propio). Ahora la posición
+  // y la vista se capturan en el propio evento de scroll (con el diseño ya calculado: lectura barata) y solo la
+  // escritura se aplaza. Así, al cambiar de sección a mitad de un scroll, lo pendiente se guarda con la vista de la que
+  // se sale, no con la nueva (Inicio y Biblioteca comparten este oyente: no hay desmontaje entre ellas).
   useLayoutEffect(() => {
     if (!active) return undefined
     const content = workspaceRef.current?.closest('.music-app__content')
     if (!content) return undefined
-    let frame = 0
-    const save = () => {
-      frame = 0
-      if (!workspaceRef.current?.offsetParent) return
-      scrollPositionsRef.current.set(workspaceKeyRef.current, getScrollTargets(workspaceRef.current).map((target) => target.scrollTop))
+    let timer = 0
+    let pendingSave = null
+    const flush = () => {
+      timer = 0
+      if (pendingSave) scrollPositionsRef.current.set(pendingSave.key, pendingSave.positions)
+      pendingSave = null
     }
     const onScroll = () => {
-      if (!frame) frame = requestAnimationFrame(save)
+      if (!workspaceRef.current?.isConnected) return
+      // Al cambiar de vista, el primer scroll de la nueva (el reinicio a 0) no debe pisar lo pendiente de la anterior.
+      if (pendingSave && pendingSave.key !== workspaceKeyRef.current) flush()
+      pendingSave = { key: workspaceKeyRef.current, positions: getScrollTargets(workspaceRef.current).map((target) => target.scrollTop) }
+      clearTimeout(timer)
+      timer = setTimeout(flush, 150)
     }
     content.addEventListener('scroll', onScroll, { passive: true })
     return () => {
       content.removeEventListener('scroll', onScroll)
-      if (frame) cancelAnimationFrame(frame)
+      clearTimeout(timer)
+      flush()
     }
   }, [active])
 
@@ -889,6 +926,8 @@ function YoutubeView({
     // Una playlist o los Me gusta elegidos en la barra lateral llegan como objeto: { type: 'playlist', id } o { type: 'liked' }.
     if (view && typeof view === 'object') {
       if (view.type === 'playlist' && view.id) openPlaylist(view.id)
+      else if (view.type === 'artist' && view.id) openArtist(view.id)
+      else if (view.type === 'album' && view.id) openAlbum(view.id)
       else if (view.type === 'liked') openLiked()
       else if (view.type === 'link') void openLinkTarget(view.target)
       return
@@ -1023,6 +1062,8 @@ function YoutubeView({
     playerRef.current = player
   })
   const currentSong = player.currentSong
+  // Escuchas para Estadísticas (como Limusic): tiempo oído de verdad, guardado en el equipo.
+  useListenTracker({ song: currentSong, position: player.currentTime, duration: player.progressMax, playing: player.isPlaying })
   const currentTrack = useMemo(() => (currentSong ? adaptSong(currentSong) : null), [currentSong])
   const playerQueue = player.queue
   const adaptedQueue = useMemo(() => playerQueue.map(adaptSong), [playerQueue])
@@ -1030,6 +1071,56 @@ function YoutubeView({
     (index) => playerRef.current.playFrom(playerRef.current.queue, index),
     [],
   )
+  // Los enlaces del reproductor (artista y álbum, también en sus pestañas) llevan a su página; si esta sección está
+  // oculta, se vuelve a ella. Estables por la misma razón: leen lo último a través de un ref.
+  const dockNavRef = useRef(null)
+  useEffect(() => {
+    dockNavRef.current = { active, onSearchNavigate, openAlbum, openArtist }
+  })
+  // Sin id (vídeos subidos, artistas sin canal): se busca por nombre y se abre el que coincida, o el primero.
+  const findByName = useCallback(async (type, query, name) => {
+    const items = (await api.search(query, type))?.items ?? []
+    const wanted = String(name || query).trim().toLocaleLowerCase()
+    const label = (item) => String(item.name ?? item.title ?? '').trim().toLocaleLowerCase()
+    return (items.find((item) => label(item) === wanted) ?? items[0])?.id ?? null
+  }, [])
+  const handleDockAlbum = useCallback(async (albumId, title, artist) => {
+    const nav = dockNavRef.current
+    const id = albumId || (title ? await findByName('album', [title, artist].filter(Boolean).join(' '), title).catch(() => null) : null)
+    if (!id) return
+    if (!nav.active) nav.onSearchNavigate?.()
+    nav.openAlbum(id)
+  }, [findByName])
+  const handleDockArtist = useCallback(async (artistId, name) => {
+    const nav = dockNavRef.current
+    const id = artistId || (name ? await findByName('artist', name, name).catch(() => null) : null)
+    if (!id) return
+    if (!nav.active) nav.onSearchNavigate?.()
+    nav.openArtist(id)
+  }, [findByName])
+  // Tercera forma del controlador (contraído, normal y extenso): "Reproduciendo ahora" a pantalla completa.
+  const [nowPlayingOpen, setNowPlayingOpen] = useState(false)
+  const openNowPlaying = useCallback(() => setNowPlayingOpen(true), [])
+  const closeNowPlaying = useCallback(() => setNowPlayingOpen(false), [])
+  const seekFromNowPlaying = useCallback((time) => {
+    const event = { target: { value: time } }
+    playerRef.current.handleSeek(event)
+    playerRef.current.commitSeek(event)
+  }, [])
+  const changeVolumeFromNowPlaying = useCallback((value) => playerRef.current.setVolume(value / 100), [])
+  // Sin canción (se cerró el reproductor) o con otro reproductor al mando, la vista extensa se cierra sola. Un vacío
+  // pasajero (al arrancar, la cola se restaura y la canción o el dueño de la reproducción parpadean ~1 s) no la cierra:
+  // se mantiene con la última canción y solo se cierra si dura más de 1,5 s.
+  const lastTrackRef = useRef(null)
+  if (currentTrack) lastTrackRef.current = currentTrack
+  const nowPlayingAvailable = Boolean(currentTrack) && !suppressed
+  useEffect(() => {
+    if (!nowPlayingOpen || nowPlayingAvailable) return undefined
+    const timer = setTimeout(() => setNowPlayingOpen(false), 1500)
+    return () => clearTimeout(timer)
+  }, [nowPlayingAvailable, nowPlayingOpen])
+  const nowPlayingTrack = currentTrack ?? lastTrackRef.current
+  const showNowPlaying = nowPlayingOpen && Boolean(nowPlayingTrack)
 
   return (
     <div className="youtube-catalog">
@@ -1060,11 +1151,11 @@ function YoutubeView({
         <PlayerDock
           collapsed={playerCollapsed}
           externalPlayback={{ analyser: playerAnalyser, commitSeek: player.commitSeek, currentIndex: player.currentIndex, currentTime: player.currentTime, duration: player.progressMax, error: player.playerError, handleSeek: player.handleSeek, isBuffering: player.isBuffering, isPlaying: player.isPlaying, setVolume: player.setVolume, togglePlayback: player.togglePlay, volume: player.volume }}
-          // Los enlaces del reproductor (artista y álbum) llevan a su página; si esta sección está oculta, se vuelve a ella.
-          onAlbumSelect={(albumId) => { if (!active) onSearchNavigate?.(); openAlbum(albumId) }}
-          onArtistSelect={(artistId) => { if (!active) onSearchNavigate?.(); openArtist(artistId) }}
+          onAlbumSelect={handleDockAlbum}
+          onArtistSelect={handleDockArtist}
           onClose={player.closePlayer}
           onOpenMiniPlayer={() => openMiniPlayer().catch(() => {})}
+          onOpenNowPlaying={openNowPlaying}
           onNext={player.playNext}
           onPrevious={player.playPrev}
           onQueueSelect={handleQueueSelect}
@@ -1076,6 +1167,29 @@ function YoutubeView({
           suppressed={suppressed}
         />,
         root,
+      )}
+      {showNowPlaying && (
+        <NowPlayingOverlay
+          currentIndex={player.currentIndex}
+          currentTime={player.currentTime}
+          duration={player.progressMax}
+          isBuffering={player.isBuffering}
+          isPlaying={player.isPlaying}
+          liked={likedSongIds.has(nowPlayingTrack.id)}
+          onAlbumSelect={handleDockAlbum}
+          onArtistSelect={handleDockArtist}
+          onClose={closeNowPlaying}
+          onNext={player.playNext}
+          onPrevious={player.playPrev}
+          onQueueSelect={handleQueueSelect}
+          onSeek={seekFromNowPlaying}
+          onToggleFavorite={(liked) => onToggleSongFavorite(nowPlayingTrack.id, liked, nowPlayingTrack)}
+          onTogglePlayback={player.togglePlay}
+          onVolumeChange={changeVolumeFromNowPlaying}
+          queue={adaptedQueue}
+          track={nowPlayingTrack}
+          volume={Math.round(player.volume * 100)}
+        />
       )}
     </div>
   )

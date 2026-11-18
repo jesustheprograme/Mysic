@@ -1,30 +1,48 @@
 import { LoaderCircle, MoreVertical, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
-import { memo, useEffect, useRef, useState } from 'react'
+import { createOverlayScrollbarRef } from '../../lib/overlayScrollbar.js'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import ArtworkImage from '../ArtworkImage.jsx'
 import VerticalSpectrum from '../VerticalSpectrum.jsx'
+import { groupQueue } from './queueGroups.js'
 import { sizedImage } from '../../lib/imageSize.js'
-import { formatTime } from './utilidadesReproductor.js'
+import { formatTime, isRealAlbum, UNKNOWN_ARTIST } from './utilidadesReproductor.js'
+
+// La barra de la cola va en el margen derecho del panel (20 px), fuera de las filas: no tapa los "⋮".
+const queueScrollbarRef = createOverlayScrollbarRef({ inset: -10 })
 
 // El dock se repinta unas 5 veces por segundo (currentTime). Estas piezas no dependen del tiempo:
 // con `memo` solo se vuelven a renderizar cuando cambian sus propios datos.
-// Artista y álbum son enlaces cuando se conoce su id y hay manejador: abren su página.
-const TrackSummary = memo(function TrackSummary({ album, albumId, artwork, artist, artistId, onAlbumSelect, onArtistSelect, title }) {
+// Artista y álbum son enlaces cuando se conoce su id y hay manejador: abren su página. Con `linkByName` (YouTube Music)
+// también sin id: el manejador recibe (id, nombre[, artista]) y busca por nombre. "Sencillo" sin id es el relleno del
+// servidor para "sin álbum": no se muestra.
+// Con `onArtworkClick`, la portada abre "Reproduciendo ahora" a pantalla completa.
+const TrackSummary = memo(function TrackSummary({ album, albumId, artwork, artist, artistId, linkByName = false, onAlbumSelect, onArtistSelect, onArtworkClick, title }) {
+  const artistLink = onArtistSelect && (artistId || (linkByName && artist && artist !== UNKNOWN_ARTIST))
+  const showAlbum = isRealAlbum(album, albumId)
+  const albumLink = onAlbumSelect && (albumId || linkByName)
+  // Cuadrado exacto: object-fit: cover recorta las franjas negras laterales de las miniaturas de vídeo 16:9. Las
+  // miniaturas de vídeo se piden en maxresdefault (la de InnerTube, 400x225, se veía borrosa a 220 px).
+  const image = artwork && <ArtworkImage url={artwork} size={220} />
   return (
     <>
-      <div className="player-dock__artwork">
-        {/* Cuadrado exacto: object-fit: cover recorta las franjas negras laterales de las miniaturas de vídeo 16:9. */}
-        {artwork && <img src={artwork} alt="" decoding="async" />}
-      </div>
+      {onArtworkClick ? (
+        <button className="player-dock__artwork player-dock__artwork--button" type="button" aria-label="Abrir reproducción a pantalla completa" title="Pantalla completa" onClick={onArtworkClick}>
+          {image}
+        </button>
+      ) : (
+        <div className="player-dock__artwork">{image}</div>
+      )}
       <div className="player-dock__details">
         <strong>{title}</strong>
         <span className="player-dock__meta">
-          {artistId && onArtistSelect
-            ? <button className="player-dock__link player-dock__link--artist" type="button" title={`Abrir artista ${artist}`} onClick={() => onArtistSelect(artistId)}>{artist}</button>
+          {artistLink
+            ? <button className="player-dock__link player-dock__link--artist" type="button" title={`Abrir artista ${artist}`} onClick={() => onArtistSelect(artistId, artist)}>{artist}</button>
             : <span className="player-dock__link player-dock__link--artist">{artist}</span>}
-          {album && (
+          {showAlbum && (
             <>
               <i aria-hidden="true">·</i>
-              {albumId && onAlbumSelect
-                ? <button className="player-dock__link" type="button" title={`Abrir álbum ${album}`} onClick={() => onAlbumSelect(albumId)}>{album}</button>
+              {albumLink
+                ? <button className="player-dock__link" type="button" title={`Abrir álbum ${album}`} onClick={() => onAlbumSelect(albumId, album, artist)}>{album}</button>
                 : <span className="player-dock__link">{album}</span>}
             </>
           )}
@@ -34,11 +52,11 @@ const TrackSummary = memo(function TrackSummary({ album, albumId, artwork, artis
   )
 })
 
-export function PlayerPanelContent({ album, albumId, artwork, artist, artistId, currentTime, duration, error, hasAudio, isBuffering = false, isPlaying, onAlbumSelect, onArtistSelect, onNext, onPrevious, onTogglePlayback, progress, title, trackAction = null }) {
+export function PlayerPanelContent({ album, albumId, artwork, artist, artistId, currentTime, duration, error, hasAudio, isBuffering = false, isPlaying, linkByName = false, onAlbumSelect, onArtistSelect, onArtworkClick, onNext, onPrevious, onTogglePlayback, progress, title, trackAction = null }) {
   return (
     <>
       <div className={`player-dock__track${trackAction ? '' : ' player-dock__track--without-action'}`}>
-        <TrackSummary album={album} albumId={albumId} artwork={artwork} artist={artist} artistId={artistId} onAlbumSelect={onAlbumSelect} onArtistSelect={onArtistSelect} title={title} />
+        <TrackSummary album={album} albumId={albumId} artwork={artwork} artist={artist} artistId={artistId} linkByName={linkByName} onAlbumSelect={onAlbumSelect} onArtistSelect={onArtistSelect} onArtworkClick={onArtworkClick} title={title} />
         {trackAction}
       </div>
 
@@ -97,40 +115,80 @@ const QueueItem = memo(function QueueItem({ index, isActive, item, onSelect }) {
   )
 })
 
+const countLabel = (count) => `${count} ${count === 1 ? 'canción' : 'canciones'} en la cola`
+
+// Fila de un artista o álbum de la cola: abre su página si se conoce su id (y hay manejador); si no, solo informa.
+const QueueGroupItem = memo(function QueueGroupItem({ group, isActive, kind, onOpen }) {
+  const canOpen = Boolean(group.id && onOpen)
+  const label = kind === 'album' ? 'álbum' : 'artista'
+  return (
+    <button
+      className={`player-dock__queue-item player-dock__queue-item--group player-dock__queue-item--${kind}${isActive ? ' player-dock__queue-item--active' : ''}`}
+      type="button"
+      disabled={!canOpen}
+      title={canOpen ? `Abrir ${label} ${group.title}` : group.title}
+      onClick={canOpen ? () => onOpen(group.id) : undefined}
+    >
+      {group.artwork ? <img src={sizedImage(group.artwork, 36)} alt="" width="36" height="36" loading="lazy" decoding="async" /> : <i aria-hidden="true" />}
+      <span>
+        <strong>{group.title}</strong>
+        <small>{[group.subtitle, countLabel(group.count)].filter(Boolean).join(' · ')}</small>
+      </span>
+    </button>
+  )
+})
+
+const TABS = [
+  { id: 'queue', label: 'Cola' },
+  { id: 'artist', label: 'Artistas' },
+  { id: 'album', label: 'Álbumes' },
+]
+
 // Requiere `queue` y `onQueueSelect` estables entre renders para que `memo` sirva.
-export const PlayerQueue = memo(function PlayerQueue({ activeIndex = null, activeTrackId = null, onQueueSelect, queue }) {
+export const PlayerQueue = memo(function PlayerQueue({ activeIndex = null, activeTrackId = null, onAlbumSelect, onArtistSelect, onQueueSelect, queue }) {
+  const [tab, setTab] = useState('queue')
+  // Solo se agrupa la pestaña abierta, y solo cuando cambia la cola.
+  const groups = useMemo(() => (tab === 'queue' ? null : groupQueue(queue, tab)), [queue, tab])
+  const activeSong = activeIndex !== null ? queue[activeIndex] : queue.find((item) => item.id === activeTrackId)
+  const activeKey = groups && activeSong ? groupQueue([activeSong], tab)[0]?.key : null
+  const onOpen = tab === 'album' ? onAlbumSelect : onArtistSelect
+
   return (
     <section className="player-dock__queue" aria-labelledby="player-queue-title">
       <div className="player-dock__tabs" role="tablist" aria-label="Contenido del reproductor">
-        <button className="player-dock__tab player-dock__tab--active" type="button" role="tab" aria-selected="true">
-          Cola
-        </button>
-        <button className="player-dock__tab" type="button" role="tab" aria-selected="false">
-          Artistas
-        </button>
-        <button className="player-dock__tab" type="button" role="tab" aria-selected="false">
-          Favoritos
-        </button>
+        {TABS.map(({ id, label }) => (
+          <button
+            className={`player-dock__tab${tab === id ? ' player-dock__tab--active' : ''}`}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            key={id}
+            onClick={() => setTab(id)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
-      <h2 id="player-queue-title" className="sr-only">Cola de reproducción</h2>
-      <div className="player-dock__queue-list">
-        {queue.map((item, index) => {
-          const isActive = activeIndex === index || (activeIndex === null && item.id === activeTrackId)
+      <h2 id="player-queue-title" className="sr-only">{tab === 'queue' ? 'Cola de reproducción' : tab === 'album' ? 'Álbumes de la cola' : 'Artistas de la cola'}</h2>
+      <div className="player-dock__queue-list" ref={queueScrollbarRef} role="tabpanel">
+        {groups
+          ? groups.length
+            ? groups.map((group) => <QueueGroupItem group={group} isActive={group.key === activeKey} key={group.key} kind={tab} onOpen={onOpen} />)
+            : <p className="player-dock__queue-empty">{tab === 'album' ? 'Las canciones de la cola no indican álbum.' : 'Las canciones de la cola no indican artista.'}</p>
+          : queue.map((item, index) => {
+            const isActive = activeIndex === index || (activeIndex === null && item.id === activeTrackId)
 
-          return (
-            <QueueItem
-              index={index}
-              isActive={isActive}
-              item={item}
-              key={item.id}
-              onSelect={onQueueSelect}
-            />
-          )
-        })}
+            return (
+              <QueueItem
+                index={index}
+                isActive={isActive}
+                item={item}
+                key={item.id}
+                onSelect={onQueueSelect}
+              />
+            )
+          })}
       </div>
-      <button className="player-dock__clear" type="button">
-        Limpiar cola
-      </button>
     </section>
   )
 })
@@ -268,7 +326,7 @@ export function CompactNowPlaying({ analyser, currentTime, duration, hasAudio, i
         <CompactPlaybackTime currentTime={currentTime} duration={duration} />
         <CompactTrackTicker key={track.id} artist={track.artist} onExpand={onExpand} title={track.title} />
         <div className="player-dock__compact-spectrum">
-          <VerticalSpectrum analyser={analyser} playing={isPlaying} width={28} span={0.86} />
+          <VerticalSpectrum analyser={analyser} playing={isPlaying} width={28} span={0.97} />
         </div>
       </div>
     </div>

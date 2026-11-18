@@ -54,9 +54,13 @@ function ShortcutEntry({ entry, kind }) {
       icon={pinned ? PinOff : Pin}
       label={pinned ? 'Quitar de accesos directos' : 'Añadir un acceso directo'}
       onSelect={() => {
-        if (pinned) unpinShortcut(kind, entry.id)
-        else pinShortcut(shortcut)
-        showToast(pinned ? 'Acceso directo quitado' : 'Acceso directo añadido al inicio')
+        if (pinned) {
+          unpinShortcut(kind, entry.id)
+          showToast('Acceso directo quitado')
+          return
+        }
+        // Nunca reemplaza uno existente: con 10 en el inicio no se añade y se explica cómo hacer sitio.
+        showToast(pinShortcut(shortcut) ? 'Acceso directo añadido al inicio' : 'Ya tienes 10 accesos directos: quita uno con la ✕ para añadir otro')
       }}
     />
   )

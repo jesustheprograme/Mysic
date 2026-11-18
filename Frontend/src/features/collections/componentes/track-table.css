@@ -21,11 +21,42 @@
 /* ---- Modo tabla: # · carátula · título y artista · álbum · fecha de adición · ✓ y corazón · duración ---- */
 .collection-detail__tracks { container-type: inline-size; }
 
+/* Filas compactas y a lo ancho (playlists, álbumes y el resto de listas, en escritorio):
+   - Se salen 22 px del margen lateral de la página (28 px): quedan a 6 px de los bordes del área central.
+   - Título y artista juntos (sin hueco entre líneas) y fila de 50 px en lugar de 58 px, con portada de 40 px. */
+@media (min-width: 761px) {
+  .collection-detail .collection-detail__tracks { margin-inline: -22px; }
+
+  .music-app .collection-detail .collection-detail__tracks .collection-detail__track {
+    min-height: 50px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+    padding-left: 8px;
+  }
+  .collection-detail .collection-detail__tracks .collection-detail__table-head--table { padding-left: 8px; }
+
+  .collection-detail .collection-detail__tracks .collection-detail__track .collection-detail__track-main {
+    gap: 1px;
+    align-content: center;
+  }
+  .collection-detail .collection-detail__tracks .collection-detail__track .collection-detail__track-title { line-height: 1.25; }
+  .collection-detail .collection-detail__tracks .collection-detail__track .collection-detail__track-main > small,
+  .collection-detail .collection-detail__tracks .collection-detail__track .collection-detail__track-main > small .collection-detail__catalog-link { line-height: 1.3; }
+  .collection-detail .collection-detail__tracks .collection-detail__track-thumb { width: 40px; height: 40px; }
+}
+
 .collection-detail .collection-detail__tracks .collection-detail__track.collection-detail__track--table,
 .collection-detail .collection-detail__tracks .collection-detail__table-head--table {
-  grid-template-columns: 28px 44px minmax(0, 1.5fr) minmax(0, 1fr) 112px 66px 44px;
+  grid-template-columns: 28px 40px minmax(0, 1.7fr) minmax(0, 1fr) 112px 66px 44px;
   gap: 12px;
 }
+
+/* Sin fechas conocidas no hay columna de fecha: su ancho pasa al título y al álbum. */
+.collection-detail .collection-detail__tracks--no-dates .collection-detail__track.collection-detail__track--table,
+.collection-detail .collection-detail__tracks--no-dates .collection-detail__table-head--table {
+  grid-template-columns: 28px 40px minmax(0, 1.7fr) minmax(0, 1fr) 66px 44px;
+}
+.collection-detail .collection-detail__tracks--no-dates .collection-detail__track-date { display: none; }
 
 .collection-detail .collection-detail__tracks .collection-detail__table-head--table {
   display: grid;

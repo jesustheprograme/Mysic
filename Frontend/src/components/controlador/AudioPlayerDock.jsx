@@ -1,7 +1,9 @@
-import { ListMusic, X } from 'lucide-react'
+import { ListMusic } from 'lucide-react'
+import PlayerDockMenu from '../reproductor/PlayerDockMenu.jsx'
 import { useArtworkAccent } from '../../features/adaptive-theme/useArtworkAccent.js'
 import useAmbientAccent from '../../features/adaptive-theme/useAmbientAccent.js'
-import LyricsSection from '../../features/lyrics/LyricsSection.jsx'
+import { useState } from 'react'
+import LyricsSection, { LyricsToggleButton } from '../../features/lyrics/LyricsSection.jsx'
 import useTaskbarControls from '../../features/taskbar/useTaskbarControls.js'
 import HeartToggle from '../HeartToggle.jsx'
 import {
@@ -22,6 +24,7 @@ function AudioPlayerDock(props) {
     onPrevious, onQueueSelect, onToggleCollapsed, onToggleFavorite, queue, suppressed = false, track,
   } = props
   const player = useAudioPlayerDock(props)
+  const [lyricsOpen, setLyricsOpen] = useState(false)
   // Botones de la miniatura de la barra de tareas (Windows): los maneja el reproductor que tiene el control.
   useTaskbarControls({
     active: !suppressed,
@@ -77,15 +80,7 @@ function AudioPlayerDock(props) {
       <div className="player-dock__header">
         <strong>{isLoading ? 'Descubrimiento semanal' : 'Reproduciendo ahora'}</strong>
         <div className="player-dock__header-actions">
-          <button
-            className="player-dock__close"
-            type="button"
-            aria-label="Cerrar reproductor"
-            title="Cerrar reproductor"
-            onClick={onClose}
-          >
-            <X size={18} aria-hidden="true" />
-          </button>
+          <PlayerDockMenu onClose={onClose} />
         </div>
       </div>
 
@@ -152,6 +147,7 @@ function AudioPlayerDock(props) {
             >
               <ListMusic size={17} aria-hidden="true" />
             </button>
+            <LyricsToggleButton open={lyricsOpen} onToggle={() => setLyricsOpen((open) => !open)} />
             <div className="player-dock__volume">
               <VolumeControl
                 expanded={player.volumeExpanded}
@@ -166,11 +162,14 @@ function AudioPlayerDock(props) {
             currentTime={player.currentTime}
             duration={player.duration}
             onSeek={player.seekTo}
+            open={lyricsOpen}
             track={track}
           />
 
           <PlayerQueue
             activeTrackId={track.id}
+            onAlbumSelect={onAlbumSelect}
+            onArtistSelect={onArtistSelect}
             onQueueSelect={onQueueSelect}
             queue={queue}
           />

@@ -1,7 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { attachOverlayScrollbar } from '../../lib/overlayScrollbar.js'
 import '../../styles/home.css'
 import { Download, LoaderCircle, Trash2 } from 'lucide-react'
 import AppHeader from '../../components/AppHeader.jsx'
+import ContentTopbar from '../../components/ContentTopbar.jsx'
 import AppSidebar from '../../components/AppSidebar.jsx'
 import AlbumView from '../collections/AlbumView.jsx'
 import ArtistView from '../collections/ArtistView.jsx'
@@ -27,7 +29,6 @@ import useLocalDownloads from '../offline/useLocalDownloads.js'
 import { useDownloads } from '../youtube/hooks/useDownloads.js'
 import { useYoutubeFavorites } from '../youtube/hooks/useYoutubeFavorites.js'
 import { adaptSong } from '../youtube/lib/adapters.js'
-import { libraryCacheKey } from '../youtube/libraryCache.js'
 import { recordPlayInStorage, setPlayHistoryOwner } from '../youtube/playHistory.js'
 import { noteSongPlay } from '../youtube/recentListens.js'
 import { sidebarViewFor } from './utilidades/sidebarView.js'
@@ -419,6 +420,9 @@ function useDiscoveryPage({
   const [youtubeSearchRequest, setYoutubeSearchRequest] = useState({ nonce: 0, query: '' })
   const [youtubeStopNonce, setYoutubeStopNonce] = useState(0)
   const [youtubeViewKind, setYoutubeViewKind] = useState('home')
+  // Vista exacta de YouTube (home, search, playlist, artist…): el buscador fijo de arriba solo va en el Inicio y en sus
+  // resultados de búsqueda (para poder afinarla); en playlists, artistas, álbumes y demás apartados no aparece.
+  const [youtubePage, setYoutubePage] = useState('home')
   const [youtubeActive, setYoutubeActive] = useState(null)
   const [youtubeLibrary, setYoutubeLibrary] = useState(readLibrarySummary)
   const [activeAlbumId, setActiveAlbumId] = useState(getAlbumIdFromHash)
@@ -454,6 +458,10 @@ function useDiscoveryPage({
   const lastRecordedPlayRef = useRef(null)
   const playbackStateRef = useRef({ currentTime: 0, duration: 0, isPlaying: false, volume: 75 })
   const contentRef = useRef(null)
+  // Barra de scroll superpuesta del área de contenido (no ocupa espacio; ver src/lib/overlayScrollbar.js).
+  // Pegada al borde derecho del área, junto al reproductor.
+  // La barra del bloque central va a la izquierda (junto a la barra lateral), no pegada al reproductor.
+  useEffect(() => attachOverlayScrollbar(contentRef.current, { inset: 2, side: 'left' }), [])
   const discoveryLoadingTimerRef = useRef(null)
   const scrollPositionsRef = useRef(new Map())
   const mobileBrandHiddenRef = useRef(false)
@@ -730,6 +738,7 @@ function useDiscoveryPage({
     const onView = (event) => {
       const { id, kind } = event.detail ?? {}
       setYoutubeViewKind((previous) => sidebarViewFor(kind, previous))
+      setYoutubePage(kind ?? 'home')
       // Una playlist de la cuenta o los Me gusta abiertos: la barra lateral resalta esa entrada.
       setYoutubeActive(kind === 'liked' ? { type: 'liked' } : kind === 'playlist' && id ? { id, type: 'playlist' } : null)
     }
@@ -788,6 +797,14 @@ function useDiscoveryPage({
     else if (!preserveDiscoveryMix) setDiscoveryMix([])
     setYoutubeVisited(true)
     setYoutubePlaybackRequest((current) => ({ nonce: (current?.nonce ?? 0) + 1, song }))
+  }
+
+  // Estadísticas: reproducir una lista de YouTube Music desde una posición (sin salir de la página).
+  function playYoutubeSongs(songs, index = 0) {
+    if (!songs?.length) return
+    setDiscoveryMix([])
+    setYoutubeVisited(true)
+    setYoutubePlaybackRequest((current) => ({ nonce: (current?.nonce ?? 0) + 1, song: songs[index] ?? songs[0], songs, index }))
   }
 
   function playContextSong(song, contextSongs = playbackSongs) {
@@ -913,7 +930,7 @@ function useDiscoveryPage({
 
   function renderPage() {
     return (
-    <div className={`music-app${sidebarCollapsed ? ' music-app--sidebar-collapsed' : ''}${playerVisible ? ' music-app--player-open' : ''}${playerVisible && playerCollapsed ? ' music-app--player-collapsed' : ''}`} id="music-home">
+    <div className={`music-app${activeSection === 'youtube' && (youtubePage === 'home' || youtubePage === 'search') ? ' music-app--search-bar' : ''}${sidebarCollapsed ? ' music-app--sidebar-collapsed' : ''}${playerVisible ? ' music-app--player-open' : ''}${playerVisible && playerCollapsed ? ' music-app--player-collapsed' : ''}`} id="music-home">
       <AppHeader
         collapsed={sidebarCollapsed}
         mobileBrandHidden={mobileBrandHidden}
@@ -962,6 +979,7 @@ function useDiscoveryPage({
         playlists={orderedPlaylists}
       />
 
+      <ContentTopbar contentRef={contentRef} />
       <div className="music-app__content" ref={contentRef}>
         {activeSection === 'import' && mayImportMusic ? (
           <Suspense fallback={<div className="collection-empty" role="status">Cargando importador…</div>}>
@@ -1051,7 +1069,8 @@ function useDiscoveryPage({
                 onToggleFavorite={toggleSongFavorite}
                 preview={preview}
                 recentSongs={recentSongs}
-                youtubeLibraryKey={libraryCacheKey(youtubeFavoriteStoragePrefix)}
+                onPlayYoutubeSongs={playYoutubeSongs}
+                onYoutubeNavigate={openYoutubeView}
                 searchKey={normalizedQuery}
                 section={activeSection}
                 selectedSongId={selectedSongId}
@@ -1301,12 +1320,14 @@ function useDiscoveryPage({
       {playlistPickerSong && (
         <PlaylistPickerModal
           analyser={playerAnalyser}
+          libraryPlaylists={youtubeLibrary.playlists}
           onAdd={async (selectedPlaylistIds) => {
+            // Playlists de Mysic; las de YouTube Music las guarda el propio diálogo. Cierra él si todo fue bien.
             const selectedIds = new Set(selectedPlaylistIds)
             const results = await Promise.all(playlists.map((playlist) => (
               onSetTrackInPlaylist(playlist.id, playlistPickerSong, selectedIds.has(playlist.id))
             )))
-            if (results.every(Boolean)) setPlaylistPickerSong(null)
+            return results.every(Boolean)
           }}
           onClose={() => setPlaylistPickerSong(null)}
           onCreate={() => openCreatePlaylist(playlistPickerSong)}

@@ -1,24 +1,25 @@
 /*
- * Buscador y desplegable de resultados (diseño de referencia: barra con foco violeta, panel con
- * secciones, tarjeta de "Mejor coincidencia", portadas cuadradas y avatares de artista circulares).
+ * Buscador y desplegable de resultados con el diseño de Mysic: la misma superficie neutra, el acento del tema y la
+ * densidad del menú contextual (filas compactas, texto de 13-14 px, miniaturas de 36-48 px). Antes era un diseño
+ * propio con acento violeta, fondo azulado y tamaños grandes (texto 16-18 px, miniaturas 58-72 px, 600 px de ancho).
  *
  * Usa clases propias (sx-*) en lugar de las antiguas yt-music-search__* para no heredar los
  * estilos de línea inferior y esquinas rectas que el encabezado aplicaba a esas clases.
- * El acento violeta es local a este componente: cambiar --sx-accent lo recolorea todo.
  */
 .yt-music-search {
   /* El panel se posiciona respecto a esta raíz; no debe depender de hojas ajenas para ello. */
   position: relative;
-  --sx-accent: #8b7cf6;
-  --sx-accent-strong: #7c6cf0;
-  --sx-surface: #0f1117;
-  --sx-surface-raised: #151823;
-  --sx-line: rgb(255 255 255 / 0.08);
-  --sx-line-strong: rgb(255 255 255 / 0.14);
-  --sx-text: #f4f5f8;
-  --sx-muted: #9ea3b3;
-  --sx-hover: rgb(255 255 255 / 0.05);
-  --sx-active: rgb(255 255 255 / 0.09);
+  --sx-accent: var(--m-accent, #ff6542);
+  --sx-accent-strong: var(--m-accent, #ff6542);
+  --sx-surface: oklch(0.21 0.008 165);
+  --sx-surface-raised: oklch(0.26 0.008 165);
+  --sx-bar: rgb(255 255 255 / 0.07);
+  --sx-line: rgb(255 255 255 / 0.1);
+  --sx-line-strong: rgb(255 255 255 / 0.12);
+  --sx-text: #eceeed;
+  --sx-muted: #a2a9a6;
+  --sx-hover: rgb(255 255 255 / 0.06);
+  --sx-active: rgb(255 255 255 / 0.1);
 }
 
 /* ---- Barra ---- */
@@ -28,20 +29,21 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
-  height: 44px;
-  padding: 0 10px 0 14px;
+  gap: 10px;
+  height: 38px;
+  padding: 0 8px 0 12px;
   border: 1px solid var(--sx-line-strong);
-  border-radius: 12px;
-  background: var(--sx-surface);
+  border-radius: 10px;
+  background: var(--sx-bar);
   color: var(--sx-muted);
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .sx-bar:focus-within,
 .yt-music-search--open .sx-bar {
-  border-color: var(--sx-accent-strong);
-  box-shadow: 0 0 0 3px rgb(124 108 240 / 0.16);
+  border-color: color-mix(in srgb, var(--sx-accent) 70%, transparent);
+  background: var(--sx-surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sx-accent) 18%, transparent);
 }
 
 .sx-bar input {
@@ -52,11 +54,11 @@
   background: transparent;
   color: var(--sx-text);
   font: inherit;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .sx-bar input::placeholder {
-  color: #6f7487;
+  color: #7d8582;
 }
 
 .sx-bar input::-webkit-search-cancel-button {
@@ -66,8 +68,8 @@
 .sx-clear {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: 0;
   border-radius: 50%;
   background: transparent;
@@ -94,22 +96,22 @@
   z-index: 1;
   top: calc(100% + 8px);
   left: 50%;
-  /* Al menos tan ancho como la barra y hasta 600px, para que las filas no queden apretadas. */
-  width: max(100%, min(600px, calc(100vw - 32px)));
+  /* Tan ancho como la barra y como mucho 480 px: un panel compacto, no una página encima de la página. */
+  width: max(100%, min(480px, calc(100vw - 32px)));
   /* Cabe el resultado completo (principal + 4 canciones + 3 álbumes) en pantallas de ~1000px;
      en ventanas más bajas el panel hace scroll en lugar de salirse de la pantalla. */
-  max-height: min(calc(100vh - 110px), 840px);
-  padding: 8px 16px 16px;
+  max-height: min(calc(100vh - 120px), 560px);
+  padding: 4px 6px 6px;
   overflow-y: auto;
   border: 1px solid var(--sx-line);
-  border-radius: 16px;
+  border-radius: 12px;
   background: var(--sx-surface);
-  box-shadow: 0 24px 60px rgb(0 0 0 / 0.6);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 0.55);
   opacity: 0;
   pointer-events: none;
   transform: translate(-50%, -6px);
   transition: opacity 150ms ease, transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
-  scrollbar-color: #3a3f50 transparent !important;
+  scrollbar-color: #3a403e transparent !important;
   scrollbar-width: thin !important;
 }
 
@@ -120,7 +122,7 @@
 
 .sx-popover::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: #3a3f50;
+  background: #3a403e;
 }
 
 .yt-music-search--open .sx-popover {
@@ -135,16 +137,17 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  margin: 18px 0 6px;
+  margin: 10px 0 4px;
   padding: 0 8px;
 }
 
 .sx-heading {
   margin: 0;
-  color: var(--sx-text);
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.005em;
+  color: var(--sx-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .sx-link {
@@ -154,8 +157,8 @@
   background: transparent;
   color: var(--sx-accent);
   font: inherit;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -169,7 +172,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .sx-option:hover {
@@ -184,9 +187,9 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   min-width: 0;
-  padding: 6px 8px;
+  padding: 5px 8px;
   border: 0;
   background: transparent;
   color: inherit;
@@ -196,15 +199,15 @@
 
 .sx-copy {
   display: grid;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 
 .sx-copy strong {
   overflow: hidden;
   color: var(--sx-text);
-  font-size: 16px;
-  font-weight: 500;
+  font-size: 13.5px;
+  font-weight: 550;
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -213,7 +216,7 @@
 .sx-copy small {
   overflow: hidden;
   color: var(--sx-muted);
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -221,7 +224,7 @@
 
 .sx-time {
   color: var(--sx-muted);
-  font-size: 14px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -246,21 +249,21 @@
 }
 
 .sx-thumb--medium {
-  width: 58px;
-  height: 58px;
+  width: 36px;
+  height: 36px;
 }
 
 .sx-thumb--large {
-  width: 72px;
-  height: 72px;
+  width: 48px;
+  height: 48px;
 }
 
 .sx-thumb--square.sx-thumb--medium {
-  border-radius: 6px;
+  border-radius: 4px;
 }
 
 .sx-thumb--square.sx-thumb--large {
-  border-radius: 10px;
+  border-radius: 6px;
 }
 
 .sx-thumb--round {
@@ -269,40 +272,40 @@
 
 /* ---- Mejor coincidencia ---- */
 .sx-option--featured {
-  border: 1px solid rgb(139 124 246 / 0.5);
-  background: linear-gradient(110deg, rgb(124 108 240 / 0.16), rgb(124 108 240 / 0.04));
+  border: 1px solid color-mix(in srgb, var(--sx-accent) 38%, transparent);
+  background: linear-gradient(110deg, color-mix(in srgb, var(--sx-accent) 14%, transparent), color-mix(in srgb, var(--sx-accent) 3%, transparent));
 }
 
 .sx-option--featured:hover,
 .sx-option--featured.sx-option--active {
-  border-color: rgb(167 154 255 / 0.75);
-  background: linear-gradient(110deg, rgb(124 108 240 / 0.24), rgb(124 108 240 / 0.08));
+  border-color: color-mix(in srgb, var(--sx-accent) 60%, transparent);
+  background: linear-gradient(110deg, color-mix(in srgb, var(--sx-accent) 22%, transparent), color-mix(in srgb, var(--sx-accent) 6%, transparent));
 }
 
 .sx-option--featured .sx-choice {
-  padding: 10px 14px;
+  padding: 7px 10px;
 }
 
 .sx-option--featured .sx-copy strong {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 650;
 }
 
 /* ---- Historial y estados vacíos ---- */
 .sx-option--history .sx-thumb {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
 }
 
 .sx-remove {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  margin-right: 6px;
+  width: 28px;
+  height: 28px;
+  margin-right: 4px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
   color: var(--sx-muted);
   cursor: pointer;
@@ -315,9 +318,9 @@
 
 .sx-empty {
   margin: 0;
-  padding: 18px 8px 8px;
+  padding: 12px 8px 6px;
   color: var(--sx-muted);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 /* ---- Pantallas estrechas: la duración cede el sitio al título ---- */

@@ -94,7 +94,11 @@ export default function useVirtualGrid({ aspect = 1, columnGap = GRID_COLUMN_GAP
       const scroller = clippers.find((clipper) => clipper.scrollHeight > clipper.clientHeight && /auto|scroll/.test(getComputedStyle(clipper).overflowY))
         ?? document.scrollingElement
       if (!scroller) return
-      scroller.scrollTop += pixels
+      // Siempre instantáneo: el contenedor tiene `scroll-behavior: smooth` y `scrollTop +=` heredaba esa animación.
+      // Mientras duraba, la cuadrícula medía posiciones intermedias, volvía a compensar y, al rozar el final, pedía otra
+      // página: tras un scroll rápido la Biblioteca subía y bajaba sola durante segundos. La compensación solo debe
+      // mantener quieto lo que se ve, nunca animarse.
+      scroller.scrollBy({ behavior: 'instant', top: pixels })
       apply(false)
     }
     const schedule = () => {

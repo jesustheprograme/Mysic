@@ -23,7 +23,7 @@ const FALLBACK_ICONS = {
 }
 
 // Lado de la miniatura según .sx-thumb--medium / --large: la imagen se pide (y el proxy la guarda) a ese tamaño.
-const THUMB_PX = { large: 72, medium: 58 }
+const THUMB_PX = { large: 48, medium: 36 }
 
 // Las filas que llevan a otra pantalla muestran chevron; las canciones muestran su duración.
 const NAVIGATES = new Set(['album', 'artist'])
@@ -36,7 +36,7 @@ function Thumbnail({ row, size }) {
     <span className={`sx-thumb sx-thumb--${shape} sx-thumb--${size}`}>
       {row.thumbnail
         ? <img loading="lazy" decoding="async" src={imageUrl(sizedImage(row.thumbnail, px))} alt="" width={px} height={px} />
-        : <Fallback size={size === 'large' ? 26 : 20} aria-hidden="true" />}
+        : <Fallback size={size === 'large' ? 22 : 16} aria-hidden="true" />}
     </span>
   )
 }
@@ -64,7 +64,7 @@ function SearchOption({ active, featured = false, index, listboxId, onChoose, on
           {subtitle && <small>{subtitle}</small>}
         </span>
         {row.duration && <time className="sx-time">{row.duration}</time>}
-        {(featured || NAVIGATES.has(row.kind)) && <ChevronRight className="sx-chevron" size={20} aria-hidden="true" />}
+        {(featured || NAVIGATES.has(row.kind)) && <ChevronRight className="sx-chevron" size={16} aria-hidden="true" />}
       </button>
       {row.kind === 'history' && (
         <button
@@ -73,19 +73,20 @@ function SearchOption({ active, featured = false, index, listboxId, onChoose, on
           aria-label={`Eliminar ${row.title} del historial`}
           onClick={() => onHistoryRemove(row.title)}
         >
-          <Trash2 size={17} aria-hidden="true" />
+          <Trash2 size={15} aria-hidden="true" />
         </button>
       )}
     </div>
   )
 }
 
-function SectionHeading({ id, onViewAll, title, viewAll }) {
+function SectionHeading({ actionLabel, id, onAction, onViewAll, title, viewAll }) {
   return (
     <div className="sx-heading-row">
       <h3 className="sx-heading" id={id}>{title}</h3>
       {/* Solo ratón: el teclado ya dispone de Enter en el campo para ver todos los resultados. */}
       {viewAll && <button type="button" className="sx-link" tabIndex={-1} onClick={onViewAll}>Ver todo</button>}
+      {onAction && <button type="button" className="sx-link" onClick={onAction}>{actionLabel}</button>}
     </div>
   )
 }
@@ -96,6 +97,7 @@ export default function SearchPopover({
   hasQuery,
   listboxId,
   onChoose,
+  onHistoryClear,
   onHistoryRemove,
   onViewAll,
   open,
@@ -112,7 +114,7 @@ export default function SearchPopover({
       <div id={listboxId} role="listbox" aria-label="Sugerencias de búsqueda">
         {!hasQuery && rows.length > 0 && (
           <section role="group" aria-labelledby={`${listboxId}-recent`}>
-            <SectionHeading id={`${listboxId}-recent`} title="Búsquedas recientes" />
+            <SectionHeading actionLabel="Borrar" id={`${listboxId}-recent`} onAction={onHistoryClear} title="Búsquedas recientes" />
             {rows.map((row, index) => (
               <SearchOption {...optionProps} active={activeIndex === index} index={index} key={`${row.kind}-${row.title}`} row={row} />
             ))}

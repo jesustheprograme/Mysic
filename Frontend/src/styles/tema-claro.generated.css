@@ -1,5 +1,110 @@
 /* Generado por scripts/generar-tema-claro.mjs a partir del CSS de la app: no editar a mano.
    Cambia el CSS original y ejecuta "npm run tema:generar". */
+@media (min-width: 761px) {
+    :root[data-theme='light'] .music-app--search-bar:has(> .app-header--desktop-shell) .content-topbar {
+        border-bottom: 1px solid rgb(0 0 0 / 0.06);
+        background: rgb(246 249 249 / 0.86)
+    }
+    :root[data-theme='light'] .music-app .app-sidebar__item--active {
+        color: var(--m-accent);
+        background: color-mix(in srgb, var(--m-accent) 10%, transparent)
+    }
+    :root[data-theme='light'] .music-app .app-sidebar__item--active svg {
+        color: var(--m-accent)
+    }
+    :root[data-theme='light'] .music-app .app-sidebar__item--active::before, :root[data-theme='light'] .music-app .app-sidebar--collapsed .app-sidebar__item--active::before {
+        background: var(--m-accent)
+    }
+    :root[data-theme='light'] .music-app .app-header--desktop-shell {
+        border: 0;
+        background: transparent
+    }
+    :root[data-theme='light'] .music-app .app-header--desktop-shell .app-header__brand {
+        text-decoration: none
+    }
+    :root[data-theme='light'] .music-app .app-header--desktop-shell .app-header__wordmark {
+        color: rgb(0 0 0)
+    }
+    :root[data-theme='light'] .music-app .app-header--desktop-shell .app-header__inner::before {
+        background: var(--mysic-header-surface, rgb(248 251 251))
+    }
+    :root[data-theme='light'] .music-app .collection-detail {
+        --btn-accent: var(--collection-accent, var(--m-accent));
+        background: transparent
+    }
+    @supports (color: oklch(from red l c h)) {
+        :root[data-theme='light'] .music-app .collection-detail {
+            --btn-accent: oklch(from var(--collection-accent, var(--m-accent)) clamp(0.5, l, 0.62) calc(c * 1.3) h)
+        }
+    }
+    :root[data-theme='light'] .music-app .collection-detail__back {
+        background: rgb(255 255 255 / 0.28)
+    }
+    :root[data-theme='light'] .music-app .collection-detail__summary::before {
+        background: var(--collection-artwork) center 25% / cover no-repeat
+    }
+    :root[data-theme='light'] .music-app .collection-detail__summary::after {
+        background: linear-gradient(90deg, rgb(248 251 251 / 0.72) 0%, rgb(248 251 251 / 0.35) 45%, rgb(248 251 251 / 0) 100%),
+      linear-gradient(180deg, transparent 45%, rgb(248 251 251 / 0.75) 100%),
+      linear-gradient(
+        to bottom,
+        rgb(248 251 251 / 0) calc(30% - 24px),
+        rgb(248 251 251 / 0.45) calc(65% + 18px),
+        rgb(248 251 251) calc(100% + 60px)
+      )
+    }
+    :root[data-theme='light'] .music-app .collection-detail__kind {
+        color: oklch(0 0 0 / 0.72)
+    }
+    :root[data-theme='light'] .music-app .collection-detail__identity p {
+        color: oklch(0 0 0 / 0.72)
+    }
+    :root[data-theme='light'] .music-app .collection-detail__count {
+        color: oklch(0 0 0 / 0.72)
+    }
+    :root[data-theme='light'] .music-app .collection-detail__pill--primary {
+        color: rgb(0 0 0);
+        background: var(--btn-accent)
+    }
+    :root[data-theme='light'] .music-app .collection-detail__pill--primary:hover {
+        background: color-mix(in srgb, var(--btn-accent) 86%, rgb(0 0 0))
+    }
+    :root[data-theme='light'] .music-app .collection-detail__pill--outline {
+        border: 1px solid oklch(0 0 0 / 0.22);
+        color: rgb(1 2 1);
+        background: rgb(255 255 255 / 0.25)
+    }
+    :root[data-theme='light'] .music-app .collection-detail__pill--outline:hover {
+        background: oklch(0 0 0 / 0.12)
+    }
+    :root[data-theme='light'] .music-app .collection-detail__control {
+        border: 1px solid oklch(0 0 0 / 0.22);
+        background: rgb(255 255 255 / 0.25)
+    }
+    :root[data-theme='light'] .music-app .collection-detail__pill--saved {
+        border-color: color-mix(in srgb, var(--btn-accent) 70%, transparent);
+        color: color-mix(in srgb, var(--btn-accent) 60%, rgb(0 0 0));
+        background: color-mix(in srgb, var(--btn-accent) 22%, transparent)
+    }
+    :root[data-theme='light'] .music-app .collection-detail__search {
+        border: 1px solid oklch(0 0 0 / 0.16);
+        color: oklch(0 0 0 / 0.7);
+        background: rgb(255 255 255 / 0.3)
+    }
+    :root[data-theme='light'] .music-app .collection-detail__search:focus-within {
+        border-color: color-mix(in srgb, var(--btn-accent) 75%, transparent)
+    }
+    :root[data-theme='light'] .music-app .collection-detail__search input {
+        border: 0;
+        outline: 0;
+        color: rgb(1 2 1);
+        background: transparent
+    }
+    :root[data-theme='light'] .music-app .collection-detail__table-head {
+        border-bottom: 1px solid oklch(0 0 0 / 0.1);
+        color: var(--m-text-dim)
+    }
+}
 :root[data-theme='light'] .heart-container {
     --heart-color: #4bd27b;
     border: 0;
@@ -134,6 +239,60 @@
 :root[data-theme='light'] .collection-detail__track-album, :root[data-theme='light'] .collection-detail__track-date {
     color: rgb(86 92 90)
 }
+:root[data-theme='light'] .comments__sort {
+    background: rgb(0 0 0 / 0.06)
+}
+:root[data-theme='light'] .comments__sort-option {
+    color: rgb(0 0 0 / 0.62)
+}
+:root[data-theme='light'] .comments__sort-option:hover {
+    color: rgb(0 0 0)
+}
+:root[data-theme='light'] .comments__sort-option--active {
+    color: rgb(246 248 248);
+    background: rgb(1 1 1)
+}
+:root[data-theme='light'] .comments__sort-option--active:hover {
+    color: rgb(246 248 248)
+}
+:root[data-theme='light'] .comment__avatar {
+    background: rgb(0 0 0 / 0.08)
+}
+:root[data-theme='light'] .comment__pinned {
+    color: rgb(0 0 0 / 0.55)
+}
+:root[data-theme='light'] .comment__meta {
+    color: rgb(0 0 0 / 0.5)
+}
+:root[data-theme='light'] .comment__author {
+    color: rgb(0 0 0 / 0.88)
+}
+:root[data-theme='light'] .comment__author--owner {
+    color: rgb(246 248 248);
+    background: rgb(0 0 0 / 0.82)
+}
+:root[data-theme='light'] .comment__text {
+    color: rgb(0 0 0 / 0.86)
+}
+:root[data-theme='light'] .comment__actions {
+    color: rgb(0 0 0 / 0.55)
+}
+:root[data-theme='light'] .comment__heart {
+    color: #ff5a7a
+}
+:root[data-theme='light'] .comment__replies-toggle {
+    color: var(--player-accent, #8ab4ff)
+}
+:root[data-theme='light'] .comment__replies-toggle:hover {
+    background: rgb(0 0 0 / 0.07)
+}
+:root[data-theme='light'] .comments__status, :root[data-theme='light'] .comments__empty {
+    color: rgb(0 0 0 / 0.55)
+}
+:root[data-theme='light'] .comments__status button {
+    color: rgb(0 0 0);
+    background: rgb(0 0 0 / 0.1)
+}
 :root[data-theme='light'] .artists-page__head h1 {
     color: rgb(0 0 0)
 }
@@ -232,6 +391,254 @@
 :root[data-theme='light'] .skeleton {
     background: oklch(0 0 0 / 0.07)
 }
+:root[data-theme='light'] .stats {
+    --stats-accent: var(--m-accent, #ff6542);
+    --stats-dim: var(--m-text-dim, rgb(96 104 100));
+    --stats-line: var(--m-line-strong, rgb(0 0 0 / 0.14));
+    --stats-card: rgb(0 0 0 / 0.04)
+}
+:root[data-theme='light'] .stats__title-row h1 {
+    color: rgb(0 0 0)
+}
+:root[data-theme='light'] .stats__ranges {
+    background: rgb(0 0 0 / 0.06)
+}
+:root[data-theme='light'] .stats__range {
+    border: 0;
+    color: var(--stats-dim);
+    background: transparent
+}
+:root[data-theme='light'] .stats__range:hover {
+    color: rgb(0 0 0)
+}
+:root[data-theme='light'] .stats__range--active {
+    color: rgb(244 244 244);
+    background: var(--stats-accent)
+}
+:root[data-theme='light'] .stats__range--active:hover {
+    color: rgb(244 244 244)
+}
+:root[data-theme='light'] .stats__total {
+    color: rgb(0 0 0)
+}
+:root[data-theme='light'] .stats__total small {
+    color: var(--stats-dim)
+}
+:root[data-theme='light'] .stats__summary {
+    color: var(--stats-dim)
+}
+:root[data-theme='light'] .stats__change {
+    color: #ff8a80;
+    background: rgb(255 138 128 / 0.12)
+}
+:root[data-theme='light'] .stats__change--up {
+    color: #6fdc9a;
+    background: rgb(111 220 154 / 0.12)
+}
+:root[data-theme='light'] .stats__tile {
+    background: var(--stats-card)
+}
+:root[data-theme='light'] .stats__tile dt {
+    color: var(--stats-dim)
+}
+:root[data-theme='light'] .stats__tile dd {
+    color: rgb(0 0 0)
+}
+:root[data-theme='light'] .stats__tile small {
+    color: var(--stats-dim)
+}
+:root[data-theme='light'] .stats__section-title {
+    color: rgb(0 0 0)
+}
+:root[data-theme='light'] .stats__section-title svg {
+    color: var(--stats-accent)
+}
+:root[data-theme='light'] .stats__facts span {
+    color: var(--stats-dim)
+}
+:root[data-theme='light'] .stats__facts strong {
+    color: rgb(0 0 0)
+}
+:root[data-theme='light'] .stats__bars {
+    border-bottom: 1px solid var(--stats-line)
+}
+:root[data-theme='light'] .stats__bar {
+    background: var(--stats-accent)
+}
+:root[data-theme='light'] .stats__bars {
+    background: linear-gradient(to bottom, rgb(0 0 0 / 0.06) 1px, transparent 1px) 0 0 / 100% 25%
+}
+:root[data-theme='light'] .stats__bar-slot--hover {
+    background: rgb(0 0 0 / 0.05)
+}
+:root[data-theme='light'] .stats__tip {
+    border: 1px solid rgb(0 0 0 / 0.08);
+    background: rgb(244 246 249 / 0.96)
+}
+:root[data-theme='light'] .stats__tip strong {
+    color: rgb(0 0 0)
+}
+:root[data-theme='light'] .stats__tip span {
+    color: rgb(0 0 0)
+}
+:root[data-theme='light'] .stats__tip i {
+    background: var(--stats-accent)
+}
+:root[data-theme='light'] .stats__ticks span {
+    color: var(--stats-dim)
+}
+:root[data-theme='light'] .stats__hero, :root[data-theme='light'] .stats__artists button, :root[data-theme='light'] .stats__songs button, :root[data-theme='light'] .stats__albums button {
+    border: 0;
+    color: inherit;
+    background: transparent
+}
+:root[data-theme='light'] .stats__hero {
+    background: var(--stats-card)
+}
+:root[data-theme='light'] .stats__hero:not(:disabled):hover {
+    background: rgb(0 0 0 / 0.08)
+}
+:root[data-theme='light'] .stats__hero-copy small {
+    color: var(--stats-accent)
+}
+:root[data-theme='light'] .stats__hero-copy strong {
+    color: rgb(0 0 0)
+}
+:root[data-theme='light'] .stats__hero-copy span {
+    color: var(--stats-dim)
+}
+:root[data-theme='light'] .stats__hero-copy em {
+    color: rgb(0 0 0)
+}
+:root[data-theme='light'] .stats__artists button:not(:disabled):hover, :root[data-theme='light'] .stats__songs button:hover {
+    background: rgb(0 0 0 / 0.06)
+}
+:root[data-theme='light'] .stats__rank {
+    color: var(--stats-dim)
+}
+:root[data-theme='light'] .stats__avatar-empty, :root[data-theme='light'] .stats__cover-empty {
+    background: rgb(0 0 0 / 0.08)
+}
+:root[data-theme='light'] .stats__artist-copy strong, :root[data-theme='light'] .stats__song-copy strong {
+    color: rgb(0 0 0)
+}
+:root[data-theme='light'] .stats__meter {
+    background: rgb(0 0 0 / 0.07)
+}
+:root[data-theme='light'] .stats__meter i {
+    background: var(--stats-accent)
+}
+:root[data-theme='light'] .stats__time, :root[data-theme='light'] .stats__plays {
+    color: var(--stats-dim)
+}
+:root[data-theme='light'] .stats__song-copy span {
+    color: var(--stats-dim)
+}
+:root[data-theme='light'] .stats__albums strong {
+    color: rgb(0 0 0)
+}
+:root[data-theme='light'] .stats__albums span {
+    color: var(--stats-dim)
+}
+:root[data-theme='light'] .stats__donut circle {
+    fill: none
+}
+:root[data-theme='light'] .stats__donut-track {
+    stroke: rgb(0 0 0 / 0.06)
+}
+:root[data-theme='light'] .stats__donut-value {
+    fill: rgb(0 0 0)
+}
+:root[data-theme='light'] .stats__donut-label {
+    fill: var(--stats-dim)
+}
+:root[data-theme='light'] .stats__donut-arc--morning, :root[data-theme='light'] .stats__dot--morning {
+    stroke: #ffc35a;
+    background: #ffc35a
+}
+:root[data-theme='light'] .stats__donut-arc--afternoon, :root[data-theme='light'] .stats__dot--afternoon {
+    stroke: var(--stats-accent);
+    background: var(--stats-accent)
+}
+:root[data-theme='light'] .stats__donut-arc--evening, :root[data-theme='light'] .stats__dot--evening {
+    stroke: #c46fe0;
+    background: #c46fe0
+}
+:root[data-theme='light'] .stats__donut-arc--night, :root[data-theme='light'] .stats__dot--night {
+    stroke: #5b8cff;
+    background: #5b8cff
+}
+:root[data-theme='light'] .stats__legend {
+    color: rgb(0 0 0)
+}
+:root[data-theme='light'] .stats__legend span {
+    color: var(--stats-dim)
+}
+:root[data-theme='light'] .stats__persona {
+    color: var(--stats-dim)
+}
+:root[data-theme='light'] .stats__persona strong {
+    color: rgb(0 0 0)
+}
+:root[data-theme='light'] .stats__heat-hour, :root[data-theme='light'] .stats__heat-day {
+    color: var(--stats-dim)
+}
+:root[data-theme='light'] .stats__cell {
+    background: rgb(0 0 0 / 0.05)
+}
+:root[data-theme='light'] .stats__cell--1 {
+    background: color-mix(in srgb, var(--stats-accent) 28%, transparent)
+}
+:root[data-theme='light'] .stats__cell--2 {
+    background: color-mix(in srgb, var(--stats-accent) 50%, transparent)
+}
+:root[data-theme='light'] .stats__cell--3 {
+    background: color-mix(in srgb, var(--stats-accent) 75%, transparent)
+}
+:root[data-theme='light'] .stats__cell--4 {
+    background: var(--stats-accent)
+}
+:root[data-theme='light'] .stats__heat-legend {
+    color: var(--stats-dim)
+}
+:root[data-theme='light'] .stats__footer {
+    border-top: 1px solid rgb(0 0 0 / 0.07)
+}
+:root[data-theme='light'] .stats__note {
+    color: var(--stats-dim)
+}
+:root[data-theme='light'] .stats__clear, :root[data-theme='light'] .stats__confirm button {
+    border: 1px solid var(--stats-line);
+    color: rgb(5 6 5);
+    background: transparent
+}
+:root[data-theme='light'] .stats__clear:hover, :root[data-theme='light'] .stats__confirm button:hover {
+    background: rgb(0 0 0 / 0.07)
+}
+:root[data-theme='light'] .stats__confirm {
+    color: rgb(0 0 0)
+}
+:root[data-theme='light'] .stats__confirm .stats__danger {
+    border-color: transparent;
+    color: rgb(0 0 0);
+    background: #d9443a
+}
+:root[data-theme='light'] .stats__confirm .stats__danger:hover {
+    background: #ea5147
+}
+:root[data-theme='light'] .stats--empty h1 {
+    color: rgb(0 0 0)
+}
+:root[data-theme='light'] .stats--empty p {
+    color: var(--stats-dim)
+}
+:root[data-theme='light'] .stats__empty-icon {
+    color: var(--stats-accent);
+    background: rgb(0 0 0 / 0.06)
+}
+:root[data-theme='light'] .stats__skeleton i {
+    background: rgb(0 0 0 / 0.05)
+}
 :root[data-theme='light'] .link-dialog__backdrop {
     background: rgb(255 255 255 / 0.55)
 }
@@ -269,6 +676,150 @@
 :root[data-theme='light'] .link-dialog .link-dialog__error {
     color: #ff8a7a
 }
+:root[data-theme='light'] .lsp__trigger {
+    color: rgb(0 0 0 / 0.62);
+    background: rgb(0 0 0 / 0.06)
+}
+:root[data-theme='light'] .lsp__trigger:hover, :root[data-theme='light'] .lsp__trigger--open {
+    color: rgb(1 1 1);
+    background: rgb(0 0 0 / 0.11)
+}
+:root[data-theme='light'] .lsp__trigger-offset {
+    color: var(--player-accent, #8ab4ff)
+}
+:root[data-theme='light'] .lsp {
+    border: 1px solid rgb(0 0 0 / 0.09);
+    color: rgb(1 1 1);
+    background: rgb(238 243 241)
+}
+:root[data-theme='light'] .lsp__header {
+    border-bottom: 1px solid rgb(0 0 0 / 0.07)
+}
+:root[data-theme='light'] .lsp__header span {
+    color: rgb(0 0 0 / 0.5)
+}
+:root[data-theme='light'] .lsp__row {
+    color: rgb(0 0 0 / 0.86)
+}
+:root[data-theme='light'] .lsp__row:hover {
+    background: rgb(0 0 0 / 0.06)
+}
+:root[data-theme='light'] .lsp__row--selected {
+    background: rgb(0 0 0 / 0.05)
+}
+:root[data-theme='light'] .lsp__row--muted .lsp__name {
+    color: rgb(0 0 0 / 0.45)
+}
+:root[data-theme='light'] .lsp__row:focus-visible {
+    outline: 2px solid rgb(0 0 0 / 0.5)
+}
+:root[data-theme='light'] .lsp__auto-icon {
+    color: var(--player-accent, #8ab4ff);
+    background: rgb(0 0 0 / 0.07)
+}
+:root[data-theme='light'] .lsp__auto-copy small {
+    color: rgb(0 0 0 / 0.5)
+}
+:root[data-theme='light'] .lsp__check {
+    color: var(--player-accent, #8ab4ff)
+}
+:root[data-theme='light'] .lsp__divider {
+    background: rgb(0 0 0 / 0.07)
+}
+:root[data-theme='light'] .lsp__radio {
+    border: 2px solid rgb(0 0 0 / 0.35)
+}
+:root[data-theme='light'] .lsp__radio--on {
+    border-color: var(--player-accent, #8ab4ff)
+}
+:root[data-theme='light'] .lsp__radio--on::after {
+    background: var(--player-accent, #8ab4ff)
+}
+:root[data-theme='light'] .lsp__badge {
+    color: rgb(0 0 0 / 0.55);
+    background: rgb(0 0 0 / 0.06)
+}
+:root[data-theme='light'] .lsp__badge--synced {
+    color: rgb(0 0 0 / 0.85);
+    background: rgb(0 0 0 / 0.11)
+}
+:root[data-theme='light'] .lsp__note {
+    color: rgb(0 0 0 / 0.42)
+}
+:root[data-theme='light'] .lsp__retry {
+    color: var(--player-accent, #8ab4ff)
+}
+:root[data-theme='light'] .lsp__retry:hover {
+    text-decoration: underline
+}
+:root[data-theme='light'] .lsp__skeleton {
+    background: rgb(0 0 0 / 0.07)
+}
+:root[data-theme='light'] .lsp__offset {
+    border-top: 1px solid rgb(0 0 0 / 0.07);
+    color: rgb(0 0 0 / 0.6)
+}
+:root[data-theme='light'] .lsp__offset-copy strong {
+    color: rgb(1 1 1)
+}
+:root[data-theme='light'] .lsp__stepper {
+    border: 1px solid rgb(0 0 0 / 0.1);
+    background: rgb(0 0 0 / 0.04)
+}
+:root[data-theme='light'] .lsp__stepper button {
+    color: rgb(0 0 0 / 0.75)
+}
+:root[data-theme='light'] .lsp__stepper button:hover {
+    color: rgb(0 0 0);
+    background: rgb(0 0 0 / 0.08)
+}
+:root[data-theme='light'] .lsp__stepper output {
+    color: rgb(1 1 1)
+}
+:root[data-theme='light'] .lsp__reset {
+    color: rgb(0 0 0 / 0.6)
+}
+:root[data-theme='light'] .lsp__reset:hover {
+    color: rgb(0 0 0);
+    background: rgb(0 0 0 / 0.08)
+}
+:root[data-theme='light'] .lsp__searched {
+    border-top: 1px solid rgb(0 0 0 / 0.07);
+    color: rgb(0 0 0 / 0.6)
+}
+:root[data-theme='light'] .lsp__searched button {
+    color: var(--player-accent, #8ab4ff)
+}
+:root[data-theme='light'] .lsp__search {
+    border-top: 1px solid rgb(0 0 0 / 0.07);
+    color: rgb(0 0 0 / 0.6)
+}
+:root[data-theme='light'] .lsp__search:hover {
+    color: rgb(0 0 0);
+    background: rgb(0 0 0 / 0.04)
+}
+:root[data-theme='light'] .lsp__search-form {
+    border-top: 1px solid rgb(0 0 0 / 0.07)
+}
+:root[data-theme='light'] .lsp__search-form input {
+    border: 1px solid rgb(0 0 0 / 0.1);
+    color: rgb(1 1 1);
+    background: rgb(0 0 0 / 0.04)
+}
+:root[data-theme='light'] .lsp__search-form input:focus {
+    border-color: rgb(0 0 0 / 0.3);
+    outline: none
+}
+:root[data-theme='light'] .lsp__search-actions button {
+    color: rgb(0 0 0 / 0.7)
+}
+:root[data-theme='light'] .lsp__search-actions button:hover {
+    color: rgb(0 0 0)
+}
+:root[data-theme='light'] .lsp__search-actions .lsp__search-submit {
+    color: rgb(246 248 248);
+    background: rgb(1 1 1)
+}
 :root[data-theme='light'] .lyrics__toggle {
     border: 1px solid rgb(198 206 204);
     background: transparent;
@@ -294,6 +845,16 @@
 :root[data-theme='light'] .lyrics__plain, :root[data-theme='light'] .lyrics__message {
     color: rgb(62 66 64)
 }
+:root[data-theme='light'] .lyrics__chip {
+    color: rgb(0 0 0 / 0.5)
+}
+:root[data-theme='light'] .lyrics__chip:hover {
+    color: rgb(1 1 1);
+    background: rgb(0 0 0 / 0.06)
+}
+:root[data-theme='light'] .lyrics__chip--on {
+    color: var(--player-accent, #8ab4ff)
+}
 :root[data-theme='light'] .mini-player-document, :root[data-theme='light'] .mini-player-document body, :root[data-theme='light'] .mini-player-document #root {
     background: rgb(243 248 246)
 }
@@ -309,7 +870,7 @@
 }
 :root[data-theme='light'] .mini-player__surface {
     border: 1px solid rgb(0 0 0 / 0.11);
-    background: rgb(237 243 241 / 0.98)
+    background: rgb(237 243 241)
 }
 :root[data-theme='light'] .mini-player__track img, :root[data-theme='light'] .mini-player__artwork-placeholder {
     background: linear-gradient(145deg, rgb(221 229 226), rgb(238 242 241))
@@ -469,6 +1030,54 @@
     color: rgb(134 144 141)
 }
 :root[data-theme='light'] .mini-player__empty {
+    color: rgb(136 147 143)
+}
+:root[data-theme='light'] .mini-player .mini-detail__back {
+    color: rgb(72 80 78)
+}
+:root[data-theme='light'] .mini-detail__back:hover {
+    color: rgb(1 1 1);
+    background: rgb(0 0 0 / 0.07)
+}
+:root[data-theme='light'] .mini-detail__art {
+    background: rgb(0 0 0 / 0.06)
+}
+:root[data-theme='light'] .mini-detail__copy small {
+    color: rgb(108 117 114)
+}
+:root[data-theme='light'] .mini-detail__copy strong {
+    color: rgb(1 1 1)
+}
+:root[data-theme='light'] .mini-detail__copy > span {
+    color: rgb(108 117 114)
+}
+:root[data-theme='light'] .mini-player .mini-detail__play {
+    color: rgb(246 248 248);
+    background: rgb(1 1 1)
+}
+:root[data-theme='light'] .mini-detail__section > h3 {
+    color: rgb(72 80 78)
+}
+:root[data-theme='light'] .mini-player .mini-detail__song {
+    color: rgb(37 42 40)
+}
+:root[data-theme='light'] .mini-detail__song:hover {
+    background: rgb(0 0 0 / 0.055)
+}
+:root[data-theme='light'] .mini-player .mini-detail__song--active {
+    color: rgb(1 1 1);
+    background: rgb(0 0 0 / 0.08)
+}
+:root[data-theme='light'] .mini-detail__index {
+    color: rgb(136 147 143)
+}
+:root[data-theme='light'] .mini-detail__song-copy strong {
+    color: inherit
+}
+:root[data-theme='light'] .mini-detail__song-copy small {
+    color: rgb(136 147 143)
+}
+:root[data-theme='light'] .mini-detail__song time {
     color: rgb(136 147 143)
 }
 :root[data-theme='light'] .mi-header h1 {
@@ -673,6 +1282,97 @@
 }
 :root[data-theme='light'] .mi-empty {
     color: var(--muted)
+}
+:root[data-theme='light'] .now-playing {
+    color: rgb(1 1 1);
+    background: rgb(248 251 251)
+}
+:root[data-theme='light'] .now-playing::after {
+    background: linear-gradient(180deg, rgb(248 251 251 / 0.25) 0%, rgb(248 251 251 / 0.55) 70%, rgb(248 251 251 / 0.85) 100%)
+}
+:root[data-theme='light'] .now-playing__eyebrow {
+    color: rgb(0 0 0 / 0.55)
+}
+:root[data-theme='light'] .now-playing__next {
+    border: 1px solid rgb(0 0 0 / 0.08);
+    color: rgb(1 1 1);
+    background: rgb(244 247 246 / 0.82)
+}
+:root[data-theme='light'] .now-playing__next:hover {
+    background: rgb(238 243 241 / 0.92)
+}
+:root[data-theme='light'] .now-playing__next img, :root[data-theme='light'] .now-playing__next-art {
+    background: rgb(0 0 0 / 0.08)
+}
+:root[data-theme='light'] .now-playing__next-copy small {
+    color: var(--player-accent, #8ab4ff)
+}
+:root[data-theme='light'] .now-playing__next-copy span {
+    color: rgb(0 0 0 / 0.6)
+}
+:root[data-theme='light'] .now-playing__close {
+    color: rgb(0 0 0 / 0.8);
+    background: rgb(0 0 0 / 0.06)
+}
+:root[data-theme='light'] .now-playing__close:hover {
+    color: rgb(0 0 0);
+    background: rgb(0 0 0 / 0.14)
+}
+:root[data-theme='light'] .now-playing__art {
+    background: rgb(0 0 0 / 0.06)
+}
+:root[data-theme='light'] .now-playing__titles p {
+    color: rgb(0 0 0 / 0.66)
+}
+:root[data-theme='light'] .now-playing__titles button {
+    color: inherit
+}
+:root[data-theme='light'] .now-playing__titles button:hover {
+    color: rgb(0 0 0);
+    text-decoration: underline
+}
+:root[data-theme='light'] .now-playing .lyrics__plain, :root[data-theme='light'] .now-playing .lyrics__message {
+    color: rgb(0 0 0 / 0.78)
+}
+:root[data-theme='light'] .now-playing .player-dock__queue {
+    border: 0
+}
+:root[data-theme='light'] .now-playing__timeline > span {
+    color: rgb(0 0 0 / 0.62)
+}
+:root[data-theme='light'] .now-playing__transport > button {
+    color: rgb(0 0 0 / 0.86)
+}
+:root[data-theme='light'] .now-playing__transport > button:hover {
+    color: rgb(0 0 0);
+    background: rgb(0 0 0 / 0.08)
+}
+:root[data-theme='light'] .now-playing__transport > .now-playing__play {
+    color: rgb(246 248 248);
+    background: var(--player-accent, rgb(1 1 1))
+}
+:root[data-theme='light'] .now-playing__transport > .now-playing__play:hover {
+    color: rgb(246 248 248);
+    background: var(--player-accent, rgb(1 1 1))
+}
+:root[data-theme='light'] .now-playing__view-toggle {
+    color: rgb(109 118 115)
+}
+:root[data-theme='light'] .now-playing__view-toggle:hover {
+    color: rgb(0 0 0 / 0.82);
+    background: rgb(0 0 0 / 0.07)
+}
+:root[data-theme='light'] .now-playing__view-toggle--on, :root[data-theme='light'] .now-playing__view-toggle--on:hover {
+    color: rgb(0 0 0)
+}
+:root[data-theme='light'] .now-playing .volume-control__level {
+    background: linear-gradient(
+    0deg,
+    rgb(7 8 6) 0%,
+    rgb(7 8 6) var(--volume-level),
+    rgb(198 206 203) var(--volume-level),
+    rgb(198 206 203) 100%
+  )
 }
 :root[data-theme='light'] .shortcuts-backdrop {
     background: rgb(255 255 255 / 0.6)
@@ -1002,24 +1702,26 @@
     color: rgb(80 84 89)
 }
 :root[data-theme='light'] .yt-music-search {
-    --sx-accent: #8b7cf6;
-    --sx-accent-strong: #7c6cf0;
-    --sx-surface: rgb(241 244 254);
-    --sx-surface-raised: rgb(235 240 255);
-    --sx-line: rgb(0 0 0 / 0.08);
-    --sx-line-strong: rgb(0 0 0 / 0.14);
-    --sx-text: rgb(1 1 1);
-    --sx-muted: rgb(90 95 109);
-    --sx-hover: rgb(0 0 0 / 0.05);
-    --sx-active: rgb(0 0 0 / 0.09)
+    --sx-accent: var(--m-accent, #ff6542);
+    --sx-accent-strong: var(--m-accent, #ff6542);
+    --sx-surface: oklch(0.9559 0.008 165);
+    --sx-surface-raised: oklch(0.9324 0.008 165);
+    --sx-bar: rgb(0 0 0 / 0.07);
+    --sx-line: rgb(0 0 0 / 0.1);
+    --sx-line-strong: rgb(0 0 0 / 0.12);
+    --sx-text: rgb(3 4 3);
+    --sx-muted: rgb(86 92 90);
+    --sx-hover: rgb(0 0 0 / 0.06);
+    --sx-active: rgb(0 0 0 / 0.1)
 }
 :root[data-theme='light'] .sx-bar {
     border: 1px solid var(--sx-line-strong);
-    background: var(--sx-surface);
+    background: var(--sx-bar);
     color: var(--sx-muted)
 }
 :root[data-theme='light'] .sx-bar:focus-within, :root[data-theme='light'] .yt-music-search--open .sx-bar {
-    border-color: var(--sx-accent-strong)
+    border-color: color-mix(in srgb, var(--sx-accent) 70%, transparent);
+    background: var(--sx-surface)
 }
 :root[data-theme='light'] .sx-bar input {
     border: 0;
@@ -1028,7 +1730,7 @@
     color: var(--sx-text)
 }
 :root[data-theme='light'] .sx-bar input::placeholder {
-    color: rgb(148 153 173)
+    color: rgb(131 139 136)
 }
 :root[data-theme='light'] .sx-clear {
     border: 0;
@@ -1047,10 +1749,10 @@
     background: var(--sx-surface)
 }
 :root[data-theme='light'] .sx-popover::-webkit-scrollbar-thumb {
-    background: rgb(203 209 230)
+    background: rgb(206 213 211)
 }
 :root[data-theme='light'] .sx-heading {
-    color: var(--sx-text)
+    color: var(--sx-muted)
 }
 :root[data-theme='light'] .sx-link {
     border: 0;
@@ -1088,12 +1790,12 @@
     color: var(--sx-muted)
 }
 :root[data-theme='light'] .sx-option--featured {
-    border: 1px solid rgb(139 124 246 / 0.5);
-    background: linear-gradient(110deg, rgb(124 108 240 / 0.16), rgb(124 108 240 / 0.04))
+    border: 1px solid color-mix(in srgb, var(--sx-accent) 38%, transparent);
+    background: linear-gradient(110deg, color-mix(in srgb, var(--sx-accent) 14%, transparent), color-mix(in srgb, var(--sx-accent) 3%, transparent))
 }
 :root[data-theme='light'] .sx-option--featured:hover, :root[data-theme='light'] .sx-option--featured.sx-option--active {
-    border-color: rgb(167 154 255 / 0.75);
-    background: linear-gradient(110deg, rgb(124 108 240 / 0.24), rgb(124 108 240 / 0.08))
+    border-color: color-mix(in srgb, var(--sx-accent) 60%, transparent);
+    background: linear-gradient(110deg, color-mix(in srgb, var(--sx-accent) 22%, transparent), color-mix(in srgb, var(--sx-accent) 6%, transparent))
 }
 :root[data-theme='light'] .sx-remove {
     border: 0;
@@ -1194,6 +1896,18 @@
 :root[data-theme='light'] .song-more:hover, :root[data-theme='light'] .song-more:focus-visible, :root[data-theme='light'] .song-more[aria-expanded='true'] {
     color: rgb(0 0 0);
     background: color-mix(in srgb, var(--m-accent, #ff6542) 30%, transparent)
+}
+:root[data-theme='light'] .overlay-scrollbar {
+    background: rgb(0 0 0 / 0.13)
+}
+:root[data-theme='light'] .overlay-scrollbar:hover, :root[data-theme='light'] .overlay-scrollbar--dragging {
+    background: rgb(0 0 0 / 0.24)
+}
+:root[data-theme='light'][data-theme='light'] .overlay-scrollbar {
+    background: rgb(255 255 255 / 0.16)
+}
+:root[data-theme='light'][data-theme='light'] .overlay-scrollbar:hover, :root[data-theme='light'][data-theme='light'] .overlay-scrollbar--dragging {
+    background: rgb(255 255 255 / 0.3)
 }
 :root[data-theme='light'] {
     color: rgb(1 1 0);
@@ -4091,6 +4805,15 @@
     color: rgb(255 255 255);
     background: rgb(18 19 18)
 }
+:root[data-theme='light'] .playlist-picker__group {
+    color: rgb(119 121 129)
+}
+:root[data-theme='light'] .playlist-picker__status {
+    color: rgb(119 121 129)
+}
+:root[data-theme='light'] .playlist-picker__status--error, :root[data-theme='light'] .playlist-picker__save-error {
+    color: #ff8a80
+}
 :root[data-theme='light'] .playlist-modal__intro {
     color: rgb(121 132 128)
 }
@@ -4254,9 +4977,16 @@
 :root[data-theme='light'] .player-dock__close, :root[data-theme='light'] .player-dock__action {
     color: rgb(90 99 96)
 }
+:root[data-theme='light'] .player-dock__menu[data-state='open'] {
+    color: rgb(1 1 1);
+    background: rgb(0 0 0 / 0.08)
+}
 :root[data-theme='light'] .player-dock__close:hover, :root[data-theme='light'] .player-dock__action:hover {
     color: rgb(1 1 1);
     background: rgb(0 0 0 / 0.07)
+}
+:root[data-theme='light'] .player-dock__artwork--button {
+    border: 0
 }
 :root[data-theme='light'] .player-dock__track strong {
     color: rgb(1 1 1)
@@ -4311,6 +5041,10 @@
 :root[data-theme='light'] .player-dock__actions {
     border-top: 1px solid rgb(0 0 0 / 0.08)
 }
+:root[data-theme='light'] .player-dock__action--active {
+    color: rgb(1 1 1);
+    background: rgb(0 0 0 / 0.09)
+}
 :root[data-theme='light'] .player-dock__queue {
     border-top: 1px solid rgb(0 0 0 / 0.08)
 }
@@ -4347,15 +5081,14 @@
 :root[data-theme='light'] .player-dock__queue-item > svg {
     color: rgb(125 135 132)
 }
-:root[data-theme='light'] .player-dock__clear {
-    border: 1px solid rgb(0 0 0 / 0.08);
-    color: rgb(57 64 61);
+:root[data-theme='light'] .player-dock__queue-item--group > i {
+    background: rgb(0 0 0 / 0.06)
+}
+:root[data-theme='light'] .player-dock__queue-item--group:disabled:hover {
     background: transparent
 }
-:root[data-theme='light'] .player-dock__clear:hover {
-    border-color: rgb(0 0 0 / 0.2);
-    color: rgb(0 0 0);
-    background: rgb(0 0 0 / 0.04)
+:root[data-theme='light'] .player-dock__queue-empty {
+    color: rgb(125 135 132)
 }
 :root[data-theme='light'] .player-dock:not(.player-dock--collapsed) {
     background-image: linear-gradient(180deg, color-mix(in srgb, var(--player-accent, transparent) 32%, transparent) 0%, transparent 55%)
@@ -4424,98 +5157,6 @@
 }
 :root[data-theme='light'] .music-app .waveform-timeline > span {
     color: var(--m-text-dim)
-}
-@media (min-width: 761px) {
-    :root[data-theme='light'] .music-app .app-sidebar__item--active {
-        color: var(--m-accent);
-        background: color-mix(in srgb, var(--m-accent) 10%, transparent)
-    }
-    :root[data-theme='light'] .music-app .app-sidebar__item--active svg {
-        color: var(--m-accent)
-    }
-    :root[data-theme='light'] .music-app .app-sidebar__item--active::before, :root[data-theme='light'] .music-app .app-sidebar--collapsed .app-sidebar__item--active::before {
-        background: var(--m-accent)
-    }
-    :root[data-theme='light'] .music-app .app-header--desktop-shell {
-        border: 0;
-        background: transparent
-    }
-    :root[data-theme='light'] .music-app .collection-detail {
-        --btn-accent: var(--collection-accent, var(--m-accent));
-        background: transparent
-    }
-    @supports (color: oklch(from red l c h)) {
-        :root[data-theme='light'] .music-app .collection-detail {
-            --btn-accent: oklch(from var(--collection-accent, var(--m-accent)) clamp(0.5, l, 0.62) calc(c * 1.3) h)
-        }
-    }
-    :root[data-theme='light'] .music-app .collection-detail__back {
-        background: rgb(255 255 255 / 0.28)
-    }
-    :root[data-theme='light'] .music-app .collection-detail__summary::before {
-        background: var(--collection-artwork) center 25% / cover no-repeat
-    }
-    :root[data-theme='light'] .music-app .collection-detail__summary::after {
-        background: linear-gradient(90deg, rgb(248 251 251 / 0.72) 0%, rgb(248 251 251 / 0.35) 45%, rgb(248 251 251 / 0) 100%),
-      linear-gradient(180deg, transparent 45%, rgb(248 251 251 / 0.75) 100%),
-      linear-gradient(
-        to bottom,
-        rgb(248 251 251 / 0) calc(30% - 24px),
-        rgb(248 251 251 / 0.45) calc(65% + 18px),
-        rgb(248 251 251) calc(100% + 60px)
-      )
-    }
-    :root[data-theme='light'] .music-app .collection-detail__kind {
-        color: oklch(0 0 0 / 0.72)
-    }
-    :root[data-theme='light'] .music-app .collection-detail__identity p {
-        color: oklch(0 0 0 / 0.72)
-    }
-    :root[data-theme='light'] .music-app .collection-detail__count {
-        color: oklch(0 0 0 / 0.72)
-    }
-    :root[data-theme='light'] .music-app .collection-detail__pill--primary {
-        color: rgb(0 0 0);
-        background: var(--btn-accent)
-    }
-    :root[data-theme='light'] .music-app .collection-detail__pill--primary:hover {
-        background: color-mix(in srgb, var(--btn-accent) 86%, rgb(0 0 0))
-    }
-    :root[data-theme='light'] .music-app .collection-detail__pill--outline {
-        border: 1px solid oklch(0 0 0 / 0.22);
-        color: rgb(1 2 1);
-        background: rgb(255 255 255 / 0.25)
-    }
-    :root[data-theme='light'] .music-app .collection-detail__pill--outline:hover {
-        background: oklch(0 0 0 / 0.12)
-    }
-    :root[data-theme='light'] .music-app .collection-detail__control {
-        border: 1px solid oklch(0 0 0 / 0.22);
-        background: rgb(255 255 255 / 0.25)
-    }
-    :root[data-theme='light'] .music-app .collection-detail__pill--saved {
-        border-color: color-mix(in srgb, var(--btn-accent) 70%, transparent);
-        color: color-mix(in srgb, var(--btn-accent) 60%, rgb(0 0 0));
-        background: color-mix(in srgb, var(--btn-accent) 22%, transparent)
-    }
-    :root[data-theme='light'] .music-app .collection-detail__search {
-        border: 1px solid oklch(0 0 0 / 0.16);
-        color: oklch(0 0 0 / 0.7);
-        background: rgb(255 255 255 / 0.3)
-    }
-    :root[data-theme='light'] .music-app .collection-detail__search:focus-within {
-        border-color: color-mix(in srgb, var(--btn-accent) 75%, transparent)
-    }
-    :root[data-theme='light'] .music-app .collection-detail__search input {
-        border: 0;
-        outline: 0;
-        color: rgb(1 2 1);
-        background: transparent
-    }
-    :root[data-theme='light'] .music-app .collection-detail__table-head {
-        border-bottom: 1px solid oklch(0 0 0 / 0.1);
-        color: var(--m-text-dim)
-    }
 }
 :root[data-theme='light'] .music-app .song-row--active .song-row__title-link {
     color: var(--m-accent)
