@@ -35,6 +35,28 @@ function resizeGoogle(url, step) {
   return url.replace(box[0], `=w${Math.round((width * step) / short)}-h${Math.round((height * step) / short)}`)
 }
 
+const YTIMG_VIDEO = /^https?:\/\/i\d?\.ytimg\.com\/vi(?:_webp)?\/([\w-]{11})\//i
+// Desde este escalón la miniatura que da InnerTube (≤ 480x360, firmada) se ve borrosa: se pide maxresdefault.
+const MAXRES_MIN_STEP = 360
+
+/**
+ * Portada grande (vista extensa, controlador): URLs a probar en orden. Como Limusic: una miniatura de vídeo en un
+ * hueco grande se pide como maxresdefault.jpg (1280x720, sin firma) y, si no existe (YouTube responde 404 con un gris
+ * de 120x90), se vuelve a la original. El recorte cuadrado lo hace el CSS (object-fit: cover).
+ */
+export function artworkSources(url, cssPx, ratio) {
+  if (typeof url !== 'string' || !url) return []
+  const sized = sizedImage(url, cssPx, ratio)
+  const video = YTIMG_VIDEO.exec(url)
+  const sources = video && imageStep(cssPx, ratio) >= MAXRES_MIN_STEP
+    ? [`https://i.ytimg.com/vi/${video[1]}/maxresdefault.jpg`, sized, url]
+    : [sized, url]
+  return [...new Set(sources)]
+}
+
+/** i.ytimg responde a un tamaño que no tiene con un gris de 120x90: se trata como fallo. */
+export const isMissingThumb = (image) => image?.naturalWidth === 120 && image?.naturalHeight === 90
+
 /**
  * URL de `url` adecuada para un hueco de `cssPx` píxeles CSS (su lado mayor). Reescribe el tamaño en los hosts de
  * Google (=wN-hN / =sN) y cambia las miniaturas de vídeo sin firmar por mqdefault cuando el hueco es pequeño.

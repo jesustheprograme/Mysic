@@ -1,6 +1,21 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { deviceScale, IMAGE_STEPS, imageStep, sizedImage } from './imageSize.js'
+import { artworkSources, deviceScale, IMAGE_STEPS, imageStep, isMissingThumb, sizedImage } from './imageSize.js'
+
+test('artworkSources: miniatura de vídeo en hueco grande → maxresdefault y respaldo a la original', () => {
+  const signed = 'https://i.ytimg.com/vi/ViFHruS6oO8/hqdefault.jpg?sqp=-oay&rs=AMz'
+  assert.deepEqual(artworkSources(signed, 560, 1.25), ['https://i.ytimg.com/vi/ViFHruS6oO8/maxresdefault.jpg', signed])
+  // Hueco pequeño: la miniatura de siempre.
+  assert.deepEqual(artworkSources(signed, 48, 1), [signed])
+  // Google: tamaño reescrito y la original como respaldo.
+  assert.deepEqual(artworkSources('https://lh3.googleusercontent.com/a=w120-h120-l90-rj', 560, 1.25), [
+    'https://lh3.googleusercontent.com/a=w720-h720-l90-rj',
+    'https://lh3.googleusercontent.com/a=w120-h120-l90-rj',
+  ])
+  assert.deepEqual(artworkSources('', 560), [])
+  assert.equal(isMissingThumb({ naturalWidth: 120, naturalHeight: 90 }), true)
+  assert.equal(isMissingThumb({ naturalWidth: 1280, naturalHeight: 720 }), false)
+})
 
 test('deviceScale acota la densidad entre 1 y 2 y vale 1 sin ventana', () => {
   assert.equal(deviceScale(), 1)
