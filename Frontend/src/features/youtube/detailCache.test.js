@@ -62,6 +62,20 @@ test('pasada la ventana usable se espera a la red; si falla, se usa lo viejo gua
   await assert.rejects(empty.cache.get('album', 'X', '/album/X'), /sin red/)
 })
 
+test('forget: olvida un detalle (memoria y disco) y la siguiente apertura lo pide de nuevo', async () => {
+  let version = 1
+  const { cache, calls, reload } = setup({ fetcher: async () => ({ version }) })
+  await cache.get('playlist', 'P1', '/playlist/P1')
+  await cache.get('playlist', 'P2', '/playlist/P2')
+  version = 2
+  cache.forget('playlist', 'P1')
+  assert.equal((await cache.get('playlist', 'P1', '/playlist/P1')).version, 2, 'con la canción recién añadida')
+  assert.equal((await cache.get('playlist', 'P2', '/playlist/P2')).version, 1, 'las demás siguen guardadas')
+  assert.equal(calls.length, 3)
+  cache.forget('playlist', 'P2')
+  assert.equal((await reload().get('playlist', 'P2', '/playlist/P2')).version, 2, 'tampoco queda en disco')
+})
+
 test('sobrevive a un reinicio (lee del disco) y no pide mientras sea fresco', async () => {
   const { cache, reload, calls } = setup()
   await cache.get('artist', 'AR1', '/artist/AR1')

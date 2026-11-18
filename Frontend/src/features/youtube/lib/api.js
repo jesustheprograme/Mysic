@@ -206,7 +206,19 @@ export const api = {
   explore: (signal) => fetchJson('/explore', signal),
   radio: (id, signal) => fetchJson(`/radio/${encodeURIComponent(id)}`, signal),
   playlist: (id, signal) => details.get('playlist', id, `/playlist/${encodeURIComponent(id)}`, signal),
+  // Playlists propias de YouTube Music donde se puede guardar una canción, y si ya la tienen (ruta propia de Mysic).
+  playlistTargets: (videoId, signal) => fetchJson(`/playlist/targets/${encodeURIComponent(videoId)}`, signal, 0),
+  setInPlaylist: async (playlistId, videoId, add) => {
+    const path = `/playlist/${encodeURIComponent(playlistId)}/videos`
+    const result = add ? await send(path, 'POST', { videoId }) : await send(`${path}/${encodeURIComponent(videoId)}`, 'DELETE')
+    // La playlist cambió: su detalle guardado ya no vale (con y sin el prefijo VL de las URLs de YouTube Music).
+    for (const id of new Set([playlistId, `VL${playlistId}`, playlistId.replace(/^VL/, '')])) details.forget('playlist', id)
+    return result
+  },
   recommendations: (id, signal) => fetchJson(`/recommendations/${encodeURIComponent(id)}`, signal),
+  // Comentarios de YouTube (ruta propia de Mysic en el servidor). Un 404 significa que el servidor aún no la tiene.
+  comments: (id, { sort = 'top', page = 0 } = {}, signal) => fetchJson(`/comments/${encodeURIComponent(id)}?sort=${sort}&page=${page}`, signal, 0),
+  commentReplies: (id, commentId, sort = 'top', signal) => fetchJson(`/comments/${encodeURIComponent(id)}/replies/${encodeURIComponent(commentId)}?sort=${sort}`, signal, 0),
   search,
   warmSearch,
   suggest: (q, signal) => detail(`suggest:${q.trim().toLocaleLowerCase()}`, `/suggest?q=${encodeURIComponent(q)}`, signal),

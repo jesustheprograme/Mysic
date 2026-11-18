@@ -119,6 +119,15 @@ export function createDetailCache({ fetcher, now = Date.now, persisted = persist
         throw error
       })
     },
+    /** Olvida un detalle (por ejemplo, una playlist a la que se acaba de añadir una canción): la próxima vez se pide. */
+    forget(kind, id) {
+      const key = keyOf(kind, id)
+      generation += 1 // lo que ya estaba en vuelo traería la versión anterior: no se guarda
+      memory.delete(key)
+      inflight.delete(key)
+      persisted.remove(storeKey(key))
+      persisted.write(INDEX_KEY, readIndex().filter((item) => item !== key))
+    },
     /** Alcance actual: usuario de Mysic y cuenta de YouTube. Cambiarlo no borra nada, solo separa. */
     setScope(next) {
       scope = next || 'anon'
