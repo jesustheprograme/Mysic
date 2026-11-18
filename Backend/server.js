@@ -35,6 +35,7 @@ const { checkDatabaseHealth, closeDatabase, connectDatabase } = require('./src/d
 const { checkPrismaHealth, closePrisma, connectPrisma } = require('./src/prisma')
 const { YOUTUBE_USER_PATHS } = require('./src/youtube/authPaths')
 const { artistCacheHeaders } = require('./src/cache-headers')
+const { serverTiming } = require('./src/server-timing')
 
 const app = express()
 let server
@@ -110,6 +111,8 @@ async function start() {
   app.use(morgan(config.nodeEnv === 'production' ? 'combined' : 'dev'))
   app.use(express.json({ limit: '32kb' }))
   app.use(cookieParser())
+  // Tiempo del servidor en cada respuesta de la API (ver src/server-timing.js).
+  app.use('/api', serverTiming())
 
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -179,6 +182,13 @@ async function start() {
   app.use(['/api/youtube/link', '/api/youtube/account'], youtubeLibraryCache.invalidateOnWrite)
   app.get('/api/youtube/library/overview', youtubeLibraryCache.middleware, ...createLibraryOverviewHandler())
   app.get('/api/youtube/library/:kind', ...createLibrarySectionHandler())
+  // Guardar canciones en las playlists propias de YouTube Music (ver src/playlist-edit.mjs). Van antes del router
+  // generado (que tiene GET /playlist/:id) y vacían la biblioteca en caché del usuario al modificar.
+  const { createPlaylistEditRoutes } = await import('./src/playlist-edit.mjs')
+  const playlistEdit = createPlaylistEditRoutes()
+  app.get('/api/youtube/playlist/targets/:videoId', ...playlistEdit.targets)
+  app.post('/api/youtube/playlist/:id/videos', youtubeLibraryCache.invalidateOnWrite, ...playlistEdit.add)
+  app.delete('/api/youtube/playlist/:id/videos/:videoId', youtubeLibraryCache.invalidateOnWrite, ...playlistEdit.remove)
 
   app.use('/api/youtube', artistCacheHeaders, createYoutubeRouter())
 

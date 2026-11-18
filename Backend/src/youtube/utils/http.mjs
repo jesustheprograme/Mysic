@@ -14,7 +14,12 @@ export function asyncRoute(handler, failureMessage = 'Error interno') {
       await handler(req, res, next);
     } catch (error) {
       console.error(`${failureMessage}:`, error);
-      if (!res.headersSent) res.status(500).json({ error: failureMessage, details: error.message });
+      if (!res.headersSent) {
+        // MYSIC-LOCAL: las rutas ponen su Cache-Control público antes de consultar a YouTube; si la consulta falla, el
+        // error no debe guardarse (un 500 pasajero quedaba en caché 5 min, o 1 h en la ficha de artista).
+        res.setHeader('Cache-Control', 'no-store');
+        res.status(500).json({ error: failureMessage, details: error.message });
+      }
     }
   };
 }

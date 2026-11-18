@@ -1,5 +1,72 @@
 # Despliegues de producción
 
+## 2026-11-18 19:53 UTC (14:53 America/Lima) — playlists de YouTube, errores sin caché y Server-Timing (v2)
+
+- Paquete: `mysic-backend-20261118-playlist-save-error-cache-v2.tar.gz`
+- SHA-256: `5a0c5af149053fd1721e20408cc0e1eb5a688f75469e13d3c219d143d5818762`
+- Alcance: tres rutas para listar playlists editables y añadir/quitar canciones en YouTube Music, `Cache-Control: no-store` para errores de `asyncRoute`, `Server-Timing` y `Timing-Allow-Origin` para `/api`, cuatro archivos nuevos y dos registros de prueba en `Backend/package.json`; no se modificaron frontend, `.env`, secretos, datos, dependencias, Nginx ni `authPaths.js`
+- Respaldo final: `/srv/mysic/releases/pre-playlist-save-error-cache-20261118T195041Z`, con `server.js`, `http.mjs`, `package.json`, hashes, permisos, 181/181 pruebas previas, journal, 187/187 pruebas posteriores y la verificación pública/métricas
+- Base remota: 2/2 hashes de `BASELINE.txt` correctos (`server.js` CRLF `5cf64da6…21a82` y `http.mjs` `a86ae7ef…18d326`); los cuatro archivos nuevos no existían y los dos paquetes sustituidos no estaban aplicados
+- Integridad: SHA-256 externo correcto y 6/6 entradas de `MANIFEST.sha256` válidas antes de aplicar y en destino después de copiar
+- Permisos: los seis archivos del paquete quedaron `ubuntu:ubuntu` 0644
+- `package.json`: `src/server-timing.test.js` y `src/playlist-edit.test.mjs` registrados exactamente una vez en las posiciones indicadas; JSON válido, sin BOM y `ubuntu:ubuntu` 0644
+- Backend en servidor: `npm run check` correcto; 187/187 pruebas, 0 fallos y esquema Prisma válido (181 pruebas previas + 6 nuevas)
+- Servicios: `mysic-api` activo y Nginx activo; readiness pública HTTP 200 con `status: ready`; salud de YouTube HTTP 200 con `ready: true`, `online: true`
+- 7.1 `GET /api/health`: HTTP 200; `Server-Timing: app;dur=0.1`, `Timing-Allow-Origin: *`, `Cache-Control: no-store`
+- 7.2 `GET /api/youtube/search?q=ado&type=song`: HTTP 200; conserva `Cache-Control: public, max-age=60, stale-while-revalidate=240`; `Server-Timing: app;dur=1.0` y `Timing-Allow-Origin: *`
+- 7.3 `GET /api/youtube/album/MPREb_0000000000000`: HTTP 500 esperado; `Cache-Control: no-store`, `Server-Timing: app;dur=120.3`; no llevó caché pública
+- 7.4 rutas nuevas sin sesión: HTTP 401 en `GET playlist/targets`, `POST playlist/PLx/videos` y `DELETE playlist/PLx/videos/:videoId`; todas llevaron `Server-Timing` y `Timing-Allow-Origin: *`; no se escribió en ninguna playlist real
+- 7.5 rutas personales sin sesión: HTTP 401 en `home`, `library/overview`, `playlist/x` y `stream/dQw4w9WgXcQ`
+- 7.6 `GET /api/youtube/comments/dQw4w9WgXcQ`: HTTP 200, 8.970 bytes; `Cache-Control: private, max-age=120`, `Server-Timing: app;dur=0.4`
+- 7.7 journal posterior: sin avisos ni errores nuevos aparte de las dos líneas esperadas del 500 provocado en 7.3 (`No contents found in the response` y el acceso HTTP 500)
+- `Server-Timing`, tres peticiones seguidas: health `0.2/0.2/0.2 ms`; search `8.7/1.2/0.5 ms`; artist `334.0/0.9/0.5 ms`; comments `391.2/0.6/0.4 ms`
+- Métricas: servicio activo desde 19:51:18 UTC; 433,6 MB al minuto 1:24 (pico 433,6 MB). `ps -C node` solo imprimió la cabecera porque el proceso figura como `MainThread`; la inspección equivalente mostró PID 1524119, CPU 4,3 %, memoria 3,7 %, RSS 223.944 KiB y 1:58 de ejecución
+- Host: 5.903 MB RAM total, 818 MB usados, 5.084 MB disponibles, sin swap; uptime 71 días 4:19; carga `0.18/0.48/0.29`; 1 CPU; `/srv` en `/dev/sda1`, 45 GB totales, 22 GB usados, 23 GB libres (50 %)
+- Avisos/errores de `mysic-api` en las últimas 24 h con prioridad warning o superior: 0; no hubo líneas para el top 5
+- Nginx: el formato configurado no incluye `$request_time`, por lo que no fue posible calcular p50/p95 sin cambiar la configuración; no se modificó
+- Reversiones intermedias: tres reversiones automáticas restauraron y verificaron la base antes del intento final. Fueron causadas por el arnés operativo, no por el paquete: comprobación de `ready` contra `/api/health` en vez de `/api/health/ready`; uso de `grep -q` con `pipefail`; y comprobación única de YouTube antes de que terminara de inicializar. El intento final esperó correctamente tanto la readiness como `ready:true, online:true`
+
+`DEPLOY_OK` — la v2 quedó activa, con 187/187 pruebas y todas las verificaciones públicas correctas; falta únicamente la prueba manual autorizada del propietario para añadir y quitar una canción.
+
+## 2026-11-18 19:09 UTC (14:09 America/Lima) — playlist de YouTube, no aplicado por base divergente
+
+- Paquete: `mysic-backend-20261118-playlist-save-error-cache.tar.gz`
+- SHA-256: `a147df96d0b99f183f59f5d4aae1a8bb79fe12ebd0b234fefca41002006c8f40`
+- Alcance previsto: rutas para guardar y quitar canciones en playlists propias de YouTube Music, `Cache-Control: no-store` en errores de `asyncRoute`, cabeceras `Server-Timing`/`Timing-Allow-Origin` en `/api` y registro de dos archivos de prueba; no se pretendía modificar frontend, `.env`, secretos, datos, dependencias, Nginx ni `authPaths.js`
+- Integridad: SHA-256 externo correcto; paquete extraído en un directorio temporal remoto y 6/6 entradas de `MANIFEST.sha256` válidas
+- Base remota: 1/2 entradas de `BASELINE.txt` válidas. `Backend/src/youtube/utils/http.mjs` coincidió con `a86ae7ef3456c08e15c77a9268a9492e2d73d101e9ff2c49d2f2a83fc418d326`; `Backend/server.js` debía ser `60d6b59b3a740da58918a90eae2b337783d93695b49f59f8a0185d02c8cb4ca9`, pero producción tenía `5cf64da6cd9f5a59961532d78096d7e3c16674268d2836f09baacd73c6621a82`
+- Paquete sustituido: no había marcadores de `playlist-edit` ni `server-timing` en `server.js` o `package.json`; los cuatro archivos nuevos estaban ausentes y ambas pruebas figuraban 0 veces, por lo que `mysic-backend-20261118-youtube-playlist-save.tar.gz` no estaba aplicado
+- Estado previo observado: `mysic-api` activo y Nginx activo
+- Acción: despliegue detenido en el paso 2, antes de crear respaldo o modificar producción, conforme a la orden de no aplicar ante cualquier discrepancia
+- No ejecutado por la detención: copia a destino, edición de `package.json`, `npm run check`, reinicio, readiness, verificación funcional y captura de métricas posteriores
+- Reversión: no fue necesaria; no se copió ni modificó ningún archivo de la aplicación y no se reinició ningún servicio. Los archivos temporales de prevalidación se eliminaron
+
+`DEPLOY_REVERTED` — el paquete no quedó activo: la base de `server.js` divergía y producción permaneció sin cambios.
+
+## 2026-11-18 01:06 UTC (2026-11-17 20:06 America/Lima) — comentarios públicos de YouTube
+
+- Paquete: `mysic-backend-20261117-youtube-comments.tar.gz`
+- SHA-256: `54512673052a3e83978e6b800d68e2d21de50f238de6f9041ecbb01ae23ae86f`
+- Alcance: tres archivos nuevos (`youtube/comments.mjs`, su prueba y `routes/comments.mjs`), dos líneas de registro en `routes/index.mjs` y un único argumento nuevo en el script `test` de `Backend/package.json`; no se modificaron frontend, `.env`, secretos, datos, dependencias, Nginx ni `authPaths.js`
+- Respaldo previo: `/srv/mysic/releases/pre-youtube-comments-20261118T010407Z`, con `routes/index.mjs`, `package.json`, hashes, permisos, 175/175 pruebas previas y journal reciente
+- Base remota: el hash de `routes/index.mjs` coincidía con `b533548f1a8a674bc79229a67553cc6ed8530e2c90a17c64aff6baa136c5d8d2`; los tres archivos nuevos no existían
+- Integridad: SHA-256 externo correcto y 4/4 entradas de `MANIFEST.sha256` válidas antes y después de copiar
+- Permisos: los cuatro archivos del paquete quedaron `ubuntu:ubuntu` 0644; `routes/index.mjs` estaba en 0666 y quedó normalizado al modo solicitado 0644
+- `package.json`: `src/youtube/youtube/comments.test.mjs` registrado exactamente una vez; JSON válido, sin BOM y propietario/permisos conservados (`ubuntu:ubuntu` 0644)
+- Backend en servidor: `npm run check` correcto; 181/181 pruebas, 0 fallos y esquema Prisma válido
+- Servicios: `mysic-api` activo y Nginx activo
+- Readiness público: HTTP 200, `status: ready`; YouTube público: HTTP 200, `ready: true`, `online: true`
+- Comentarios página 0 (`dQw4w9WgXcQ`): HTTP 200, 20 elementos con `id`, `text` y `author`, total 2.462.447, `hasMore: true`; primer id `UgwW_cL1iucaVqoLCZV4AaABAg`
+- Comentarios página 1: HTTP 200, 20 elementos; primer id `UgxIOV-sXAchpKX94cB4AaABAg`, distinto al de la página 0
+- Orden nuevo: HTTP 200, 20 comentarios
+- Respuestas: comentario `UgwW_cL1iucaVqoLCZV4AaABAg`, 699 respuestas anunciadas; HTTP 200 y 3 respuestas devueltas en la primera carga
+- Validación: `GET /api/youtube/comments/xx` respondió HTTP 400
+- Rutas personales sin sesión: HTTP 401 en `home`, `library/overview`, `playlist/x` y `stream/dQw4w9WgXcQ`
+- Journal posterior: sin avisos ni errores; no apareció el aviso conocido `CommentFilterContextView not found`
+- Reversión: no fue necesaria
+
+`DEPLOY_OK` — la API pública de comentarios quedó desplegada y verificada de extremo a extremo.
+
 ## 2026-11-16 05:31 UTC (00:31 America/Lima) — fin seguro de continuaciones del Inicio
 
 - Paquete: `mysic-backend-20261116-home-more-end.tar.gz`

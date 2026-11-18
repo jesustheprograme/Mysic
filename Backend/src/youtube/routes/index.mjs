@@ -9,6 +9,7 @@ import { invalidateStream, resolveAudioStream } from '../youtube/stream.mjs';
 import { createAlbumRouter } from './album.mjs';
 import { createArtistRouter } from './artist.mjs';
 import { createBrowseRouter } from './browse.mjs';
+import { createCommentsRouter } from './comments.mjs';
 import { createDownloadsRouter } from './downloads.mjs';
 import { createHealthRouter } from './health.mjs';
 import { createImagesRouter } from './images.mjs';
@@ -31,6 +32,7 @@ export function createApiRouter() {
   api.use('/artist', createArtistRouter({ getArtistImages }));
   api.use('/album', createAlbumRouter());
   api.use('/stream', createStreamRouter());
+  api.use('/comments', createCommentsRouter()); // MYSIC-LOCAL: comentarios de YouTube
   api.use('/downloads', createDownloadsRouter({ dir: config.downloadsDir, resolveAudioStream, invalidateStream }));
   api.use('/image', createImagesRouter({ dir: config.imageCacheDir }));
 
