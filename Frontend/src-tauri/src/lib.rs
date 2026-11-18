@@ -5,6 +5,7 @@ use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 mod audio_session;
 mod local_audio;
+mod lyrics_http;
 mod resolver;
 mod spotify_link;
 mod taskbar;
@@ -153,6 +154,57 @@ fn apply_music_import() -> Result<String, String> {
     )
 }
 
+/// Quita al mini reproductor los estilos de ventana con barra de título. Tauri hace las ventanas sin decoración
+/// conservando `WS_CAPTION` y el marco (para el ajuste a los bordes de Windows); al redimensionar o cambiar la región
+/// visible, Windows llegaba a pintar un instante la barra nativa ("Mysic Mini Player") encima de la tarjeta.
+/// Sin esos estilos no hay barra que pintar. El arrastre sigue funcionando (es el de Tauri, no el del marco).
+#[cfg(windows)]
+fn strip_native_caption(hwnd: windows::Win32::Foundation::HWND) {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetWindowLongPtrW, SetWindowLongPtrW, SetWindowPos, GWL_STYLE, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE,
+        SWP_NOSIZE, SWP_NOZORDER, WS_POPUP,
+    };
+    unsafe {
+        let style = GetWindowLongPtrW(hwnd, GWL_STYLE) as u32;
+        let next = (style & !CAPTION_STYLES) | WS_POPUP.0;
+        if next == style {
+            return;
+        }
+        SetWindowLongPtrW(hwnd, GWL_STYLE, next as isize);
+        // El cambio de marco solo se aplica con SWP_FRAMECHANGED.
+        let _ = SetWindowPos(hwnd, None, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+}
+
+#[cfg(windows)]
+const CAPTION_STYLES: u32 = windows::Win32::UI::WindowsAndMessaging::WS_CAPTION.0
+    | windows::Win32::UI::WindowsAndMessaging::WS_THICKFRAME.0
+    | windows::Win32::UI::WindowsAndMessaging::WS_SYSMENU.0
+    | windows::Win32::UI::WindowsAndMessaging::WS_MINIMIZEBOX.0
+    | windows::Win32::UI::WindowsAndMessaging::WS_MAXIMIZEBOX.0;
+
+/// Guardia del mini reproductor: Tauri vuelve a poner sus estilos (con `WS_CAPTION`) cada vez que cambia una propiedad
+/// de la ventana, por ejemplo "siempre encima" al fijarla o al abrirla, y entonces Windows pintaba la barra de título
+/// nativa, que se veía al aclararse la tarjeta. Aquí se quitan la barra y el marco de cualquier cambio de estilo antes
+/// de aplicarse, venga de donde venga.
+#[cfg(windows)]
+unsafe extern "system" fn mini_player_no_caption(
+    hwnd: windows::Win32::Foundation::HWND,
+    message: u32,
+    wparam: windows::Win32::Foundation::WPARAM,
+    lparam: windows::Win32::Foundation::LPARAM,
+    _id: usize,
+    _data: usize,
+) -> windows::Win32::Foundation::LRESULT {
+    use windows::Win32::UI::Shell::DefSubclassProc;
+    use windows::Win32::UI::WindowsAndMessaging::{GWL_STYLE, STYLESTRUCT, WM_STYLECHANGING, WS_POPUP};
+    if message == WM_STYLECHANGING && wparam.0 as i32 == GWL_STYLE.0 && lparam.0 != 0 {
+        let change = &mut *(lparam.0 as *mut STYLESTRUCT);
+        change.styleNew = (change.styleNew & !CAPTION_STYLES) | WS_POPUP.0;
+    }
+    DefSubclassProc(hwnd, message, wparam, lparam)
+}
+
 #[tauri::command]
 fn set_mini_player_bounds(
     app: tauri::AppHandle,
@@ -176,6 +228,7 @@ fn set_mini_player_bounds(
         };
 
         let hwnd = window.hwnd().map_err(|error| error.to_string())?;
+        strip_native_caption(hwnd);
         unsafe {
             let mut current_bounds = RECT::default();
             GetWindowRect(hwnd, &mut current_bounds).map_err(|error| error.to_string())?;
@@ -184,19 +237,9 @@ fn set_mini_player_bounds(
                 || current_bounds.top != y
                 || current_bounds.right - current_bounds.left != width as i32
                 || current_bounds.bottom - current_bounds.top != height as i32;
-            if bounds_changed {
-                SetWindowPos(
-                    hwnd,
-                    None,
-                    x,
-                    y,
-                    width as i32,
-                    height as i32,
-                    SWP_NOACTIVATE | SWP_NOZORDER,
-                )
-                .map_err(|error| error.to_string())?;
-            }
 
+            // Primero la región visible y después el tamaño: así nunca se ve, ni un instante, la ventana entera sin
+            // recortar (antes se movía primero y la región llegaba después).
             // Exclude the transparent CSS padding from the native window region.
             // WebView2 can paint that padding white when a transparent window loses focus.
             let scale = width as f64 / 380.0;
@@ -218,6 +261,19 @@ fn set_mini_player_bounds(
             if SetWindowRgn(hwnd, Some(region), true) == 0 {
                 let _ = DeleteObject(HGDIOBJ(region.0));
                 return Err("failed to apply mini player window region".to_string());
+            }
+
+            if bounds_changed {
+                SetWindowPos(
+                    hwnd,
+                    None,
+                    x,
+                    y,
+                    width as i32,
+                    height as i32,
+                    SWP_NOACTIVATE | SWP_NOZORDER,
+                )
+                .map_err(|error| error.to_string())?;
             }
         }
     }
@@ -274,6 +330,25 @@ async fn open_mini_player(app: tauri::AppHandle) -> Result<(), String> {
         .build()
         .map_err(|error| error.to_string())?;
 
+    // Sin barra de título nativa desde el principio (antes de mostrarse por primera vez) y para siempre: la guardia
+    // impide que Tauri la vuelva a poner.
+    // Windows solo deja instalar la guardia desde el hilo que creó la ventana (el principal); este comando es
+    // asíncrono y corre en otro hilo, así que se hace allí. El HWND viaja como número (no es Send).
+    #[cfg(windows)]
+    if let Some(window) = app.get_webview_window("mini-player") {
+        if let Ok(hwnd) = window.hwnd() {
+            let raw = hwnd.0 as isize;
+            app.run_on_main_thread(move || {
+                let hwnd = windows::Win32::Foundation::HWND(raw as *mut core::ffi::c_void);
+                unsafe {
+                    let _ = windows::Win32::UI::Shell::SetWindowSubclass(hwnd, Some(mini_player_no_caption), 1, 0);
+                }
+                strip_native_caption(hwnd);
+            })
+            .map_err(|error| error.to_string())?;
+        }
+    }
+
     Ok(())
 }
 
@@ -329,6 +404,7 @@ pub fn run() {
             resolver::warm_resolver,
             resolver::forget_audio,
             spotify_link::spotify_link_info,
+            lyrics_http::lyrics_http,
         youtube_session::open_youtube_music_login,
         ])
         .run(tauri::generate_context!())

@@ -13,19 +13,25 @@
 //! El perfil del cliente (nombre, versión, agente) es dato, no código: viene de `client-config.json` (ver
 //! `set_client_config`) y, si falta, de los valores por defecto de abajo.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tauri::http::{header, Method, Request as HttpRequest, Response as HttpResponse, StatusCode};
+use tokio::sync::OnceCell;
 
 pub const SCHEME: &str = "mysicstream";
 const PLAYER_URL: &str = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json";
 const SW_DATA_URL: &str = "https://www.youtube.com/sw.js_data";
-/// Primer tramo (para que el sonido empiece pronto) y tramos siguientes.
-const FIRST_CHUNK: u64 = 256 * 1024;
+/// Primer tramo: pequeño para que el sonido empiece pronto. El protocolo no puede responder por partes (Tauri entrega
+/// el cuerpo entero), así que el primer sonido espera a que llegue todo el tramo: en un servidor de YouTube lejano
+/// (~100 ms de ida y vuelta) 256 KB tardaban ~500 ms y 64 KB (unos 4 s de audio) ~300 ms.
+const FIRST_CHUNK: u64 = 64 * 1024;
+/// Después, tramos que crecen: 512 KB hasta el primer MB (llegan antes de que se acaben esos 4 s) y luego 2 MB.
+const RAMP_CHUNK: u64 = 512 * 1024;
+const RAMP_UNTIL: u64 = 1024 * 1024;
 const CHUNK: u64 = 2 * 1024 * 1024;
 const VISITOR_TTL_SECS: u64 = 12 * 3600;
 /// Una URL se renueva con este margen antes de caducar.
@@ -232,7 +238,13 @@ pub fn plan_range(header_value: Option<&str>, total: Option<u64>) -> Option<(u64
             return None;
         }
     }
-    let limit = if start == 0 { FIRST_CHUNK } else { CHUNK };
+    let limit = if start == 0 {
+        FIRST_CHUNK
+    } else if start < RAMP_UNTIL {
+        RAMP_CHUNK
+    } else {
+        CHUNK
+    };
     let mut end = start.saturating_add(limit - 1);
     if let Some(requested) = requested_end {
         if requested < start {
@@ -273,7 +285,24 @@ pub struct Resolver {
     visitor: Mutex<Option<(String, u64)>>,
     cache: Mutex<HashMap<String, Resolved>>,
     heads: Mutex<HashMap<String, Head>>,
-    heads_pending: Mutex<HashSet<String>>,
+    /// Trabajo en curso por pista. Al hacer clic llegan a la vez `resolve_audio` (que prepara el primer tramo) y la
+    /// petición del `<audio>`: antes cada uno resolvía y descargaba por su cuenta (dos conexiones con YouTube compitiendo
+    /// por los mismos bytes). Ahora el segundo espera al primero.
+    resolving: Mutex<HashMap<String, Arc<OnceCell<Result<Resolved, ResolveError>>>>>,
+    heads_pending: Mutex<HashMap<String, Arc<OnceCell<()>>>>,
+}
+
+/// La tarea compartida de `key` en `map` (la crea si no hay ninguna en curso).
+fn shared<T>(map: &Mutex<HashMap<String, Arc<OnceCell<T>>>>, key: &str) -> Arc<OnceCell<T>> {
+    map.lock().unwrap().entry(key.to_owned()).or_insert_with(|| Arc::new(OnceCell::new())).clone()
+}
+
+/// Terminada la tarea, se quita (si sigue siendo la misma): la siguiente vez se empieza de cero.
+fn finish<T>(map: &Mutex<HashMap<String, Arc<OnceCell<T>>>>, key: &str, cell: &Arc<OnceCell<T>>) {
+    let mut map = map.lock().unwrap();
+    if map.get(key).is_some_and(|current| Arc::ptr_eq(current, cell)) {
+        map.remove(key);
+    }
 }
 
 struct Head {
@@ -296,7 +325,15 @@ impl Resolver {
             .tcp_keepalive(Duration::from_secs(30))
             .build()
             .expect("cliente HTTP del resolvedor");
-        Self { http, config: Mutex::new(ClientConfig::default()), visitor: Mutex::new(None), cache: Mutex::new(HashMap::new()), heads: Mutex::new(HashMap::new()), heads_pending: Mutex::new(HashSet::new()) }
+        Self {
+            http,
+            config: Mutex::new(ClientConfig::default()),
+            visitor: Mutex::new(None),
+            cache: Mutex::new(HashMap::new()),
+            heads: Mutex::new(HashMap::new()),
+            resolving: Mutex::new(HashMap::new()),
+            heads_pending: Mutex::new(HashMap::new()),
+        }
     }
 
     pub fn set_config(&self, config: ClientConfig) -> bool {
@@ -382,28 +419,30 @@ impl Resolver {
         Some(Chunk { start: 0, end: take as u64 - 1, total: head.total, mime_type: head.mime_type.clone(), body: head.body[..take].to_vec() })
     }
 
-    /// Descarga por adelantado el primer tramo de una pista (se llama al prepararla). No hace nada si ya está o va en curso.
+    /// Descarga el primer tramo de una pista (al prepararla o al pedirlo el `<audio>`). Si ya está, no hace nada; si va
+    /// en curso, espera a esa misma descarga en vez de empezar otra.
     pub async fn prefetch_head(&self, id: &str) {
         if self.heads.lock().unwrap().get(id).is_some_and(|head| now_secs().saturating_sub(head.at) <= HEAD_TTL_SECS) {
             return;
         }
-        if !self.heads_pending.lock().unwrap().insert(id.to_owned()) {
-            return;
-        }
-        if let Ok(chunk) = self.fetch_network(id, Some("bytes=0-")).await {
-            if chunk.start == 0 {
-                let mut heads = self.heads.lock().unwrap();
-                heads.insert(id.to_owned(), Head { body: chunk.body, total: chunk.total, mime_type: chunk.mime_type, at: now_secs() });
-                while heads.len() > HEAD_MAX {
-                    let oldest = heads.iter().min_by_key(|(_, head)| head.at).map(|(key, _)| key.clone());
-                    match oldest {
-                        Some(key) => heads.remove(&key),
-                        None => break,
-                    };
+        let cell = shared(&self.heads_pending, id);
+        cell.get_or_init(|| async {
+            if let Ok(chunk) = self.fetch_network(id, Some("bytes=0-")).await {
+                if chunk.start == 0 {
+                    let mut heads = self.heads.lock().unwrap();
+                    heads.insert(id.to_owned(), Head { body: chunk.body, total: chunk.total, mime_type: chunk.mime_type, at: now_secs() });
+                    while heads.len() > HEAD_MAX {
+                        let oldest = heads.iter().min_by_key(|(_, head)| head.at).map(|(key, _)| key.clone());
+                        match oldest {
+                            Some(key) => heads.remove(&key),
+                            None => break,
+                        };
+                    }
                 }
             }
-        }
-        self.heads_pending.lock().unwrap().remove(id);
+        })
+        .await;
+        finish(&self.heads_pending, id, &cell);
     }
 
     async fn request_player(&self, id: &str, visitor: &str) -> Result<Value, ResolveError> {
@@ -453,11 +492,19 @@ impl Resolver {
         if !valid_video_id(id) {
             return Err(ResolveError::Unavailable("id de vídeo no válido".into()));
         }
-        if !fresh {
-            if let Some(hit) = self.cached(id) {
-                return Ok(hit);
-            }
+        if fresh {
+            return self.resolve_network(id).await; // la URL anterior falló: no vale esperar a otra resolución
         }
+        if let Some(hit) = self.cached(id) {
+            return Ok(hit);
+        }
+        let cell = shared(&self.resolving, id);
+        let result = cell.get_or_init(|| self.resolve_network(id)).await.clone();
+        finish(&self.resolving, id, &cell);
+        result
+    }
+
+    async fn resolve_network(&self, id: &str) -> Result<Resolved, ResolveError> {
         let mut visitor = self.visitor_data(false).await?;
         let mut response = self.request_player(id, &visitor).await?;
         // YouTube pide "confirmar que no eres un bot" cuando el visitante ya no vale: se renueva una vez.
@@ -475,6 +522,14 @@ impl Resolver {
     async fn fetch_chunk(&self, id: &str, range_header: Option<&str>) -> Result<Chunk, ResolveError> {
         if let Some(chunk) = self.head_chunk(id, range_header) {
             return Ok(chunk);
+        }
+        // El principio de la pista: se comparte la descarga del primer tramo (la que empezó `resolve_audio` al hacer
+        // clic, o una nueva) en vez de abrir otra conexión para los mismos bytes.
+        if plan_range(range_header, None).is_some_and(|(start, _)| start == 0) {
+            self.prefetch_head(id).await;
+            if let Some(chunk) = self.head_chunk(id, range_header) {
+                return Ok(chunk);
+            }
         }
         self.fetch_network(id, range_header).await
     }
@@ -719,7 +774,35 @@ mod tests {
     fn el_primer_tramo_es_pequeno_y_los_demas_grandes() {
         assert_eq!(plan_range(Some("bytes=0-"), Some(10_000_000)), Some((0, FIRST_CHUNK - 1)));
         assert_eq!(plan_range(None, Some(10_000_000)), Some((0, FIRST_CHUNK - 1)));
-        assert_eq!(plan_range(Some("bytes=262144-"), Some(10_000_000)), Some((262_144, 262_144 + CHUNK - 1)));
+        // Después del primero, tramos que crecen: 512 KB hasta el primer MB y luego 2 MB.
+        assert_eq!(plan_range(Some("bytes=65536-"), Some(10_000_000)), Some((65_536, 65_536 + RAMP_CHUNK - 1)));
+        assert_eq!(plan_range(Some("bytes=589824-"), Some(10_000_000)), Some((589_824, 589_824 + RAMP_CHUNK - 1)));
+        assert_eq!(plan_range(Some("bytes=1114112-"), Some(10_000_000)), Some((1_114_112, 1_114_112 + CHUNK - 1)));
+    }
+
+    #[test]
+    fn el_trabajo_de_una_pista_se_comparte_y_al_terminar_se_olvida() {
+        let map: Mutex<HashMap<String, Arc<OnceCell<u32>>>> = Mutex::new(HashMap::new());
+        let runs = std::sync::atomic::AtomicUsize::new(0);
+        let work = || async {
+            runs.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            7
+        };
+        tauri::async_runtime::block_on(async {
+            let first = shared(&map, "abc");
+            let second = shared(&map, "abc");
+            assert!(Arc::ptr_eq(&first, &second), "la misma pista comparte la tarea");
+            assert!(!Arc::ptr_eq(&first, &shared(&map, "otra")), "otra pista no");
+            assert_eq!(*first.get_or_init(work).await, 7);
+            assert_eq!(*second.get_or_init(work).await, 7);
+            assert_eq!(runs.load(std::sync::atomic::Ordering::SeqCst), 1, "una sola descarga");
+            finish(&map, "abc", &first);
+            let again = shared(&map, "abc");
+            assert!(!Arc::ptr_eq(&first, &again), "terminada, la siguiente vez empieza de cero");
+            // Quitar una tarea ya sustituida no borra la nueva.
+            finish(&map, "abc", &first);
+            assert!(Arc::ptr_eq(&again, &shared(&map, "abc")));
+        });
     }
 
     #[test]
@@ -729,7 +812,8 @@ mod tests {
         assert_eq!(plan_range(Some("bytes=0-"), Some(1000)), Some((0, 999)));
         assert_eq!(plan_range(Some("bytes=-500"), Some(10_000)), Some((9500, 9999)));
         // Sin tamaño conocido solo se puede acotar por tramo.
-        assert_eq!(plan_range(Some("bytes=1000-"), None), Some((1000, 1000 + CHUNK - 1)));
+        assert_eq!(plan_range(Some("bytes=1000-"), None), Some((1000, 1000 + RAMP_CHUNK - 1)));
+        assert_eq!(plan_range(Some("bytes=3000000-"), None), Some((3_000_000, 3_000_000 + CHUNK - 1)));
     }
 
     #[test]

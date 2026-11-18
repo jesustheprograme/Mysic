@@ -1,6 +1,6 @@
 [package]
 name = "mysic"
-version = "0.1.128"
+version = "0.1.203"
 description = "Mysic desktop music player"
 authors = ["Mysic"]
 edition = "2021"
@@ -19,6 +19,8 @@ tauri = { version = "2", features = [] }
 rfd = "0.12"
 # Resolución del audio en el equipo del usuario (src/resolver.rs). TLS nativo de Windows: sin herramientas de C extra.
 reqwest = { version = "0.12", default-features = false, features = ["native-tls", "gzip", "json", "http2"] }
+# Ya lo trae Tauri: solo `sync` (OnceCell) para que peticiones simultáneas de la misma pista compartan un solo trabajo.
+tokio = { version = "1", default-features = false, features = ["sync"] }
 tauri-plugin-oauth = "2"
 tauri-plugin-opener = "2"
 
