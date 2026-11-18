@@ -35,6 +35,7 @@ import {
   MINI_PLAYER_EXPANDED_KEY,
 } from './miniPlayerConfig'
 import ControlVolumenMini from './componentes/ControlVolumenMini'
+import DetalleCatalogoMini, { type MiniDetailSong, type MiniDetailTarget } from './componentes/DetalleCatalogoMini'
 import {
   readStoredBoolean,
   resizeWebMiniPlayer,
@@ -42,6 +43,12 @@ import {
   useVentanaMiniReproductor,
 } from './ventana/useVentanaMiniReproductor'
 import { dispatchMiniPlayerCommand, formatTime } from './utilidades/utilidadesMiniReproductor'
+import { useMiniEnUso } from './ventana/useMiniEnUso'
+import { createOverlayScrollbarRef } from '../../lib/overlayScrollbar.js'
+
+// Barra de desplazamiento superpuesta de Mysic (la nativa está oculta en toda la app, ver index.css) en las listas
+// del reproductor desplegado: cola, búsqueda, relacionados.
+const miniScrollbarRef = createOverlayScrollbarRef({ inset: 3 })
 import './mini-player.css'
 
 type MiniPlayerProps = {
@@ -87,6 +94,8 @@ function useMiniPlayerController({ hostDocument = document, hostWindow = window 
   const [catalogResults, setCatalogResults] = useState<CatalogResults | null>(null)
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [catalogError, setCatalogError] = useState('')
+  // Álbum/artista abiertos dentro del mini reproductor (pila: un álbum abierto desde un artista vuelve al artista).
+  const [detailStack, setDetailStack] = useState<MiniDetailTarget[]>([])
   const [clock, setClock] = useState(Date.now)
   const pendingCommandsRef = useRef<Partial<Record<'seek' | 'volume', MiniPlayerCommand>>>({})
   const commandTimerRef = useRef<number | null>(null)
@@ -118,6 +127,8 @@ function useMiniPlayerController({ hostDocument = document, hostWindow = window 
     revealExpandedSurface,
   )
   const visualAnchor = isNativeMiniPlayer ? anchor : 'top-right'
+  // Solo la ventana flotante nativa se aclara en reposo (en la ventana web o el modo imagen dentro de imagen, no).
+  const enUso = useMiniEnUso() || !isNativeMiniPlayer
 
   const finishCollapse = useCallback(() => {
     if (expandedRef.current) return
@@ -270,6 +281,27 @@ function useMiniPlayerController({ hostDocument = document, hostWindow = window 
     showTrackImmediately(playable)
     dispatchMiniPlayerCommand({ type: 'play-global', song: playable })
   }
+
+  function openDetail(target: MiniDetailTarget) {
+    setDetailStack((stack) => [...stack, target])
+  }
+
+  function closeDetail() {
+    setDetailStack((stack) => stack.slice(0, -1))
+  }
+
+  function playDetailSongs(songs: MiniDetailSong[], index: number) {
+    const playable = songs.map((song) => ({
+      ...song,
+      title: song.title ?? 'Canción',
+      artist: song.artist ?? 'Artista desconocido',
+      artwork: imageUrl(song.thumbnail ?? song.artwork),
+      durationSeconds: song.durationSeconds ?? 0,
+    }))
+    if (!playable[index]) return
+    showTrackImmediately(playable[index])
+    dispatchMiniPlayerCommand({ type: 'play-list-global', songs: playable, index })
+  }
   const relatedSongColumns = useMemo(() => {
     const columns: MiniSong[][] = []
     for (let index = 0; index < visibleQueue.length; index += 4) {
@@ -318,6 +350,17 @@ function useMiniPlayerController({ hostDocument = document, hostWindow = window 
     if (motionTimerRef.current !== null) window.clearTimeout(motionTimerRef.current)
     if (revealFrameRef.current !== null) hostWindow.cancelAnimationFrame(revealFrameRef.current)
   }, [hostWindow])
+
+  // Clic fuera del mini reproductor (la ventana pierde el foco): si estaba desplegado, se recoge solo. Solo en la
+  // ventana flotante nativa (en la ventana web o imagen dentro de imagen el foco cambia por otros motivos).
+  const toggleExpandedRef = useRef<() => void>(() => {})
+  useEffect(() => { toggleExpandedRef.current = toggleExpanded })
+  useEffect(() => {
+    if (!isNativeMiniPlayer) return undefined
+    const collapseOnBlur = () => { if (expandedRef.current) toggleExpandedRef.current() }
+    hostWindow.addEventListener('blur', collapseOnBlur)
+    return () => hostWindow.removeEventListener('blur', collapseOnBlur)
+  }, [hostWindow, isNativeMiniPlayer])
 
   function toggleExpanded() {
     const nextExpanded = !expandedRef.current
@@ -420,6 +463,18 @@ function useMiniPlayerController({ hostDocument = document, hostWindow = window 
   }
 
   function renderCatalogResults() {
+    const detail = detailStack[detailStack.length - 1]
+    if (detail) {
+      return (
+        <DetalleCatalogoMini
+          currentSongId={track?.id}
+          onBack={closeDetail}
+          onOpen={openDetail}
+          onPlay={playDetailSongs}
+          target={detail}
+        />
+      )
+    }
     if (catalogError) return <p className="mini-player__empty" role="alert">{catalogError}</p>
     if (!catalogResults) return <p className="mini-player__empty">{catalogLoading ? 'Buscando en YouTube Music…' : 'Busca canciones, artistas o álbumes.'}</p>
     const hasResults = catalogResults.songs.length || catalogResults.artists.length || catalogResults.albums.length
@@ -427,7 +482,7 @@ function useMiniPlayerController({ hostDocument = document, hostWindow = window 
     if (!hasResults) return <p className="mini-player__empty">{catalogLoading ? 'Buscando en YouTube Music…' : 'No se encontraron resultados.'}</p>
 
     return (
-      <div className="mini-player__related mini-player__catalog-results">
+      <div className="mini-player__related mini-player__catalog-results" ref={miniScrollbarRef}>
         {catalogResults.songs.length > 0 && (
           <section className="mini-player__related-section" aria-labelledby="mini-player-search-songs">
             <div className="mini-player__related-heading"><h3 id="mini-player-search-songs"><ListMusic size={13} aria-hidden="true" />Canciones</h3></div>
@@ -448,7 +503,7 @@ function useMiniPlayerController({ hostDocument = document, hostWindow = window 
             <div className="mini-player__related-heading"><h3 id="mini-player-search-albums"><Disc3 size={13} aria-hidden="true" />Álbumes</h3></div>
             <div className="mini-player__related-grid mini-player__related-grid--albums">
               {catalogResults.albums.slice(0, 10).map((album) => (
-                <button type="button" key={album.id} onClick={() => dispatchMiniPlayerCommand({ type: 'open-global', kind: 'album', id: album.id })}>
+                <button type="button" key={album.id} onClick={() => openDetail({ kind: 'album', id: album.id, title: album.title, thumbnail: album.thumbnail })}>
                   <img loading="lazy" decoding="async" src={imageUrl(sizedImage(album.thumbnail, 102))} alt="" width="102" height="102" />
                   <span><strong>{album.title}</strong><small>{album.artist ?? album.subtitle}</small></span>
                 </button>
@@ -461,7 +516,7 @@ function useMiniPlayerController({ hostDocument = document, hostWindow = window 
             <div className="mini-player__related-heading"><h3 id="mini-player-search-artists"><UserRound size={13} aria-hidden="true" />Artistas</h3></div>
             <div className="mini-player__related-grid mini-player__related-grid--artists">
               {catalogResults.artists.slice(0, 10).map((artist) => (
-                <button type="button" key={artist.id} onClick={() => dispatchMiniPlayerCommand({ type: 'open-global', kind: 'artist', id: artist.id })}>
+                <button type="button" key={artist.id} onClick={() => openDetail({ kind: 'artist', id: artist.id, title: artist.name ?? artist.title, thumbnail: artist.thumbnail })}>
                   <img loading="lazy" decoding="async" className="mini-player__related-artist" src={imageUrl(sizedImage(artist.thumbnail, 84))} alt="" width="84" height="84" />
                   <span><strong>{artist.name ?? artist.title}</strong><small>{artist.subtitle ?? 'Artista'}</small></span>
                 </button>
@@ -473,31 +528,33 @@ function useMiniPlayerController({ hostDocument = document, hostWindow = window 
     )
   }
 
+  const detailOpen = detailStack.length > 0
+
   return {
     activeQueueTab, catalogDownloads, catalogType, changeCatalogType, changeVolume, changingVolumeRef,
-    closeWindow, currentTime, expanded, expandedRef, finishCollapse, flushPendingCommands,
+    closeWindow, detailOpen, currentTime, expanded, expandedRef, finishCollapse, flushPendingCommands,
     isPictureInPicture, pinned, playNext, progress, queue, queueSearch, relatedAlbums,
     relatedAlbumsRef, relatedArtists, relatedArtistsRef, relatedSongColumns, relatedSongsRef,
     renderCatalogResults, renderQueue, scrollRelatedCarousel, searchCatalog, seekingRef, seekTo,
     selectQueueSong, setActiveQueueTab, setPinned, setQueueSearch, showCatalogDownloads, snapshot,
-    surfaceOpen, toggleExpanded, togglePlayback, track, visibleQueue, visualAnchor,
+    surfaceOpen, toggleExpanded, togglePlayback, track, visibleQueue, visualAnchor, enUso,
   }
 }
 
 function renderMiniPlayer(controller: ReturnType<typeof useMiniPlayerController>) {
   const {
     activeQueueTab, catalogDownloads, catalogType, changeCatalogType, changeVolume, changingVolumeRef,
-    closeWindow, currentTime, expanded, expandedRef, finishCollapse, flushPendingCommands,
+    closeWindow, detailOpen, currentTime, expanded, expandedRef, finishCollapse, flushPendingCommands,
     isPictureInPicture, pinned, playNext, progress, queue, queueSearch, relatedAlbums,
     relatedAlbumsRef, relatedArtists, relatedArtistsRef, relatedSongColumns, relatedSongsRef,
     renderCatalogResults, renderQueue, scrollRelatedCarousel, searchCatalog, seekingRef, seekTo,
     selectQueueSong, setActiveQueueTab, setPinned, setQueueSearch, showCatalogDownloads, snapshot,
-    surfaceOpen, toggleExpanded, togglePlayback, track, visibleQueue, visualAnchor,
+    surfaceOpen, toggleExpanded, togglePlayback, track, visibleQueue, visualAnchor, enUso,
   } = controller
 
   return (
     <main
-      className={`mini-player${renderQueue ? ' mini-player--expanded' : ''}${surfaceOpen ? ' mini-player--surface-open' : ''}${visualAnchor.startsWith('top') ? ' mini-player--anchor-top' : ' mini-player--anchor-bottom'}`}
+      className={`mini-player${renderQueue ? ' mini-player--expanded' : ''}${surfaceOpen ? ' mini-player--surface-open' : ''}${visualAnchor.startsWith('top') ? ' mini-player--anchor-top' : ' mini-player--anchor-bottom'}${enUso ? '' : ' mini-player--reposo'}`}
       aria-label="Mini reproductor de Mysic"
     >
       <section
@@ -640,7 +697,7 @@ function renderMiniPlayer(controller: ReturnType<typeof useMiniPlayerController>
               role="tabpanel"
               aria-labelledby={`mini-player-tab-${activeQueueTab}`}
             >
-              {activeQueueTab === 'search' && (
+              {activeQueueTab === 'search' && !detailOpen && (
                 <CatalogSearchControls
                   activeType={catalogType}
                   className="mini-player__catalog-search"
@@ -654,7 +711,7 @@ function renderMiniPlayer(controller: ReturnType<typeof useMiniPlayerController>
                 />
               )}
               {activeQueueTab === 'search' ? renderCatalogResults() : activeQueueTab === 'related' ? (
-                <div className="mini-player__related">
+                <div className="mini-player__related" ref={miniScrollbarRef}>
                   <section className="mini-player__related-section" aria-labelledby="mini-player-related-songs">
                     <div className="mini-player__related-heading">
                       <h3 id="mini-player-related-songs"><ListMusic size={13} aria-hidden="true" />Canciones</h3>
@@ -732,7 +789,7 @@ function renderMiniPlayer(controller: ReturnType<typeof useMiniPlayerController>
                   </section>
                 </div>
               ) : visibleQueue.length > 0 ? (
-                <ol className="mini-player__queue-list">
+                <ol className="mini-player__queue-list" ref={miniScrollbarRef}>
                   {visibleQueue.map((song) => (
                     <li key={song.id}>
                       <button type="button" onClick={() => selectQueueSong(song)}>

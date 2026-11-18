@@ -148,42 +148,13 @@ export function useVentanaMiniReproductor(
         ])
         if (disposed || !monitor || !size) return
 
-        const currentAnchor = anchorRef.current
+        // Mientras se arrastra solo se recuerda dónde está. Antes, al cruzar la mitad de la pantalla se cambiaba aquí la
+        // esquina de anclaje y se movía la ventana (~440 px) para conservar la tarjeta: con el botón aún pulsado, la
+        // ventana saltaba lejos del cursor. La esquina se decide al desplegar o recoger (efecto de abajo), que ya
+        // compara con la posición de la última disposición.
         const currentExpanded = windowExpandedRef.current
         const visibleHeight = (currentExpanded ? MINI_PLAYER_EXPANDED_HEIGHT : MINI_PLAYER_COLLAPSED_HEIGHT) * monitor.scaleFactor
-        const visiblePosition = getSurfacePosition(position, size.height, visibleHeight, currentExpanded, currentAnchor)
-        const nextAnchor = getAnchorAfterMove(
-          visiblePosition,
-          { width: size.width, height: visibleHeight },
-          monitor,
-          currentAnchor,
-          lastPositionRef.current,
-        )
-        const anchorChangedVertically = currentAnchor.startsWith('top') !== nextAnchor.startsWith('top')
-
-        if (!currentExpanded && anchorChangedVertically) {
-          const token = ++layoutSequenceRef.current
-          animationTokenRef.current = token
-          const clipY = getSurfaceOffset(size.height, visibleHeight, false, nextAnchor)
-          const targetPosition = new PhysicalPosition(position.x, Math.round(visiblePosition.y - clipY))
-          await invoke('set_mini_player_bounds', {
-            clipHeight: Math.round(visibleHeight),
-            clipY: Math.round(clipY),
-            height: Math.round(size.height),
-            width: Math.round(size.width),
-            x: targetPosition.x,
-            y: targetPosition.y,
-          }).catch(() => {})
-          window.setTimeout(() => {
-            if (animationTokenRef.current === token) animationTokenRef.current = 0
-          }, 80)
-        }
-
-        storePosition(visiblePosition)
-        lastPositionRef.current = visiblePosition
-        anchorRef.current = nextAnchor
-        setAnchor(nextAnchor)
-        localStorage.setItem(ANCHOR_KEY, nextAnchor)
+        storePosition(getSurfacePosition(position, size.height, visibleHeight, currentExpanded, anchorRef.current))
       }, 100)
     }).then((unlisten) => {
       if (disposed) unlisten()

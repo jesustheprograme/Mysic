@@ -30,6 +30,8 @@ export type MiniPlayerCommand =
   | { type: 'volume'; value: number }
   | { type: 'play-global'; song: MiniSong & { album?: string; albumId?: string; artistId?: string; thumbnail?: string } }
   | { type: 'open-global'; kind: 'album' | 'artist'; id: string }
+  // Lista completa (álbum, artista o playlist abiertos en el mini reproductor) empezando por `index`.
+  | { type: 'play-list-global'; songs: Array<MiniSong & { album?: string; albumId?: string; artistId?: string; thumbnail?: string }>; index: number }
 
 const CHANNEL_NAME = 'mysic-mini-player-v1'
 const SNAPSHOT_KEY = 'mysic-mini-player-snapshot-v1'

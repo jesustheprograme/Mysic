@@ -49,9 +49,27 @@
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.11);
   border-radius: 16px;
-  background: rgba(20, 24, 23, 0.98);
+  /* Opaca: con el 98 % de antes se transparentaba lo que hubiera detrás (la cabecera de Mysic, por ejemplo). */
+  background: rgb(20, 24, 23);
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.38);
-  transition: height 180ms cubic-bezier(0.32, 0.72, 0, 1);
+  transition:
+    height 180ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 220ms ease;
+}
+
+/* En reposo (sin el puntero encima ni el foco) la tarjeta queda medio transparente; al volver, opaca al instante. */
+.mini-player--reposo .mini-player__surface {
+  opacity: 0.5;
+  transition:
+    height 180ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 450ms ease 250ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mini-player__surface,
+  .mini-player--reposo .mini-player__surface {
+    transition: none;
+  }
 }
 
 .mini-player--surface-open .mini-player__surface {
@@ -587,11 +605,6 @@
   gap: 12px;
   padding: 5px 14px 12px;
   overflow-y: auto;
-  scrollbar-width: none;
-}
-
-.mini-player__related::-webkit-scrollbar {
-  display: none;
 }
 
 .mini-player__related-section {
@@ -822,14 +835,7 @@
   padding: 5px 8px 4px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
   list-style: none;
-}
-
-.mini-player__queue-list::-webkit-scrollbar {
-  width: 0;
-  height: 0;
 }
 
 .mini-player__queue-list button {
@@ -902,4 +908,210 @@
   .mini-player__volume-slider-shell {
     transition: none;
   }
+}
+
+/* Álbum, artista o playlist abiertos dentro del mini reproductor (DetalleCatalogoMini). */
+.mini-detail {
+  min-height: 0;
+  flex: 1 1 auto;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 4px 14px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+
+.mini-player .mini-detail__back {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px 4px 5px;
+  border-radius: 999px;
+  color: #aab3b0;
+  font-size: 12px;
+  font-weight: 600;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+.mini-detail__back:hover {
+  color: #f4f3ef;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.mini-detail__header {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: end;
+  gap: 14px;
+}
+
+.mini-detail__art {
+  width: 96px;
+  height: 96px;
+  display: block;
+  border-radius: 8px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.mini-detail__art--round {
+  border-radius: 50%;
+}
+
+.mini-detail__copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.mini-detail__copy small {
+  color: #8d9794;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mini-detail__copy strong {
+  overflow: hidden;
+  color: #f4f3ef;
+  font-size: 17px;
+  font-weight: 750;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mini-detail__copy > span {
+  overflow: hidden;
+  color: #8d9794;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mini-player .mini-detail__play {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 14px 6px 11px;
+  border-radius: 999px;
+  color: #0b0c0c;
+  background: #f4f3ef;
+  font-size: 12px;
+  font-weight: 700;
+  transition: transform 150ms ease, opacity 150ms ease;
+}
+
+.mini-player .mini-detail__play:hover {
+  transform: scale(1.03);
+}
+
+.mini-player .mini-detail__play:disabled {
+  opacity: 0.4;
+  transform: none;
+}
+
+.mini-detail__section {
+  display: grid;
+  gap: 6px;
+}
+
+.mini-detail__section > h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: #aab3b0;
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.mini-detail__songs {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mini-player .mini-detail__song {
+  width: 100%;
+  min-height: 40px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 3px 6px;
+  border-radius: 8px;
+  color: #c9cfcc;
+  text-align: left;
+  transition: background-color 150ms ease;
+}
+
+.mini-detail__song:hover {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.mini-player .mini-detail__song--active {
+  color: #f4f3ef;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mini-detail__song img {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.mini-detail__index {
+  color: #75807c;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.mini-detail__song-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.mini-detail__song-copy strong,
+.mini-detail__song-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mini-detail__song-copy strong {
+  color: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.mini-detail__song-copy small {
+  color: #75807c;
+  font-size: 11px;
+}
+
+.mini-detail__song time {
+  color: #75807c;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mini-detail__spin {
+  vertical-align: -2px;
+  animation: mini-detail-spin 900ms linear infinite;
+}
+
+@keyframes mini-detail-spin {
+  to { transform: rotate(360deg); }
 }

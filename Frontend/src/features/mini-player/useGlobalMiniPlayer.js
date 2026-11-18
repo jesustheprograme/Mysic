@@ -27,6 +27,12 @@ export default function useGlobalMiniPlayer(player, browse) {
       player.playFrom([command.song], 0)
       return
     }
+    if (command.type === 'play-list-global') {
+      if (!Array.isArray(command.songs) || !command.songs.length) return
+      claimMiniPlayer('global')
+      player.playFrom(command.songs, Math.max(0, Math.min(command.songs.length - 1, command.index || 0)))
+      return
+    }
     if (command.type === 'open-global') {
       window.location.hash = '#/youtube'
       if (command.kind === 'artist') browse.openArtist(command.id)
