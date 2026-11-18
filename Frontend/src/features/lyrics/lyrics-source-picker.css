@@ -1,0 +1,407 @@
+/* Selector de la fuente de la letra (LyricsSourcePicker). Compacto: 320 px de ancho, filas de 36 px, textos de 11-13 px.
+   El tema claro lo genera scripts/generar-tema-claro.mjs. */
+.lsp__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 3px 6px 3px 9px;
+  border-radius: 999px;
+  color: rgb(255 255 255 / 0.62);
+  background: rgb(255 255 255 / 0.06);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+.lsp__trigger > span:not(.lsp__trigger-offset) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lsp__trigger:hover,
+.lsp__trigger--open {
+  color: #f4f3ef;
+  background: rgb(255 255 255 / 0.11);
+}
+
+.lsp__trigger-offset {
+  color: var(--player-accent, #8ab4ff);
+  font-variant-numeric: tabular-nums;
+}
+
+.lsp__chevron {
+  flex: none;
+  transition: transform 160ms ease;
+}
+
+.lsp__trigger--open .lsp__chevron {
+  transform: rotate(180deg);
+}
+
+.lsp {
+  position: fixed;
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid rgb(255 255 255 / 0.09);
+  border-radius: 14px;
+  color: #f4f3ef;
+  background: #141716;
+  box-shadow: 0 18px 48px rgb(0 0 0 / 0.5);
+  animation: lsp-in 140ms ease-out both;
+}
+
+@keyframes lsp-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+.lsp__header {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid rgb(255 255 255 / 0.07);
+}
+
+.lsp__header strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.lsp__header span {
+  color: rgb(255 255 255 / 0.5);
+  font-size: 11px;
+}
+
+.lsp__list {
+  display: grid;
+  gap: 1px;
+  padding: 5px;
+}
+
+.lsp__row {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 9px;
+  border-radius: 10px;
+  color: rgb(255 255 255 / 0.86);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.lsp__row:hover {
+  background: rgb(255 255 255 / 0.06);
+}
+
+.lsp__row--selected {
+  background: rgb(255 255 255 / 0.05);
+}
+
+.lsp__row--muted .lsp__name {
+  color: rgb(255 255 255 / 0.45);
+}
+
+.lsp__row:focus-visible {
+  outline: 2px solid rgb(255 255 255 / 0.5);
+  outline-offset: -2px;
+}
+
+.lsp__auto-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  flex: none;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--player-accent, #8ab4ff);
+  background: rgb(255 255 255 / 0.07);
+}
+
+.lsp__auto-copy {
+  min-width: 0;
+  display: grid;
+  flex: 1;
+  gap: 1px;
+}
+
+.lsp__auto-copy strong {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.lsp__auto-copy small {
+  overflow: hidden;
+  color: rgb(255 255 255 / 0.5);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lsp__check {
+  flex: none;
+  color: var(--player-accent, #8ab4ff);
+}
+
+.lsp__divider {
+  height: 1px;
+  margin: 3px 6px;
+  background: rgb(255 255 255 / 0.07);
+}
+
+.lsp__radio {
+  width: 14px;
+  height: 14px;
+  display: grid;
+  flex: none;
+  place-items: center;
+  border: 2px solid rgb(255 255 255 / 0.35);
+  border-radius: 50%;
+}
+
+.lsp__radio--on {
+  border-color: var(--player-accent, #8ab4ff);
+}
+
+.lsp__radio--on::after {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--player-accent, #8ab4ff);
+  content: '';
+}
+
+.lsp__name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lsp__badge {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: rgb(255 255 255 / 0.55);
+  background: rgb(255 255 255 / 0.06);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lsp__badge--synced {
+  color: rgb(255 255 255 / 0.85);
+  background: rgb(255 255 255 / 0.11);
+}
+
+.lsp__note {
+  flex: none;
+  color: rgb(255 255 255 / 0.42);
+  font-size: 11px;
+}
+
+.lsp__retry {
+  color: var(--player-accent, #8ab4ff);
+  font-size: 11px;
+}
+
+.lsp__retry:hover {
+  text-decoration: underline;
+}
+
+.lsp__skeleton {
+  width: 54px;
+  height: 14px;
+  flex: none;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.07);
+  animation: lsp-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes lsp-pulse {
+  50% { opacity: 0.45; }
+}
+
+.lsp__offset {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px 10px 14px;
+  border-top: 1px solid rgb(255 255 255 / 0.07);
+  color: rgb(255 255 255 / 0.6);
+}
+
+.lsp__offset-copy {
+  min-width: 0;
+  display: grid;
+  flex: 1;
+  gap: 1px;
+}
+
+.lsp__offset-copy strong {
+  color: #f4f3ef;
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.lsp__offset-copy span {
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.lsp__stepper {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.04);
+}
+
+.lsp__stepper button {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: rgb(255 255 255 / 0.75);
+}
+
+.lsp__stepper button:hover {
+  color: #fff;
+  background: rgb(255 255 255 / 0.08);
+}
+
+.lsp__stepper output {
+  width: 50px;
+  color: #f4f3ef;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.lsp__reset {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  color: rgb(255 255 255 / 0.6);
+}
+
+.lsp__reset:hover {
+  color: #fff;
+  background: rgb(255 255 255 / 0.08);
+}
+
+/* Oculto pero ocupando su sitio: el resto no salta al aparecer. */
+.lsp__reset--hidden {
+  visibility: hidden;
+}
+
+.lsp__searched {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px;
+  border-top: 1px solid rgb(255 255 255 / 0.07);
+  color: rgb(255 255 255 / 0.6);
+  font-size: 11px;
+}
+
+.lsp__searched span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lsp__searched button {
+  flex: none;
+  color: var(--player-accent, #8ab4ff);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.lsp__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid rgb(255 255 255 / 0.07);
+  color: rgb(255 255 255 / 0.6);
+  font-size: 11.5px;
+  text-align: left;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.lsp__search span {
+  flex: 1;
+}
+
+.lsp__search:hover {
+  color: #fff;
+  background: rgb(255 255 255 / 0.04);
+}
+
+.lsp__search-form {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid rgb(255 255 255 / 0.07);
+}
+
+.lsp__search-form input {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 8px;
+  color: #f4f3ef;
+  background: rgb(255 255 255 / 0.04);
+  font-size: 12.5px;
+}
+
+.lsp__search-form input:focus {
+  border-color: rgb(255 255 255 / 0.3);
+  outline: none;
+}
+
+.lsp__search-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.lsp__search-actions button {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: rgb(255 255 255 / 0.7);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.lsp__search-actions button:hover {
+  color: #fff;
+}
+
+.lsp__search-actions .lsp__search-submit {
+  color: #0b0c0c;
+  background: #f4f3ef;
+}
+
+.lsp__search-actions .lsp__search-submit:disabled {
+  opacity: 0.4;
+}

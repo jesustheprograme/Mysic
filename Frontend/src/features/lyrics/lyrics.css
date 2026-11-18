@@ -31,12 +31,14 @@
 }
 
 .lyrics__lines {
+  /* Referencia de offsetTop para colocar la línea cantada (ver LyricsSection). */
+  position: relative;
   display: grid;
   gap: 2px;
   max-height: 320px;
   margin: 0;
   /* Espacio inferior: sin él las últimas líneas nunca podrían llegar al centro al seguirlas. */
-  padding: 8px 0 45%;
+  padding: 8px 4% 45% 0; /* derecha: hueco para la línea activa, que crece un 4 % */
   overflow-y: auto;
   list-style: none;
   overscroll-behavior: contain;
@@ -90,6 +92,64 @@
   font-size: 0.9rem;
   line-height: 1.5;
   white-space: pre-line;
+}
+
+/* Romanizado bajo la línea: más pequeño y con el mismo apagado/resaltado que la línea. */
+.lyrics__romanized {
+  display: block;
+  margin-top: 0.15em;
+  font-size: 0.62em;
+  font-weight: 600;
+  line-height: 1.3;
+  opacity: 0.85;
+}
+
+/* Traducción bajo la línea (y bajo el romanizado): como él, pero en cursiva para distinguirla. */
+.lyrics__translation {
+  display: block;
+  margin-top: 0.2em;
+  font-size: 0.58em;
+  font-style: italic;
+  font-weight: 600;
+  line-height: 1.3;
+  opacity: 0.72;
+}
+
+/* Pie: selector de fuente a la izquierda, opciones de la letra a la derecha. */
+.lyrics__footer {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+/* El selector de fuente a la izquierda; Romanizado y Traducción juntos a la derecha. */
+.lyrics__footer > :first-child {
+  margin-right: auto;
+}
+
+.lyrics__chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: rgb(255 255 255 / 0.5);
+  font-size: 11.5px;
+  font-weight: 600;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+.lyrics__chip:hover {
+  color: #f4f3ef;
+  background: rgb(255 255 255 / 0.06);
+}
+
+.lyrics__chip--on {
+  color: var(--player-accent, #8ab4ff);
 }
 
 @media (prefers-reduced-motion: reduce) {
