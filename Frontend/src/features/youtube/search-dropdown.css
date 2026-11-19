@@ -292,7 +292,8 @@
 }
 
 /* ---- Historial y estados vacíos ---- */
-.sx-option--history .sx-thumb {
+.sx-option--history .sx-thumb,
+.sx-option--query .sx-thumb {
   width: 28px;
   height: 28px;
   border-radius: 6px;
@@ -323,6 +324,57 @@
   font-size: 13px;
 }
 
+/* ---- Filas en gris mientras llega el resultado completo ---- */
+.sx-skeleton__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+}
+
+.sx-skeleton__thumb,
+.sx-skeleton__copy i {
+  display: block;
+  border-radius: 4px;
+  background: linear-gradient(100deg, var(--sx-hover) 30%, color-mix(in srgb, var(--sx-text) 12%, transparent) 50%, var(--sx-hover) 70%);
+  background-size: 220% 100%;
+  animation: sx-shimmer 1.2s linear infinite;
+}
+
+.sx-skeleton__thumb {
+  flex: none;
+  width: 36px;
+  height: 36px;
+}
+
+.sx-skeleton__copy {
+  display: grid;
+  flex: 1;
+  gap: 6px;
+}
+
+.sx-skeleton__copy i {
+  height: 10px;
+}
+
+.sx-skeleton__copy i:first-child {
+  width: 52%;
+}
+
+.sx-skeleton__copy i:last-child {
+  width: 30%;
+}
+
+@keyframes sx-shimmer {
+  to { background-position: -220% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sx-skeleton__thumb,
+  .sx-skeleton__copy i {
+    animation: none;
+  }
+}
 /* ---- Pantallas estrechas: la duración cede el sitio al título ---- */
 @media (max-width: 520px) {
   .sx-popover {

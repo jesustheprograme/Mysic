@@ -13,12 +13,14 @@ const SECTION_LABELS = {
   album: 'Álbumes',
   artist: 'Artistas',
   song: 'Canciones',
+  query: 'Búsquedas relacionadas',
 }
 
 const FALLBACK_ICONS = {
   album: Disc3,
   artist: UserRound,
   history: Clock3,
+  query: Search,
   song: Music2,
 }
 
@@ -91,6 +93,22 @@ function SectionHeading({ actionLabel, id, onAction, onViewAll, title, viewAll }
   )
 }
 
+// Mientras llega el resultado completo (más lento que /suggest) se reservan filas en gris donde irán las canciones,
+// para que el panel no parezca tener una sola respuesta ni salte de tamaño cuando lleguen.
+function SkeletonRows({ id }) {
+  return (
+    <section aria-hidden="true" className="sx-skeleton">
+      <SectionHeading id={id} title="Canciones" />
+      {[0, 1, 2].map((row) => (
+        <div className="sx-skeleton__row" key={row}>
+          <span className="sx-skeleton__thumb" />
+          <span className="sx-skeleton__copy"><i /><i /></span>
+        </div>
+      ))}
+    </section>
+  )
+}
+
 export default function SearchPopover({
   activeIndex,
   featured,
@@ -103,6 +121,7 @@ export default function SearchPopover({
   open,
   queryLength,
   rows,
+  searching = false,
   sections,
 }) {
   const optionProps = { listboxId, onChoose, onHistoryRemove }
@@ -128,6 +147,8 @@ export default function SearchPopover({
           </section>
         )}
 
+        {hasQuery && searching && !sections.some((section) => section.kind === 'song') && <SkeletonRows id={`${listboxId}-loading`} />}
+
         {hasQuery && sections.map((section) => {
           const start = nextIndex
           nextIndex += section.rows.length
@@ -143,7 +164,7 @@ export default function SearchPopover({
         })}
       </div>
 
-      {open && !rows.length && (
+      {open && !rows.length && !searching && (
         <p className="sx-empty">{queryLength < 2 ? 'Escribe para buscar en YouTube Music.' : 'No hay sugerencias todavía.'}</p>
       )}
     </div>

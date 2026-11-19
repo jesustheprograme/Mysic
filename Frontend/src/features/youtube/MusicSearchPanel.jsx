@@ -6,9 +6,10 @@ import { buildSearchModel } from './searchModel.js'
 
 // Búsquedas recientes que muestra el panel (el historial guarda hasta 10).
 const RECENT_SHOWN = 6
-const SUGGEST_DEBOUNCE_MS = 180
-// La búsqueda completa es más pesada para YouTube que las sugerencias: se pide con menos prisa.
-const SEARCH_DEBOUNCE_MS = 320
+// Las dos peticiones salen casi a la vez (en paralelo, no una tras otra): las sugerencias son baratas y llegan antes;
+// la búsqueda completa tarda más en el servidor, así que cada milisegundo de espera previa se nota en el total.
+const SUGGEST_DEBOUNCE_MS = 90
+const SEARCH_DEBOUNCE_MS = 140
 
 const normalizeKey = (text) => text.trim().toLocaleLowerCase()
 
@@ -35,7 +36,7 @@ export default function MusicSearchPanel({
 }) {
   const [open, setOpen] = useState(false)
   const [suggestions, setSuggestions] = useState({ texts: [], entities: [] })
-  const [searchResult, setSearchResult] = useState({ key: '', data: null })
+  const [searchResult, setSearchResult] = useState({ failed: false, key: '', data: null })
   const [activeIndex, setActiveIndex] = useState(-1)
   const rootRef = useRef(null)
   const inputRef = useRef(null)
@@ -67,9 +68,10 @@ export default function MusicSearchPanel({
 
   const loadFullSearch = useEffectEvent((searchQuery, signal) => {
     api.search(searchQuery, 'all', signal)
-      .then((data) => setSearchResult({ key: normalizeKey(searchQuery), data }))
-      .catch(() => {
-        // Sin resultado completo el panel sigue funcionando con las sugerencias.
+      .then((data) => setSearchResult({ data, failed: false, key: normalizeKey(searchQuery) }))
+      .catch((error) => {
+        // Sin resultado completo el panel sigue con las sugerencias (y deja de mostrar las filas en gris).
+        if (error.name !== 'AbortError') setSearchResult({ data: null, failed: true, key: normalizeKey(searchQuery) })
       })
   })
 
@@ -118,8 +120,10 @@ export default function MusicSearchPanel({
   const hasQuery = Boolean(query.trim())
   const currentKey = normalizeKey(query)
   const search = isRelevantSearch(searchResult.key, currentKey) ? searchResult.data : null
+  // Esperando el resultado completo de esta consulta: se muestran filas en gris en vez de dejar una sola respuesta.
+  const searching = hasQuery && query.trim().length >= 2 && !search && !(searchResult.failed && searchResult.key === currentKey)
   // Solo las búsquedas más recientes: el panel es un atajo, no un listado (el historial guarda hasta 10).
-  const { featured, rows, sections } = buildSearchModel({ hasQuery, history: history.slice(0, RECENT_SHOWN), search, suggestions })
+  const { featured, rows, sections } = buildSearchModel({ hasQuery, history: history.slice(0, RECENT_SHOWN), query, search, suggestions })
 
   function choose(row) {
     setActiveIndex(-1)
@@ -239,6 +243,7 @@ export default function MusicSearchPanel({
         open={open}
         queryLength={query.trim().length}
         rows={rows}
+        searching={searching}
         sections={sections}
       />
     </div>

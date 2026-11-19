@@ -4,7 +4,7 @@
 import { config } from '../config.mjs';
 import { createPersistentSearchCache } from '../utils/persistentSearchCache.mjs';
 import { getYoutube } from './client.mjs';
-import { mapAlbumItem, mapArtistItem, mapSong, mapTopResult, pickThumbnail } from './mappers.mjs';
+import { artistsOf, mapAlbumItem, mapArtistItem, mapSong, mapTopResult, pickThumbnail } from './mappers.mjs';
 
 export const SEARCH_TYPES = new Set(['all', 'song', 'artist', 'album', 'video']);
 export const VIDEO_SEARCH_PARAMS = 'EgWKAQIQAWoKEAkQChAFEAMQBA==';
@@ -45,12 +45,45 @@ const searchCache = createPersistentSearchCache({
   maxSize: config.searchCacheMax,
 });
 
+// YouTube Music cambió la búsqueda sin filtro: ya no devuelve estanterías "Canciones", "Álbumes"... sino una lista
+// plana de `ItemSection` con un MusicResponsiveListItem cada una, mezclando tipos. Los getters de youtubei.js
+// (`songs`, `artists`, `albums`) salían vacíos y el buscador solo mostraba el resultado principal. Se leen primero
+// las estanterías (formato antiguo) y, si vienen vacías, se reparte la lista plana por tipo conservando el orden.
+const flatListItems = (general) => (general?.contents || [])
+  .filter((section) => section.type === 'ItemSection' || section.type === 'MusicShelf')
+  .flatMap((section) => section.contents || [])
+  .filter((item) => item?.id && (item.type === 'MusicResponsiveListItem' || item.item_type));
+
+function mapListAlbum(item) {
+  const album = mapAlbumItem(item);
+  if (album.artist) return album;
+  const [artist] = artistsOf(item);
+  return { ...album, artist: artist?.name || '', artistId: album.artistId || artist?.channel_id || null };
+}
+
+export function mapGeneralSections(general) {
+  const shelves = { songs: mapSongs(general), artists: mapArtists(general), albums: mapAlbums(general) };
+  if (shelves.songs.length || shelves.artists.length || shelves.albums.length) return shelves;
+
+  const items = flatListItems(general);
+  const songs = items.filter((item) => item.item_type === 'song').map((item) => mapSong(item));
+  // Los vídeos oficiales y las versiones en directo van detrás de las canciones de catálogo.
+  const videos = items.filter((item) => item.item_type === 'video').map((item) => mapSong(item));
+  return {
+    songs: [...songs, ...videos],
+    artists: items.filter((item) => item.item_type === 'artist').map(mapArtistItem),
+    albums: items.filter((item) => item.item_type === 'album').map(mapListAlbum),
+  };
+}
+
 /**
  * `type === 'all'` devuelve cuanto antes las secciones incluidas en la búsqueda
  * general. El frontend completa cada sección por tipo sin bloquear el primer render.
  */
 export async function searchMusic(text, type) {
-  const key = `${type}:${text.trim().toLocaleLowerCase('es')}`;
+  // 'all' lleva versión en la clave: las respuestas guardadas antes de leer el formato plano de YouTube tenían las tres
+  // listas vacías y la caché persistente las habría seguido sirviendo hasta caducar.
+  const key = `${type === 'all' ? 'all-v2' : type}:${text.trim().toLocaleLowerCase('es')}`;
   return searchCache.get(key, () => loadSearchMusic(text, type));
 }
 
@@ -62,9 +95,7 @@ export async function loadSearchMusic(text, type, youtube = getYoutube()) {
     return {
       type: 'all',
       top: mapTopResult(card),
-      songs: mapSongs(general),
-      artists: mapArtists(general),
-      albums: mapAlbums(general),
+      ...mapGeneralSections(general),
     };
   }
 

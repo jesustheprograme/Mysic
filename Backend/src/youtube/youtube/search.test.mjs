@@ -1,7 +1,7 @@
 // Copiado de Yotubei por tools/migrar-a-mysic.mjs. No editar a mano: se regenera.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loadSearchMusic, mapVideo, SEARCH_TYPES, VIDEO_SEARCH_PARAMS } from './search.mjs';
+import { loadSearchMusic, mapGeneralSections, mapVideo, SEARCH_TYPES, VIDEO_SEARCH_PARAMS } from './search.mjs';
 
 const baseVideo = {
   id: 'abcdefghijk',
@@ -73,4 +73,27 @@ test('usa el params explícito si youtubei.js no expone videos', async () => {
     client: 'YTMUSIC',
     parse: true,
   }]]);
+});
+
+test('búsqueda general en el formato plano de ItemSection: reparte canciones, vídeos, artistas y álbumes', () => {
+  const row = (item_type, id, title, secondColumn, extra = {}) => ({ type: 'MusicResponsiveListItem', item_type, id, title, flex_columns: [{ title: { text: title } }, { title: { text: secondColumn, runs: secondColumn.split(' • ').flatMap((text, index) => (index ? [{ text: ' • ' }, { text }] : [{ text }])) } }], ...extra });
+  const general = { contents: [
+    { type: 'MusicCardShelf', contents: [] },
+    { type: 'ItemSection', contents: [row('song', 's1', 'Uno', 'Song • Ado • 23K plays', { artists: [{ name: 'Ado', channel_id: 'UC1' }] })] },
+    { type: 'ItemSection', contents: [row('video', 'v1', 'Clip', 'Video • Q2000 • 1K views', { authors: [{ name: 'Q2000', channel_id: 'UC2' }] })] },
+    { type: 'ItemSection', contents: [row('album', 'MPREb_1', 'Disco', 'Album • Ado • 2022', { year: '2022' })] },
+    { type: 'ItemSection', contents: [{ ...row('artist', 'UC3', 'Otro', 'Artist'), name: 'Otro', subtitle: { text: 'Artist • 1.6M monthly audience' } }] },
+    { type: 'ItemSection', contents: [row('song', 's2', 'Dos', 'Song • Anthrax & Sinecore • 218 plays')] },
+    { type: 'ItemSection', contents: [row('playlist', 'PL1', 'Lista', 'Playlist • YouTube Music')] },
+  ] };
+  const result = mapGeneralSections(general);
+  assert.deepEqual(result.songs.map((song) => [song.id, song.artist]), [['s1', 'Ado'], ['s2', 'Anthrax & Sinecore'], ['v1', 'Q2000']], 'canciones antes que vídeos, sin tomar "Song" por artista');
+  assert.deepEqual(result.albums.map((album) => [album.id, album.artist, album.year]), [['MPREb_1', 'Ado', '2022']]);
+  assert.deepEqual(result.artists.map((artist) => [artist.id, artist.name, artist.subtitle]), [['UC3', 'Otro', '1.6M monthly audience']]);
+});
+
+test('búsqueda general en el formato antiguo de estanterías sigue usando los getters', () => {
+  const song = { id: 'a', title: 'Vieja', artists: [{ name: 'X' }] };
+  const result = mapGeneralSections({ songs: { contents: [song] }, artists: { contents: [] }, albums: { contents: [] }, contents: [] });
+  assert.deepEqual(result.songs.map((item) => item.id), ['a']);
 });

@@ -37,7 +37,7 @@ test('con búsqueda completa respeta orden, límites y datos reales', () => {
   const search = {
     type: 'all',
     top: { kind: 'artist', id: 'ar0', title: 'Ado', subtitle: 'Artist • 12.4M monthly audience', thumbnail: 'top' },
-    songs: [1, 2, 3, 4, 5].map((n) => song(n)),
+    songs: [1, 2, 3, 4, 5, 6].map((n) => song(n)),
     albums: [1, 2, 3, 4].map((n) => album(n)),
     artists: [artist(0, { id: 'ar0', name: 'Ado' })],
   }
@@ -45,13 +45,13 @@ test('con búsqueda completa respeta orden, límites y datos reales', () => {
 
   assert.equal(model.featured.subtitle, '12.4 M oyentes mensuales')
   assert.deepEqual(model.sections.map((section) => section.kind), ['song', 'album'])
-  assert.equal(model.sections[0].rows.length, 4)
+  assert.equal(model.sections[0].rows.length, 5)
   assert.equal(model.sections[1].rows.length, 3)
   assert.equal(model.sections[0].viewAll, true)
   assert.equal(model.sections[0].rows[0].subtitle, 'Ado · Álbum 1')
   assert.equal(model.sections[0].rows[0].duration, '3:24')
   assert.equal(model.sections[1].rows[0].subtitle, 'Ado · 2024')
-  assert.equal(model.rows.length, 1 + 4 + 3)
+  assert.equal(model.rows.length, 1 + 5 + 3)
 })
 
 test('el artista del resultado principal no se repite, pero sí otros distintos', () => {
@@ -108,4 +108,25 @@ test('las filas planas siguen el orden visual para el teclado', () => {
   }
   const { rows } = buildSearchModel({ suggestions: {}, search, hasQuery: true })
   assert.deepEqual(rows.map((row) => row.kind), ['artist', 'song', 'album', 'artist'])
+})
+
+test('las búsquedas relacionadas salen de /suggest, sin repetir lo escrito y con límite', () => {
+  const suggestions = { entities: [], texts: ['ado', 'Ado', 'adolescentes', 'adolescentes', 'adolecentes', 'adoraciones', 'adolescentes mix'] }
+  const sin = buildSearchModel({ suggestions, search: null, hasQuery: true, query: 'Ado' })
+  const queries = sin.sections.find((section) => section.kind === 'query')
+  assert.deepEqual(queries.rows.map((row) => row.title), ['adolescentes', 'adolecentes', 'adoraciones', 'adolescentes mix'])
+  assert.ok(queries.rows.every((row) => row.kind === 'query'))
+  assert.equal(queries.viewAll, false)
+
+  const search = { type: 'all', top: null, songs: [song(1)], albums: [], artists: [] }
+  const con = buildSearchModel({ suggestions, search, hasQuery: true, query: 'ado' })
+  assert.equal(con.sections.find((section) => section.kind === 'query').rows.length, 3)
+  assert.deepEqual(con.rows.map((row) => row.kind), ['song', 'query', 'query', 'query'], 'el teclado recorre también las relacionadas, al final')
+})
+
+test('un solo resultado de sugerencias ya no deja el panel con una sola respuesta si hay textos', () => {
+  const suggestions = { entities: [{ kind: 'artist', id: 'ar0', title: 'Ado', subtitle: 'Artist', thumbnail: '' }], texts: ['ado', 'ado usseewa', 'ado show'] }
+  const model = buildSearchModel({ suggestions, search: null, hasQuery: true, query: 'ado' })
+  assert.equal(model.featured.id, 'ar0')
+  assert.deepEqual(model.rows.map((row) => row.title), ['Ado', 'ado usseewa', 'ado show'])
 })

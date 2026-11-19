@@ -35,18 +35,25 @@ const namedEntries = (list) => (Array.isArray(list) ? list : [])
   .filter((entry) => entry.name);
 
 /** Primer grupo de texto de la segunda columna ("Artista • 58K views • 4:39"), con su canal si lo enlaza. */
+// En la búsqueda general actual la segunda columna empieza por el tipo ("Song • Artista • 23K plays"): no es un artista.
+const KIND_PREFIX = /^(song|video|album|single|ep|playlist|artist|canci[oó]n|v[ií]deo|[aá]lbum|sencillo|artista)$/i;
+
 function artistsFromColumns(item) {
   const runs = item?.flex_columns?.[1]?.title?.runs ?? item?.subtitle?.runs ?? [];
-  const group = [];
+  const groups = [[]];
   for (const run of runs) {
     const text = plainText(run?.text ?? run);
     if (SEPARATOR.test(text)) {
-      if (group.length) break;
+      if (groups.at(-1).length) groups.push([]);
       continue;
     }
-    group.push(run);
+    groups.at(-1).push(run);
   }
-  const name = group.map((run) => plainText(run?.text ?? run)).join('').trim();
+  const named = groups.filter((entry) => entry.length);
+  const textOf = (entry) => entry.map((run) => plainText(run?.text ?? run)).join('').trim();
+  if (named.length > 1 && KIND_PREFIX.test(textOf(named[0]))) named.shift();
+  const group = named[0] ?? [];
+  const name = textOf(group);
   if (!name || METRIC.test(name)) return [];
   const channelId = group.map((run) => run?.endpoint?.payload?.browseId).find((id) => typeof id === 'string' && id.startsWith('UC'));
   return [{ name, channel_id: channelId }];

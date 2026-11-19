@@ -5,9 +5,13 @@
 //  - `search`: /search?type=all. Más lento, pero trae resultado principal, canciones con duración,
 //    artistas con oyentes y álbumes con año. Cuando llega sustituye a las sugerencias.
 
-export const MAX_SONGS = 4
+export const MAX_SONGS = 5
 export const MAX_ALBUMS = 3
 export const MAX_ARTISTS = 3
+// Búsquedas relacionadas (texto de autocompletado de /suggest): llegan antes que el resultado completo y dan
+// variedad al panel mientras este carga. Con resultados completos se reducen para no alargar el panel.
+export const MAX_QUERIES = 4
+export const MAX_QUERIES_WITH_RESULTS = 3
 
 // Etiquetas de tipo que YouTube antepone al subtítulo ("Artist • 12.4M monthly audience").
 const KIND_LABELS = new Set([
@@ -103,11 +107,11 @@ const sameEntity = (a, b) => Boolean(a && b) && a.kind === b.kind && a.id === b.
  * Construye lo que pinta el desplegable.
  *
  * Devuelve { featured, sections, rows }:
- *  - sections: [{ kind, rows, viewAll }] en el orden Canciones, Álbumes, Artistas.
+ *  - sections: [{ kind, rows, viewAll }] en el orden Canciones, Álbumes, Artistas y Búsquedas relacionadas.
  *  - rows: lista plana (principal + secciones) en el orden visual, para la navegación con teclado.
  * El artista del resultado principal no se repite en "Artistas" salvo que haya otros distintos.
  */
-export function buildSearchModel({ suggestions, search, history = [], hasQuery }) {
+export function buildSearchModel({ suggestions, search, history = [], hasQuery, query = '' }) {
   if (!hasQuery) {
     const rows = history.map((title) => ({ kind: 'history', title }))
     return { featured: null, sections: [], rows }
@@ -140,10 +144,17 @@ export function buildSearchModel({ suggestions, search, history = [], hasQuery }
   songTotal = songs.length
   albumTotal = albums.length
 
+  const typed = query.trim().toLocaleLowerCase('es')
+  const queries = (suggestions?.texts ?? [])
+    .filter((text, index, all) => text.toLocaleLowerCase('es') !== typed && all.indexOf(text) === index)
+    .slice(0, rich ? MAX_QUERIES_WITH_RESULTS : MAX_QUERIES)
+    .map((text) => ({ kind: 'query', title: text }))
+
   const sections = [
     { kind: 'song', rows: songs.slice(0, MAX_SONGS), viewAll: Boolean(rich) && songTotal > MAX_SONGS },
     { kind: 'album', rows: albums.slice(0, MAX_ALBUMS), viewAll: Boolean(rich) && albumTotal > MAX_ALBUMS },
     { kind: 'artist', rows: artists.slice(0, MAX_ARTISTS), viewAll: false },
+    { kind: 'query', rows: queries, viewAll: false },
   ].filter((section) => section.rows.length)
 
   const rows = [...(featured ? [featured] : []), ...sections.flatMap((section) => section.rows)]
