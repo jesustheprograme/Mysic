@@ -526,6 +526,10 @@ function YoutubeView({
     saveCurrentScrollPosition()
     browse.openPlaylist(playlistId)
   }
+  function openMysicPlaylist(playlist) {
+    saveCurrentScrollPosition()
+    browse.openMysicPlaylist(playlist)
+  }
   function showDownloads() {
     saveCurrentScrollPosition()
     browse.showDownloads()
@@ -924,6 +928,7 @@ function YoutubeView({
       else if (view.type === 'artist' && view.id) openArtist(view.id)
       else if (view.type === 'album' && view.id) openAlbum(view.id)
       else if (view.type === 'liked') openLiked()
+      else if (view.type === 'mysic-playlist' && view.playlist) openMysicPlaylist(view.playlist)
       else if (view.type === 'link') void openLinkTarget(view.target)
       return
     }

@@ -368,6 +368,8 @@ export function useBrowse({ progressive = false } = {}) {
   const openArtistSongs = useCallback((id) => id && openDetail('artist-songs', (signal) => api.artistSongs(id, signal)), [openDetail]);
   const openAlbum = useCallback((id) => id && openDetail('album', (signal) => api.album(id, signal)), [openDetail]);
   const openPlaylist = useCallback((id) => id && openDetail('playlist', (signal) => api.playlist(id, signal)), [openDetail]);
+  // Una playlist de Mysic (creada aquí o importada de Spotify): se abre con la misma página que las de YouTube Music.
+  const openMysicPlaylist = useCallback((data) => data?.id && openDetail('mysic-playlist', async () => data), [openDetail]);
 
   const showDownloads = () => {
     cancelRequests();
@@ -465,6 +467,7 @@ export function useBrowse({ progressive = false } = {}) {
     openArtist,
     openArtistSongs,
     openAlbum,
+    openMysicPlaylist,
     openPlaylist,
     showHome,
     showExplore,

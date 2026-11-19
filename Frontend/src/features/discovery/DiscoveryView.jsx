@@ -748,7 +748,7 @@ function useDiscoveryPage({
       setYoutubeViewKind((previous) => sidebarViewFor(kind, previous))
       setYoutubePage(kind ?? 'home')
       // Una playlist de la cuenta o los Me gusta abiertos: la barra lateral resalta esa entrada.
-      setYoutubeActive(kind === 'liked' ? { type: 'liked' } : kind === 'playlist' && id ? { id, type: 'playlist' } : null)
+      setYoutubeActive(kind === 'liked' ? { type: 'liked' } : (kind === 'playlist' || kind === 'mysic-playlist') && id ? { id, type: kind } : null)
     }
     window.addEventListener('mysic:youtube-view', onView)
     return () => window.removeEventListener('mysic:youtube-view', onView)
@@ -768,6 +768,23 @@ function useDiscoveryPage({
     if (!alreadyThere) navigateTo('youtube')
     window.__mysicYoutubeNav = view
     window.dispatchEvent(new CustomEvent('mysic:youtube-nav', { detail: { view } }))
+  }
+
+  // Las playlists de Mysic hechas solo de canciones de YouTube (las importadas de Spotify, las creadas desde YouTube)
+  // se abren con la misma página que las de YouTube Music. Vacías o con canciones del catálogo propio, en la vista
+  // clásica (que permite añadir y reordenar).
+  function openMysicPlaylist(playlistId) {
+    setMobileMenuOpen(false)
+    const playlist = orderedPlaylists.find((item) => item.id === playlistId)
+    const tracks = playlist ? getPlaylistTracks(playlist) : []
+    if (!playlist || !tracks.length || !tracks.every((track) => track.source === 'youtube')) {
+      navigateToPlaylist(playlistId)
+      return
+    }
+    openYoutubeView({
+      playlist: { description: playlist.description, id: playlist.id, songs: tracks, thumbnail: playlist.artwork || tracks[0]?.thumbnail, title: playlist.title },
+      type: 'mysic-playlist',
+    })
   }
 
   // "Abrir enlace" (barra de título): lleva a la sección de YouTube Music y allí se abre/reproduce lo pegado.
@@ -1003,10 +1020,7 @@ function useDiscoveryPage({
         youtubeActive={youtubeActive}
         youtubeLibrary={youtubeLibrary}
         youtubeView={youtubeViewKind}
-        onOpenPlaylist={(playlistId) => {
-          setMobileMenuOpen(false)
-          navigateToPlaylist(playlistId)
-        }}
+        onOpenPlaylist={openMysicPlaylist}
         onTogglePlaylistPinned={togglePlaylistPinned}
         playlists={orderedPlaylists}
       />

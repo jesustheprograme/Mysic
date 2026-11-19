@@ -6,7 +6,9 @@ import {
   Download,
   Heart,
   House,
+  ExternalLink,
   Import,
+  Link2,
   ListMusic,
   ChartColumn,
   ChevronDown,
@@ -29,7 +31,36 @@ import { countText, EMPTY_LIBRARY_SUMMARY } from '../features/youtube/librarySum
 import { sizedImage } from '../lib/imageSize.js'
 import { createOverlayScrollbarRef } from '../lib/overlayScrollbar.js'
 import { readStorage, writeStorage } from '../lib/storage.js'
+import { showToast } from '../features/youtube/toast.js'
 import '../features/link/spotify-import.css'
+
+function copyText(text) {
+  navigator.clipboard?.writeText(text).then(() => showToast('Enlace copiado.'), () => showToast('No se pudo copiar el enlace.'))
+}
+
+function PlaylistMenu({ children, title }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="app-sidebar__playlist-menu-trigger grid size-6 shrink-0 place-items-center rounded-full" type="button" aria-label={`Opciones de ${title}`} title={`Opciones de ${title}`}>
+          <MoreVertical size={17} strokeWidth={1.8} aria-hidden="true" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="app-sidebar__playlist-menu min-w-48" align="end" collisionPadding={8} sideOffset={5}>
+        {children}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function PlaylistMenuItem({ icon: Icon, label, onSelect }) {
+  return (
+    <DropdownMenuItem className="app-sidebar__playlist-menu-item grid w-full grid-cols-[22px_minmax(0,1fr)] items-center gap-[7px] rounded-sm px-2 py-2 text-left text-[11px] outline-none" onSelect={onSelect}>
+      <Icon size={15} strokeWidth={1.8} aria-hidden="true" />
+      <span>{label}</span>
+    </DropdownMenuItem>
+  )
+}
 
 // Opciones principales: Inicio es la portada de YouTube Music; todo el catálogo propio de Mysic
 // vive dentro del desplegable "Mysic".
@@ -207,13 +238,16 @@ function AppSidebar({
                   <small>{countText(youtubeLibrary.liked.count, youtubeLibrary.liked.hasMore)}</small>
                 </span>
               </button>
+              <PlaylistMenu title="Música que me gusta">
+                <PlaylistMenuItem icon={ExternalLink} label="Abrir" onSelect={() => onYoutubeNavigate?.({ type: 'liked' })} />
+              </PlaylistMenu>
             </div>
           )}
           {/* Primero las playlists de Mysic (las creadas aquí y las importadas de un enlace, las fijadas arriba) y
               después las de la biblioteca de YouTube Music. */}
           {playlists.map((playlist) => (
               <div
-                className={`app-sidebar__playlist${activePlaylistId === playlist.id ? ' app-sidebar__playlist--active' : ''}`}
+                className={`app-sidebar__playlist${(activePlaylistId === playlist.id || (activeSection === 'youtube' && youtubeActive?.type === 'mysic-playlist' && youtubeActive.id === playlist.id)) ? ' app-sidebar__playlist--active' : ''}`}
                 key={playlist.id}
               >
                 <button
@@ -231,39 +265,10 @@ function AppSidebar({
                     <small>{getPlaylistTrackCount(playlist)} canciones</small>
                   </span>
                 </button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      className="app-sidebar__playlist-menu-trigger grid size-6 shrink-0 place-items-center rounded-full"
-                      type="button"
-                      aria-label={`Opciones de ${playlist.title}`}
-                      title={`Opciones de ${playlist.title}`}
-                    >
-                      <MoreVertical size={17} strokeWidth={1.8} aria-hidden="true" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    className="app-sidebar__playlist-menu min-w-48"
-                    align="end"
-                    collisionPadding={8}
-                    sideOffset={5}
-                  >
-                    <DropdownMenuItem
-                      className="app-sidebar__playlist-menu-item grid w-full grid-cols-[22px_minmax(0,1fr)] items-center gap-[7px] rounded-sm px-2 py-2 text-left text-[11px] outline-none"
-                      onSelect={() => onTogglePlaylistPinned?.(playlist)}
-                    >
-                      {playlist.pinned ? <PinOff size={15} strokeWidth={1.8} aria-hidden="true" /> : <Pin size={15} strokeWidth={1.8} aria-hidden="true" />}
-                      <span>{playlist.pinned ? 'Desfijar' : 'Fijar'}</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="app-sidebar__playlist-menu-item grid w-full grid-cols-[22px_minmax(0,1fr)] items-center gap-[7px] rounded-sm px-2 py-2 text-left text-[11px] outline-none"
-                      onSelect={() => onEditPlaylist?.(playlist)}
-                    >
-                      <Pencil size={15} strokeWidth={1.8} aria-hidden="true" />
-                      <span>Cambiar nombre o portada</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <PlaylistMenu title={playlist.title}>
+                  <PlaylistMenuItem icon={playlist.pinned ? PinOff : Pin} label={playlist.pinned ? 'Desfijar' : 'Fijar'} onSelect={() => onTogglePlaylistPinned?.(playlist)} />
+                  <PlaylistMenuItem icon={Pencil} label="Cambiar nombre o portada" onSelect={() => onEditPlaylist?.(playlist)} />
+                </PlaylistMenu>
               </div>
           ))}
           {youtubeLibrary.playlists.map((playlist) => (
@@ -282,6 +287,10 @@ function AppSidebar({
                   <small>{countText(playlist.count)}</small>
                 </span>
               </button>
+              <PlaylistMenu title={playlist.title}>
+                <PlaylistMenuItem icon={ExternalLink} label="Abrir" onSelect={() => onYoutubeNavigate?.({ id: playlist.id, type: 'playlist' })} />
+                <PlaylistMenuItem icon={Link2} label="Copiar enlace" onSelect={() => copyText(`https://music.youtube.com/playlist?list=${playlist.id}`)} />
+              </PlaylistMenu>
             </div>
           ))}
           </div>

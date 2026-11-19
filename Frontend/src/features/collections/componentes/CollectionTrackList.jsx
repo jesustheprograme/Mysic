@@ -3,7 +3,8 @@ import { restrictToFirstScrollableAncestor, restrictToVerticalAxis } from '@dnd-
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Clock3, ListPlus } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import useWindowedRows, { findScrollParent } from '../hooks/useWindowedRows.js'
+import { attachOverlayScrollbar } from '../../../lib/overlayScrollbar.js'
+import useWindowedRows,{ findScrollParent } from '../hooks/useWindowedRows.js'
 import { shouldWindow } from '../hooks/windowMath.js'
 import FilaCancionOrdenable from './FilaCancionOrdenable.jsx'
 import './track-table.css'
@@ -21,6 +22,9 @@ export default function CollectionTrackList({
   )
   const listRef = useRef(null)
   const [dragging, setDragging] = useState(false)
+
+  // Barra de scroll visible (superpuesta) en el bloque de canciones de playlists y álbumes.
+  useEffect(() => attachOverlayScrollbar(tracksRef?.current, { inset: 2 }), [tracksRef])
 
   // Listas largas: solo se montan las filas visibles (más un margen). Las cortas y las de álbumes
   // con varios discos se renderizan completas, como siempre.

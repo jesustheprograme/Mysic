@@ -571,6 +571,15 @@ function PlaylistDetail({ controller }) {
   return <CollectionDetailView addedAt={addedAt ?? undefined} table collection={{ artist: 'YouTube Music', artwork: data.thumbnail, description: data.description, id: data.id, kind: 'Playlist', title: data.title }} likedSongIds={likedSongIds} onAlbumSelect={openAlbum} onArtistSelect={openArtist} onBack={controller.goBack} onDownloadCollection={() => downloads.downloadMany(sourceSongs)} onPlaybackToggle={player.togglePlay} onShuffle={() => { noteListen(); controller.playShuffled(sourceSongs) }} onSongIntent={player.warmSong} onSongSelect={(songId) => { noteListen(); playSongs(sourceSongs, songId) }} onToggleFavorite={toggleSongFavorite} renderTrackActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} selectedSongSource="youtube" songs={sourceSongs.map(adaptSong)} />
 }
 
+// Playlist de Mysic (creada aquí o importada de Spotify): misma página que las de YouTube Music, sin indexarla en la biblioteca.
+function MysicPlaylistDetail({ controller }) {
+  const { browse, downloads, likedSongIds, openAlbum, openArtist, player, playSongs, renderSongActions, toggleSongFavorite } = controller
+  const data = browse.view.data
+  const sourceSongs = data.songs
+  const songs = useMemo(() => sourceSongs.map(adaptSong), [sourceSongs])
+  return <CollectionDetailView table collection={{ artist: 'Mysic', artwork: data.thumbnail, description: data.description, id: data.id, kind: 'Playlist', title: data.title }} likedSongIds={likedSongIds} onAlbumSelect={openAlbum} onArtistSelect={openArtist} onBack={controller.goBack} onDownloadCollection={() => downloads.downloadMany(sourceSongs)} onPlaybackToggle={player.togglePlay} onShuffle={() => controller.playShuffled(sourceSongs)} onSongIntent={player.warmSong} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleFavorite={toggleSongFavorite} renderTrackActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} selectedSongSource="youtube" songs={songs} />
+}
+
 // Sin cuenta vinculada la portada no muestra nada más que este botón centrado. La vinculación en
 // escritorio abre la ventana segura de Google; en la web se despliega el formulario de sesión.
 function UnlinkedPrompt({ controller }) {
@@ -605,6 +614,7 @@ export default function YoutubeCatalogContent({ controller }) {
   if (kind === 'album') return <AlbumDetail controller={controller} />
   if (kind === 'liked') return <LikedSongsDetail controller={controller} />
   if (kind === 'playlist') return <PlaylistDetail controller={controller} />
+  if (kind === 'mysic-playlist') return <MysicPlaylistDetail controller={controller} />
   if (kind === 'downloads') return <DownloadsView controller={controller} />
   if (kind === 'official-library') return <OfficialLibraryView controller={controller} />
   return null
