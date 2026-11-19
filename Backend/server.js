@@ -192,6 +192,15 @@ async function start() {
   app.post('/api/youtube/playlist/:id/videos', youtubeLibraryCache.invalidateOnWrite, ...playlistEdit.add)
   app.delete('/api/youtube/playlist/:id/videos/:videoId', youtubeLibraryCache.invalidateOnWrite, ...playlistEdit.remove)
 
+  // Lo que se marca en Mysic (Me gusta, álbumes guardados, artistas seguidos) se reenvía a YouTube Music (ver
+  // src/library-rating.mjs). Van bajo /api/youtube/library, que ya exige sesión; vacían la biblioteca en caché.
+  const { createLibraryRatingRoutes } = await import('./src/library-rating.mjs')
+  const rating = createLibraryRatingRoutes()
+  for (const [kind, on, off] of [['song', rating.songOn, rating.songOff], ['album', rating.albumOn, rating.albumOff], ['artist', rating.artistOn, rating.artistOff]]) {
+    app.put(`/api/youtube/library/rating/${kind}/:id`, youtubeLibraryCache.invalidateOnWrite, ...on)
+    app.delete(`/api/youtube/library/rating/${kind}/:id`, youtubeLibraryCache.invalidateOnWrite, ...off)
+  }
+
   app.use('/api/youtube', artistCacheHeaders, createYoutubeRouter())
 
   app.post('/api/auth/register', authLimiter, auth.register)

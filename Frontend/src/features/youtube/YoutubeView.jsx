@@ -22,6 +22,7 @@ import { readLiked, removeLiked, writeLiked } from './likedDb.js'
 import { loadPlaylistIndex, setLikedAdded, syncPlaylistIndex } from './playlistIndex.js'
 import SavedInPlaylists from './SavedInPlaylists.jsx'
 import { dedupeById, MAX_LIKED_PAGES, mergeLikedHead, needsFullSync, pageIsKnown } from './likedSync.js'
+import { ratingSync, reconcileFavorites } from './ratingSync.js'
 import { chooseLibrary, LIBRARY_CACHE_KEY, libraryCacheKey, persistLibrary, withoutTrimMark } from './libraryCache.js'
 import { applyOverview, applyPage, canLoadMore, emptyLibrary, emptyMeta, legacyMeta, withError, withLoading } from './libraryPages.js'
 import { LIKED_NAV_ID, publishLibrarySummary, summarizeLibrary } from './librarySummary.js'
@@ -36,6 +37,10 @@ import { spotifyImport } from '../link/spotifyImportStore.js'
 import { trackQuery } from './ytLink.js'
 import { AUTOPLAY_EVENT, freshSongs, needsTopUp, readAutoplay } from './autoplay.js'
 import ToastHost from './ToastHost.jsx'
+
+// Sincronización de fondo con YouTube Music: al volver a la ventana (con un mínimo entre dos) y cada pocos minutos.
+const BACKGROUND_SYNC_MIN_MS = 45_000
+const BACKGROUND_SYNC_EVERY_MS = 5 * 60_000
 
 // Clave que useBrowse (generado) usa para recordar la última vista. La app siempre arranca en Inicio: lo último
 // visto en otra sesión (Explorar, un artista...) no se restaura. Solo la primera vez que se monta en esta ejecución.
@@ -74,6 +79,7 @@ function YoutubeView({
   onQueueStart,
   onSearchNavigate,
   onAddSongFavorites,
+  onRemoveSongFavorites,
   onToggleSongFavorite,
   favoriteStoragePrefix = 'mysic:youtube',
   playbackToggleNonce = 0,
@@ -90,15 +96,54 @@ function YoutubeView({
   const queueRequestRef = useRef(null)
   clearBrowseRestoreOnce()
   const browse = useBrowse({ progressive: true })
-  const { ids: likedArtistIds, toggleFavorite: toggleArtistFavorite } = useYoutubeFavorites(
+  const { addFavorites: addArtistFavorites, ids: likedArtistIds, removeFavorites: removeArtistFavorites, toggleFavorite: toggleLocalArtistFavorite } = useYoutubeFavorites(
     `${favoriteStoragePrefix}:favorite-artists`,
     'mysic:youtube:favorite-artists',
   )
-  const { ids: likedAlbumIds, toggleFavorite: toggleAlbumFavorite } = useYoutubeFavorites(
+  const { addFavorites: addAlbumFavorites, ids: likedAlbumIds, removeFavorites: removeAlbumFavorites, toggleFavorite: toggleLocalAlbumFavorite } = useYoutubeFavorites(
     `${favoriteStoragePrefix}:favorite-albums`,
     'mysic:youtube:favorite-albums',
   )
-  // Máquina de estados de la cuenta (ver accountState.js): arranca con la instantánea no sensible guardada para
+  // Álbumes guardados y artistas seguidos: se marcan al instante en Mysic y se reenvían a YouTube Music; si lo rechaza,
+  // se deshace y se avisa (ver ratingSync.js). Sin cuenta vinculada o con un servidor anterior se quedan solo aquí.
+  const rate = (kind, id, liked, undo, label) => {
+    toggleLocal(kind, id, liked)
+    void ratingSync.push(kind, id, liked).then((result) => {
+      if (result !== 'failed') return
+      undo()
+      showToast(`YouTube Music no pudo guardar ${label}. Se deshizo el cambio.`)
+    })
+  }
+  function toggleLocal(kind, id, liked) {
+    if (kind === 'album') toggleLocalAlbumFavorite(id, liked)
+    else toggleLocalArtistFavorite(id, liked)
+  }
+  const toggleAlbumFavorite = (id, liked) => rate('album', id, liked, () => toggleLocalAlbumFavorite(id, !liked), 'el álbum en tu biblioteca')
+  const toggleArtistFavorite = (id, liked) => rate('artist', id, liked, () => toggleLocalArtistFavorite(id, !liked), 'el artista')
+  const likedSongIdsRef = useRef(likedSongIds)
+  likedSongIdsRef.current = likedSongIds
+  const lastLibrarySyncRef = useRef(0)
+  // Me gusta que llegan de YouTube Music: se suman como favoritas salvo lo que Mysic acaba de quitar.
+  function addRemoteLikes(items) {
+    onAddSongFavorites(items.filter((song) => ratingSync.recent('song', song.id) !== false).map((song) => adaptSong(song)))
+  }
+  // Álbumes y artistas de la biblioteca de YouTube Music: lo nuevo se marca aquí; lo quitado allí (estaba en la sincronización
+  // anterior y ya no) se desmarca, pero solo si la categoría llegó entera en esta respuesta y nunca lo que Mysic acaba de
+  // cambiar. Se compara con lo que YouTube acaba de enviar (`overview`), no con la biblioteca guardada, que conserva lo viejo.
+  function mirrorSavedLibrary(previous, library, overview) {
+    const idsOf = (items) => (items ?? []).map((item) => item.id).filter(Boolean)
+    const mirror = (kind, fields, local, add, remove) => {
+      const sections = fields.map((field) => overview?.sections?.[field])
+      const remote = overview ? sections.flatMap((section) => idsOf(section?.items)) : fields.flatMap((field) => idsOf(library[field]))
+      const complete = Boolean(overview) && sections.every((section) => section && !section.error && !section.hasMore)
+      const before = previous ? new Set(fields.flatMap((field) => idsOf(previous[field]))) : null
+      const changes = reconcileFavorites({ complete, local, previous: before, recent: (id) => ratingSync.recent(kind, id), remote })
+      if (changes.add.length) add(changes.add.map((id) => ({ id })))
+      if (changes.remove.length) remove(changes.remove)
+    }
+    mirror('album', ['albums'], likedAlbumIds, addAlbumFavorites, removeAlbumFavorites)
+    mirror('artist', ['artists', 'subscriptions'], likedArtistIds, addArtistFavorites, removeArtistFavorites)
+  }  // Máquina de estados de la cuenta (ver accountState.js): arranca con la instantánea no sensible guardada para
   // este usuario, de modo que una cuenta ya vinculada nunca se pinta como nueva mientras se confirma.
   const [accountState, dispatchAccount] = useReducer(reduceAccount, favoriteStoragePrefix, (prefix) => {
     const state = initialAccountState(readAccountSnapshot(prefix))
@@ -150,6 +195,11 @@ function YoutubeView({
   // Nunca abre la Biblioteca: el destino estable es Inicio.
   const refreshPersonalizedHome = useEffectEvent(() => finishLinking())
   const syncFavoritesFromAccount = useEffectEvent(() => syncOfficialLibrary({ show: false, silent: true }))
+  // Sincronización de fondo (al volver a la ventana y cada pocos minutos): pide la biblioteca nueva, no la copia del servidor.
+  const refreshFavoritesInBackground = useEffectEvent(() => {
+    if (document.hidden || officialLibraryBusy || Date.now() - lastLibrarySyncRef.current < BACKGROUND_SYNC_MIN_MS) return
+    void syncOfficialLibrary({ fresh: true, show: false, silent: true })
+  })
   const startupSyncedRef = useRef(false)
   const libraryCacheRef = useRef(null)
   const libraryRequestRef = useRef(0)
@@ -775,7 +825,7 @@ function YoutubeView({
       const next = applyPage(libraryCacheRef.current ?? emptyLibrary(), libraryMetaRef.current, kind, page)
       rememberLibrary(next.library)
       updateLibraryMeta(withLoading(next.meta, kind, false))
-      if (kind === 'liked-songs') onAddSongFavorites(page.items.map((song) => adaptSong(song)))
+      if (kind === 'liked-songs') addRemoteLikes(page.items)
       return true
     } catch (error) {
       if (error.name === 'AbortError' || requestId !== libraryRequestRef.current) return false
@@ -825,7 +875,13 @@ function YoutubeView({
         if (stored?.addedAt?.[song.id]) addedAt[song.id] = stored.addedAt[song.id]
         else if (known && !known.has(song.id)) addedAt[song.id] = now
       }
-      onAddSongFavorites(songs.map((song) => adaptSong(song)))
+      // Lo quitado en YouTube Music (estaba en la última lista completa y ya no): se quita también aquí. Lo que solo se
+      // marcó en Mysic no figura en esa lista y se conserva.
+      if (full && stored) {
+        const { remove } = reconcileFavorites({ complete: true, local: likedSongIdsRef.current, previous: new Set(stored.songs.map((song) => song.id)), recent: (id) => ratingSync.recent('song', id), remote: songs.map((song) => song.id) })
+        if (remove.length) onRemoveSongFavorites?.(remove)
+      }
+      addRemoteLikes(songs)
       setLikedAdded(addedAt)
       showCompleteLiked(songs)
       await writeLiked(key, { addedAt, complete: true, fullAt: full ? now : stored.fullAt, songs })
@@ -885,8 +941,10 @@ function YoutubeView({
       }
       const { library } = chooseLibrary(previous, fetched)
       rememberLibrary(library)
+      mirrorSavedLibrary(previous, library, overview)
+      lastLibrarySyncRef.current = Date.now()
       updateLibraryMeta(meta)
-      onAddSongFavorites(favorites.map((song) => adaptSong(song)))
+      addRemoteLikes(favorites)
       perfMarkOnce('library-first-page', { paged: Boolean(overview) })
       perfMark('library-refresh-done', { fresh, paged: Boolean(overview) })
       setLibraryStatus({ error: '', lastUpdated: Date.now(), loading: false, refreshing: false })
@@ -998,6 +1056,20 @@ function YoutubeView({
     return () => {
       clearTimeout(timer)
       startupSyncedRef.current = false
+    }
+  }, [accountConnected])
+  // Con la cuenta vinculada, lo marcado en YouTube Music (en el navegador o en el móvil) llega solo: al volver a Mysic y
+  // cada pocos minutos con la ventana a la vista, sin esperar a abrir la Biblioteca.
+  useEffect(() => {
+    if (!accountConnected) return undefined
+    const onVisible = () => { if (!document.hidden) refreshFavoritesInBackground() }
+    window.addEventListener('focus', onVisible)
+    document.addEventListener('visibilitychange', onVisible)
+    const timer = setInterval(refreshFavoritesInBackground, BACKGROUND_SYNC_EVERY_MS)
+    return () => {
+      window.removeEventListener('focus', onVisible)
+      document.removeEventListener('visibilitychange', onVisible)
+      clearInterval(timer)
     }
   }, [accountConnected])
   useEffect(() => {

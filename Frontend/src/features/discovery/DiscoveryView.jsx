@@ -12,6 +12,7 @@ import PlaylistPickerModal from '../playlists/PlaylistPickerModal.jsx'
 import SpotifyImportModal from '../link/SpotifyImportModal.jsx'
 import { importPill, spotifyImport, useSpotifyImport } from '../link/spotifyImportStore.js'
 import { showToast } from '../youtube/toast.js'
+import { ratingSync } from '../youtube/ratingSync.js'
 import PlaylistView from '../playlists/PlaylistView.jsx'
 import { getPlaylistTrackCount, getPlaylistTracks, resolvePlaylistSongs } from '../playlists/playlistTracks.js'
 import HomeDiscoveryPrompt from './HomeDiscoveryPrompt.jsx'
@@ -882,9 +883,20 @@ function useDiscoveryPage({
     ),
   })
 
+  // Me gusta de una canción de YouTube: se aplica al instante y se reenvía a la cuenta vinculada; si YouTube Music lo
+  // rechaza, se deshace y se avisa (ver youtube/ratingSync.js).
+  function toggleYoutubeSong(songId, liked, song) {
+    youtubeSongFavorites.toggleFavorite(songId, liked, song)
+    void ratingSync.push('song', songId, liked).then((result) => {
+      if (result !== 'failed') return
+      youtubeSongFavorites.toggleFavorite(songId, !liked, song)
+      showToast('YouTube Music no pudo guardar el Me gusta. Se deshizo el cambio.')
+    })
+  }
+
   function toggleSongFavorite(songId, liked, song) {
     if (song?.source === 'youtube') {
-      youtubeSongFavorites.toggleFavorite(songId, liked, song)
+      toggleYoutubeSong(songId, liked, song)
       return
     }
     onToggleFavorite?.(songId, liked)
@@ -1274,7 +1286,8 @@ function useDiscoveryPage({
                 )}
                 onSearchNavigate={() => navigateTo('youtube')}
                 onAddSongFavorites={youtubeSongFavorites.addFavorites}
-                onToggleSongFavorite={youtubeSongFavorites.toggleFavorite}
+                onRemoveSongFavorites={youtubeSongFavorites.removeFavorites}
+                onToggleSongFavorite={toggleYoutubeSong}
                 playbackToggleNonce={youtubePlaybackToggleNonce}
                 playerCollapsed={playerCollapsed}
                 playbackRequest={youtubePlaybackRequest}

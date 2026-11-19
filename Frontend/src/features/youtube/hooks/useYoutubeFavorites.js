@@ -84,5 +84,16 @@ export function useYoutubeFavorites(storageKey, legacyStorageKey = null) {
     setEntries((current) => mergeFavoriteEntries(current, songs))
   }
 
-  return { addFavorites, ids, items, toggleFavorite }
+  // Quita varios a la vez (lo que se quitó en YouTube Music). Mismo Map si no cambia nada.
+  function removeFavorites(removedIds) {
+    setEntries((current) => {
+      const wanted = removedIds.filter((id) => current.has(id))
+      if (!wanted.length) return current
+      const next = new Map(current)
+      for (const id of wanted) next.delete(id)
+      return next
+    })
+  }
+
+  return { addFavorites, ids, items, removeFavorites, toggleFavorite }
 }
