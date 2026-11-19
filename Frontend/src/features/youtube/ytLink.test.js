@@ -59,4 +59,5 @@ test('spotifyPlaylistDetails: la playlist de Mysic que nace de una de Spotify', 
   // El servidor admite 80 caracteres de título; sin nombre ni dueño hay valores por defecto.
   assert.equal(spotifyPlaylistDetails({ name: 'x'.repeat(200) }, songs).title.length, 80)
   assert.deepEqual(spotifyPlaylistDetails({}, []), { title: 'Playlist de Spotify', description: 'Importada de Spotify', artwork: null, tracks: [] })
+  assert.equal(spotifyPlaylistDetails({ name: 'x', cover: 'https://i.scdn.co/image/abc' }, songs).artwork, 'https://i.scdn.co/image/abc', 'prefiere la portada de Spotify')
 })

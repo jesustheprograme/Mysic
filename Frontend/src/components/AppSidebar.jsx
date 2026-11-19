@@ -29,6 +29,7 @@ import { countText, EMPTY_LIBRARY_SUMMARY } from '../features/youtube/librarySum
 import { sizedImage } from '../lib/imageSize.js'
 import { createOverlayScrollbarRef } from '../lib/overlayScrollbar.js'
 import { readStorage, writeStorage } from '../lib/storage.js'
+import '../features/link/spotify-import.css'
 
 // Opciones principales: Inicio es la portada de YouTube Music; todo el catálogo propio de Mysic
 // vive dentro del desplegable "Mysic".
@@ -75,6 +76,9 @@ function AppSidebar({
   onYoutubeNavigate,
   playlists = [],
   showLegacy = false,
+  // Importación de una playlist de Spotify en marcha o terminada ({ label, percent }) y cómo abrir su cuadro.
+  importPill = null,
+  onOpenImport,
   // Playlists y Me gusta de la cuenta de YouTube Music (se vinculan solos) y cuál de ellos está abierto.
   youtubeActive = null,
   youtubeLibrary = EMPTY_LIBRARY_SUMMARY,
@@ -185,6 +189,12 @@ function AppSidebar({
               <Plus size={17} strokeWidth={1.8} aria-hidden="true" />
             </button>
           </div>
+          {importPill && (
+            <button className="app-sidebar__import" type="button" aria-label={`. Abrir detalles`} onClick={() => onOpenImport?.()}>
+              <span>{importPill.label}</span>
+              <span className="app-sidebar__import-bar" aria-hidden="true"><i style={{ width: `%` }} /></span>
+            </button>
+          )}
           {/* Solo esta lista hace scroll (con su barra superpuesta): la navegación de arriba, el título "Playlists" y
               su botón "+" se quedan quietos. */}
           <div className="app-sidebar__playlist-list" ref={playlistScrollbarRef}>

@@ -56,7 +56,7 @@ export function cleanTitle(title) {
  * descripción que dice de dónde viene (sirve además para reconocerla al volver a importar el mismo enlace), portada y
  * las canciones encontradas en YouTube Music, sin repetidas y en el orden de la lista.
  */
-export function spotifyPlaylistDetails({ name, owner }, songs) {
+export function spotifyPlaylistDetails({ cover, name, owner }, songs) {
   const seen = new Set()
   const tracks = []
   for (const song of songs ?? []) {
@@ -67,7 +67,8 @@ export function spotifyPlaylistDetails({ name, owner }, songs) {
   return {
     title: (String(name ?? '').trim() || 'Playlist de Spotify').slice(0, 80),
     description: owner ? `Importada de Spotify · ${owner}` : 'Importada de Spotify',
-    artwork: tracks.find((track) => track.thumbnail)?.thumbnail || null,
+    // La portada de la lista en Spotify; sin ella, la de su primera canción.
+    artwork: cover || tracks.find((track) => track.thumbnail)?.thumbnail || null,
     tracks,
   }
 }

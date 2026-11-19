@@ -10,7 +10,8 @@ use serde::Serialize;
 use serde_json::Value;
 
 const WEB_UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
-const MAX_PLAYLIST_TRACKS: usize = 25;
+// Como limusic: la página pública de Spotify deja leer como mucho las primeras 100 pistas de una lista.
+const MAX_PLAYLIST_TRACKS: usize = 100;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -46,6 +47,10 @@ pub struct SpotifyLink {
     pub owner: Option<String>,
     /// Pista: sus artistas; lista o álbum: las primeras pistas.
     pub tracks: Vec<SpotifyTrack>,
+    /// Portada de la lista o álbum (la imagen pública de Spotify), si la página la trae.
+    pub cover: Option<String>,
+    /// La lista llegó al máximo que se puede leer: puede tener más canciones de las que se ven.
+    pub truncated: bool,
 }
 
 /// `None` si no es un enlace de Spotify de pista, álbum, artista o playlist. Acepta lo que se pega de verdad:
@@ -108,12 +113,17 @@ pub fn parse_embed(kind: LinkKind, html: &str) -> Result<SpotifyLink, String> {
                 .and_then(Value::as_array)
                 .map(|list| list.iter().filter_map(|a| text_at(a, "name")).map(str::to_owned).collect())
                 .unwrap_or_default();
-            Ok(SpotifyLink { kind, name: name.clone(), owner: None, tracks: vec![SpotifyTrack { title: name, artists }] })
+            Ok(SpotifyLink { kind, name: name.clone(), owner: None, tracks: vec![SpotifyTrack { title: name, artists }], cover: None, truncated: false })
         }
-        LinkKind::Artist => Ok(SpotifyLink { kind, name, owner: None, tracks: Vec::new() }),
+        LinkKind::Artist => Ok(SpotifyLink { kind, name, owner: None, tracks: Vec::new(), cover: None, truncated: false }),
         LinkKind::Album | LinkKind::Playlist => {
             let owner = text_at(entity, "subtitle").map(str::to_owned);
-            let tracks = entity
+            let cover = entity
+                .pointer("/coverArt/sources/0/url")
+                .and_then(Value::as_str)
+                .filter(|url| url.starts_with("https://"))
+                .map(str::to_owned);
+            let tracks: Vec<SpotifyTrack> = entity
                 .get("trackList")
                 .and_then(Value::as_array)
                 .map(Vec::as_slice)
@@ -128,7 +138,8 @@ pub fn parse_embed(kind: LinkKind, html: &str) -> Result<SpotifyLink, String> {
                 })
                 .take(MAX_PLAYLIST_TRACKS)
                 .collect();
-            Ok(SpotifyLink { kind, name, owner, tracks })
+            let truncated = tracks.len() >= MAX_PLAYLIST_TRACKS;
+            Ok(SpotifyLink { kind, name, owner, tracks, cover, truncated })
         }
     }
 }
@@ -215,6 +226,27 @@ mod tests {
         assert_eq!(link.owner.as_deref(), Some("Yo"));
         assert_eq!(link.tracks.iter().map(|t| t.title.as_str()).collect::<Vec<_>>(), vec!["A", "B"]);
         assert_eq!(link.tracks[0].artists, vec!["X", "Y"]);
+    }
+
+    #[test]
+    fn reads_more_than_25_tracks_the_cover_and_flags_a_cut_list() {
+        let list = |count: usize| {
+            let rows: Vec<String> = (0..count).map(|n| format!(r#"{{"title":"T{n}","subtitle":"A"}}"#)).collect();
+            page(&format!(
+                r#"{{"name":"Larga","subtitle":"Yo","coverArt":{{"sources":[{{"url":"https://i.scdn.co/image/abc"}}]}},"trackList":[{}]}}"#,
+                rows.join(",")
+            ))
+        };
+        let medium = parse_embed(LinkKind::Playlist, &list(50)).unwrap();
+        assert_eq!(medium.tracks.len(), 50, "ya no se recorta a 25");
+        assert_eq!(medium.cover.as_deref(), Some("https://i.scdn.co/image/abc"));
+        assert!(!medium.truncated);
+        let long = parse_embed(LinkKind::Playlist, &list(140)).unwrap();
+        assert_eq!(long.tracks.len(), 100, "el máximo que deja leer Spotify");
+        assert!(long.truncated);
+        // Sin portada, o con una dirección que no es https, no hay portada.
+        let bare = parse_embed(LinkKind::Playlist, &page(r#"{"name":"M","trackList":[]}"#)).unwrap();
+        assert_eq!(bare.cover, None);
     }
 
     #[test]

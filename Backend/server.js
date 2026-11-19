@@ -36,6 +36,7 @@ const { checkPrismaHealth, closePrisma, connectPrisma } = require('./src/prisma'
 const { YOUTUBE_USER_PATHS } = require('./src/youtube/authPaths')
 const { artistCacheHeaders } = require('./src/cache-headers')
 const { serverTiming } = require('./src/server-timing')
+const { mountJsonParsers } = require('./src/json-limits')
 
 const app = express()
 let server
@@ -109,7 +110,8 @@ async function start() {
     },
   }))
   app.use(morgan(config.nodeEnv === 'production' ? 'combined' : 'dev'))
-  app.use(express.json({ limit: '32kb' }))
+  // 32 kB en casi todo; 2 MB en /api/playlists (una playlist se guarda entera de una vez). Ver src/json-limits.js.
+  mountJsonParsers(app)
   app.use(cookieParser())
   // Tiempo del servidor en cada respuesta de la API (ver src/server-timing.js).
   app.use('/api', serverTiming())

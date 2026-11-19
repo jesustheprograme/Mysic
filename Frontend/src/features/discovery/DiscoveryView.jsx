@@ -9,6 +9,9 @@ import AlbumView from '../collections/AlbumView.jsx'
 import ArtistView from '../collections/ArtistView.jsx'
 import PlaylistEditorModal from '../playlists/PlaylistEditorModal.jsx'
 import PlaylistPickerModal from '../playlists/PlaylistPickerModal.jsx'
+import SpotifyImportModal from '../link/SpotifyImportModal.jsx'
+import { importPill, spotifyImport, useSpotifyImport } from '../link/spotifyImportStore.js'
+import { showToast } from '../youtube/toast.js'
 import PlaylistView from '../playlists/PlaylistView.jsx'
 import { getPlaylistTrackCount, getPlaylistTracks, resolvePlaylistSongs } from '../playlists/playlistTracks.js'
 import HomeDiscoveryPrompt from './HomeDiscoveryPrompt.jsx'
@@ -812,6 +815,27 @@ function useDiscoveryPage({
     setYoutubePlaybackRequest((current) => ({ nonce: (current?.nonce ?? 0) + 1, song: songs[index] ?? songs[0], songs, index }))
   }
 
+  // Importar una playlist de Spotify (features/link): el almacén busca las canciones y pide aquí guardarlas, reproducirlas
+  // y avisar. Se renueva en cada render para usar siempre las playlists y funciones al día. La playlist queda fijada
+  // (la primera de la barra lateral) y NO se abre ninguna página: el progreso se ve en el cuadro y en el sidebar.
+  const spotifyImportState = useSpotifyImport()
+  useEffect(() => {
+    spotifyImport.configure({
+      notify: showToast,
+      play: (songs) => playYoutubeSongs(songs, 0),
+      save: async (details, knownId) => {
+        const existing = knownId ? null : playlists.find((playlist) => playlist.title === details.title && playlist.description === details.description)
+        const targetId = knownId ?? existing?.id
+        if (targetId) {
+          const updated = await onUpdatePlaylist(targetId, { artwork: details.artwork, pinned: true, tracks: details.tracks })
+          return updated ? { id: targetId, updated: Boolean(existing) } : null
+        }
+        const createdId = await createPlaylist({ artwork: details.artwork, description: details.description, pinned: true, title: details.title, tracks: details.tracks })
+        return createdId ? { id: createdId, updated: false } : null
+      },
+    })
+  })
+
   function playContextSong(song, contextSongs = playbackSongs) {
     if (!song) return false
     if (song.source === 'youtube') {
@@ -956,6 +980,8 @@ function useDiscoveryPage({
         activeSection={activeSection}
         canImportMusic={mayImportMusic}
         showLegacy={maySeeLegacy}
+        importPill={importPill(spotifyImportState)}
+        onOpenImport={() => spotifyImport.reopen()}
         collapsed={sidebarCollapsed}
         mobileOpen={mobileMenuOpen}
         onCreatePlaylist={() => {
@@ -1213,16 +1239,6 @@ function useDiscoveryPage({
                 favoriteStoragePrefix={youtubeFavoriteStoragePrefix}
                 likedSongIds={youtubeSongFavorites.ids}
                 onAddToPlaylist={setPlaylistPickerSong}
-                onImportPlaylist={async ({ artwork, description, title, tracks }) => {
-                  // Playlist de un enlace (Spotify): queda como playlist de Mysic, fijada para salir la primera de la
-                  // barra lateral, y se abre. Si ya se había importado (mismo título y origen), se actualiza.
-                  const existing = playlists.find((playlist) => playlist.title === title && playlist.description === description)
-                  const playlistId = existing
-                    ? ((await onUpdatePlaylist(existing.id, { pinned: true, tracks })) ? existing.id : null)
-                    : await createPlaylist({ artwork, description, pinned: true, title, tracks })
-                  if (playlistId) navigateToPlaylist(playlistId)
-                  return playlistId ? { id: playlistId, updated: Boolean(existing) } : null
-                }}
                 onPlaybackOwnerClaim={({ preserveContext = false } = {}) => {
                   if (!preserveContext) setDiscoveryMix([])
                   setYoutubePlayerVisible(true)
@@ -1332,6 +1348,8 @@ function useDiscoveryPage({
           songs={songs}
         />
       )}
+
+      <SpotifyImportModal />
 
       {playlistPickerSong && (
         <PlaylistPickerModal

@@ -644,14 +644,14 @@
 }
 :root[data-theme='light'] .link-dialog {
     border: 1px solid oklch(0 0 0 / 0.12);
-    background: rgb(247 240 255);
-    color: rgb(5 5 8)
+    background: rgb(246 248 248);
+    color: rgb(4 4 4)
 }
 :root[data-theme='light'] .link-dialog p {
-    color: rgb(92 88 103)
+    color: rgb(92 96 94)
 }
 :root[data-theme='light'] .link-dialog__close {
-    color: rgb(92 88 103)
+    color: rgb(92 96 94)
 }
 :root[data-theme='light'] .link-dialog__close:hover {
     color: rgb(0 0 0);
@@ -675,6 +675,128 @@
 }
 :root[data-theme='light'] .link-dialog .link-dialog__error {
     color: #ff8a7a
+}
+:root[data-theme='light'] .si__backdrop {
+    background: rgb(255 255 255 / 0.6)
+}
+:root[data-theme='light'] .si {
+    border: 1px solid rgb(0 0 0 / 0.1);
+    background: rgb(246 248 248);
+    color: rgb(4 4 4)
+}
+:root[data-theme='light'] .si__head svg {
+    color: var(--m-accent, #ff6542)
+}
+:root[data-theme='light'] .si__badge {
+    color: var(--m-accent, #ff6542);
+    background: color-mix(in srgb, var(--m-accent, #ff6542) 14%, transparent)
+}
+:root[data-theme='light'] .si__close {
+    color: rgb(92 96 94)
+}
+:root[data-theme='light'] .si__close:hover {
+    color: rgb(0 0 0);
+    background: rgb(0 0 0 / 0.08)
+}
+:root[data-theme='light'] .si__head .si__close svg {
+    color: inherit
+}
+:root[data-theme='light'] .si__card {
+    border: 1px solid rgb(0 0 0 / 0.09);
+    background: rgb(0 0 0 / 0.03)
+}
+:root[data-theme='light'] .si__cover {
+    background: rgb(235 239 238)
+}
+:root[data-theme='light'] .si__cover--empty {
+    color: rgb(151 157 155)
+}
+:root[data-theme='light'] .si__card-copy span {
+    color: rgb(92 96 94)
+}
+:root[data-theme='light'] .si__spin {
+    color: var(--m-accent, #ff6542)
+}
+:root[data-theme='light'] .si__bar {
+    background: rgb(0 0 0 / 0.08)
+}
+:root[data-theme='light'] .si__bar i {
+    background: var(--m-accent, #ff6542)
+}
+:root[data-theme='light'] .si__stats {
+    color: rgb(92 96 94)
+}
+:root[data-theme='light'] .si__recent {
+    border: 1px solid rgb(0 0 0 / 0.09)
+}
+:root[data-theme='light'] .si__recent img, :root[data-theme='light'] .si__thumb-empty {
+    background: rgb(235 239 238)
+}
+:root[data-theme='light'] .si__recent-copy small {
+    color: rgb(92 96 94)
+}
+:root[data-theme='light'] .si__tier--ok {
+    color: #6fdc9a
+}
+:root[data-theme='light'] .si__tier--check {
+    color: #ffc35a
+}
+:root[data-theme='light'] .si__tier--missing {
+    color: #ff8a7a
+}
+:root[data-theme='light'] .si__note {
+    color: rgb(92 96 94)
+}
+:root[data-theme='light'] .si__note--strong {
+    color: rgb(4 4 4)
+}
+:root[data-theme='light'] .si__note--warn {
+    color: #ffc35a;
+    background: rgb(255 195 90 / 0.08)
+}
+:root[data-theme='light'] .si__details {
+    border: 1px solid rgb(0 0 0 / 0.09)
+}
+:root[data-theme='light'] .si__details summary {
+    color: rgb(27 29 27)
+}
+:root[data-theme='light'] .si__details ul {
+    color: rgb(92 96 94)
+}
+:root[data-theme='light'] .si__details strong {
+    color: rgb(4 4 4)
+}
+:root[data-theme='light'] .si__details em {
+    color: rgb(109 118 115)
+}
+:root[data-theme='light'] .si__button {
+    border: 1px solid rgb(0 0 0 / 0.14);
+    color: rgb(4 4 4);
+    background: transparent
+}
+:root[data-theme='light'] .si__button:hover {
+    background: rgb(0 0 0 / 0.07)
+}
+:root[data-theme='light'] .si__button--primary {
+    border-color: transparent;
+    color: rgb(0 0 0);
+    background: var(--m-accent, #ff6542)
+}
+:root[data-theme='light'] .si__button--primary:hover {
+    background: color-mix(in srgb, var(--m-accent, #ff6542) 86%, rgb(0 0 0))
+}
+:root[data-theme='light'] .app-sidebar__import {
+    color: var(--m-accent, #ff6542);
+    background: color-mix(in srgb, var(--m-accent, #ff6542) 12%, transparent)
+}
+:root[data-theme='light'] .app-sidebar__import:hover {
+    background: color-mix(in srgb, var(--m-accent, #ff6542) 20%, transparent)
+}
+:root[data-theme='light'] .app-sidebar__import-bar {
+    background: rgb(0 0 0 / 0.1)
+}
+:root[data-theme='light'] .app-sidebar__import-bar i {
+    background: var(--m-accent, #ff6542)
 }
 :root[data-theme='light'] .lsp__trigger {
     color: rgb(0 0 0 / 0.62);

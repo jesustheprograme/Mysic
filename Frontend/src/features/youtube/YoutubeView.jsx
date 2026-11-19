@@ -32,7 +32,8 @@ import YoutubeCatalogContent from './YoutubeCatalogContent.jsx'
 import { setAccountMenu } from './accountMenuBridge.js'
 import { shuffled } from './queueOps.js'
 import { showToast } from './toast.js'
-import { spotifyPlaylistDetails, trackQuery } from './ytLink.js'
+import { spotifyImport } from '../link/spotifyImportStore.js'
+import { trackQuery } from './ytLink.js'
 import { AUTOPLAY_EVENT, freshSongs, needsTopUp, readAutoplay } from './autoplay.js'
 import ToastHost from './ToastHost.jsx'
 
@@ -66,7 +67,6 @@ function YoutubeView({
   downloads,
   likedSongIds,
   onAddToPlaylist,
-  onImportPlaylist,
   onPlaybackOwnerClaim,
   onPlaybackStateChange,
   onPlayerCollapseToggle,
@@ -471,7 +471,7 @@ function YoutubeView({
     }
   }
 
-  async function openSpotifyTarget({ name, owner, tracks, type }) {
+  async function openSpotifyTarget({ cover, name, owner, tracks, truncated, type }) {
     const notFound = () => showToast('No se encontró en YouTube Music.')
     if (type === 'track') {
       const found = await firstMatch(trackQuery(tracks[0] ?? { title: name }), 'song')
@@ -488,21 +488,10 @@ function YoutubeView({
       const found = await firstMatch([name, owner].filter(Boolean).join(' '), 'album')
       return found ? openAlbum(found.id) : notFound()
     }
-    // Playlist: se buscan sus primeras canciones (de pocas en pocas) y suenan en el orden de la lista.
-    showToast(`Buscando «${name}» en YouTube Music…`)
-    const found = []
-    for (let start = 0; start < tracks.length; start += 4) {
-      const batch = await Promise.all(tracks.slice(start, start + 4).map((track) => firstMatch(trackQuery(track), 'song').catch(() => null)))
-      found.push(...batch.filter(Boolean))
-    }
-    if (!found.length) return notFound()
-    playFrom(found, 0)
-    // Como Limusic: además de sonar, queda guardada como playlist de Mysic (aparece la primera en la barra lateral).
-    // Antes solo se llenaba la cola y la lista se perdía al poner otra cosa.
-    const imported = await onImportPlaylist?.(spotifyPlaylistDetails({ name, owner }, found))
-    showToast(imported
-      ? `Playlist «${name}» ${imported.updated ? 'actualizada' : 'creada'}: ${found.length} de ${tracks.length} canciones`
-      : `Sonando ${found.length} de ${tracks.length} canciones de «${name}» (no se pudo guardar la playlist)`)
+    // Playlist: se abre el cuadro de importación (vista previa -> progreso -> listo), como en limusic. No abre ninguna
+    // página: la playlist queda guardada y aparece la primera en la barra lateral.
+    if (!tracks.length) return notFound()
+    if (spotifyImport.openPreview({ cover, name, owner, tracks, truncated }).busy) showToast('Ya hay una importación en curso.')
   }
 
   // Acción de cada fila de canción: solo el ✓ de las que ya están en una playlist tuya (como limusic). Radio, descarga

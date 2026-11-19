@@ -22,7 +22,7 @@ async function resolveLink(text) {
     } catch (error) {
       throw new Error(SPOTIFY_ERRORS[String(error)] ?? `No se pudo leer el enlace de Spotify: ${String(error)}`)
     }
-    return { kind: 'spotify', type: info.kind, name: info.name, owner: info.owner ?? null, tracks: info.tracks ?? [] }
+    return { kind: 'spotify', type: info.kind, name: info.name, owner: info.owner ?? null, tracks: info.tracks ?? [], cover: info.cover ?? null, truncated: Boolean(info.truncated) }
   }
   const target = parseYtLink(text)
   if (!target) throw new Error('Ese no es un enlace de YouTube Music o Spotify.')

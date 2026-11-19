@@ -15,14 +15,14 @@
   padding: 18px 18px 20px;
   border: 1px solid oklch(1 0 0 / 0.12);
   border-radius: 16px;
-  background: #15101c;
-  color: #eceaf1;
-  box-shadow: 0 24px 60px rgb(0 0 0 / 0.6);
+  background: #0b0c0c;
+  color: #ececec;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 0.7);
 }
 
 .link-dialog header { display: flex; align-items: center; justify-content: space-between; }
 .link-dialog h2 { margin: 0; font-size: 17px; font-weight: 700; }
-.link-dialog p { margin: 8px 0 14px; color: #a9a4b5; font-size: 13.5px; line-height: 1.45; }
+.link-dialog p { margin: 8px 0 14px; color: #a1a5a3; font-size: 13.5px; line-height: 1.45; }
 
 .link-dialog__close {
   width: 30px;
@@ -30,7 +30,7 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  color: #a9a4b5;
+  color: #a1a5a3;
 }
 
 .link-dialog__close:hover { color: #fff; background: oklch(1 0 0 / 0.08); }
