@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { collectArtistSongs, collectChannelVideos, createReleasePreview, expandReleaseShelf, findSongAlbum, mergeReleaseItems, selectArtistSongDetails } from './artist.mjs';
+import { channelSubscribers, collectArtistSongs, collectChannelVideos, createPlaylistShelves, createReleasePreview, createVideoPreview, mapChannelPlaylist, expandReleaseShelf, findSongAlbum, mergeReleaseItems, selectArtistSongDetails } from './artist.mjs';
 
 test('combina la vista previa y la discografía completa sin duplicar lanzamientos', () => {
   const preview = [{ id: 'album-1', title: 'Uno' }, { id: 'album-2', title: 'Dos' }];
@@ -133,4 +133,24 @@ test('entiende el formato LockupView de los vídeos de canal (duración en la in
   const songs = await collectChannelVideos({ videos: [lockup('p', '3:54'), lockup('q', '1:02:03'), lockup('r', '4:00', 'PLAYLIST'), lockup('s', 'EN VIVO')] }, { artist: 'Q2000', artistId: 'UC1' })
   assert.deepEqual(songs.map((song) => [song.id, song.durationSeconds, song.duration]), [['p', 234, '3:54'], ['q', 3723, '1:02:03']])
   assert.equal(songs[0].title, 'T p')
+})
+
+test('perfil de canal: suscriptores, listas del canal y carruseles de listas y vídeos de YouTube Music', () => {
+  const channel = { header: { content: { metadata: { metadata_rows: [{ metadata_parts: [{ text: { text: '@Q2000_' } }] }, { metadata_parts: [{ text: { text: '422 subscribers' } }, { text: { text: '311 videos' } }] }] } } } }
+  assert.equal(channelSubscribers(channel), '422 subscribers')
+  assert.equal(channelSubscribers({}), '')
+
+  const lockup = { content_id: 'PL1', content_type: 'PLAYLIST', metadata: { title: { text: 'Sunshine' } }, content_image: { primary_thumbnail: { image: [{ url: 'https://i.ytimg.com/a.jpg', width: 480 }], overlays: [{ badges: [{ text: '8 videos' }] }] } } }
+  assert.deepEqual(mapChannelPlaylist(lockup), { id: 'PL1', title: 'Sunshine', subtitle: '8 vídeos', thumbnail: 'https://i.ytimg.com/a.jpg' })
+  assert.equal(mapChannelPlaylist({ content_id: 'x', content_type: 'VIDEO' }), null)
+
+  const sections = [
+    { type: 'MusicShelf', contents: [] },
+    { type: 'MusicCarouselShelf', header: { title: { text: 'Videos' } }, contents: [{ item_type: 'video', id: 'v1', title: { text: 'Clip' }, subtitle: { text: 'Q2000 • 279 views', runs: [{ text: 'Q2000' }, { text: ' • ' }, { text: '279 views' }] } }, { item_type: 'video', id: 'v1', title: { text: 'Clip' } }] },
+    { type: 'MusicCarouselShelf', header: { title: { text: 'Playlists' } }, contents: [{ item_type: 'playlist', id: 'VLPL9', title: { text: 'Lista' }, subtitle: { text: 'Playlist • Q2000 • 10K views' }, thumbnail: [{ url: 'https://i.ytimg.com/p.jpg', width: 300 }] }] },
+    { type: 'MusicCarouselShelf', header: { title: { text: 'Albums' } }, contents: [{ item_type: 'album', id: 'MPREb_1' }] },
+  ]
+  assert.deepEqual(createPlaylistShelves(sections), [{ title: 'Playlists', items: [{ id: 'VLPL9', title: 'Lista', subtitle: 'Q2000 · 10K views', thumbnail: 'https://i.ytimg.com/p.jpg' }] }])
+  const videos = createVideoPreview(sections, { artist: 'Q2000', artistId: 'UC1' })
+  assert.deepEqual(videos.map((video) => [video.id, video.artist, video.artistId, video.album]), [['v1', 'Q2000', 'UC1', 'Vídeos']])
 })

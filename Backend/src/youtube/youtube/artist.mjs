@@ -154,14 +154,94 @@ export async function collectChannelVideos(feed, defaults, limit = MAX_CHANNEL_V
   return [...videos.values()];
 }
 
+// El canal de YouTube se pide una sola vez y lo comparten los vídeos, el perfil y las listas.
+const channelSourceCache = createAsyncTtlCache({ ttlMs: config.browseCacheTtlMs, maxSize: config.requestCacheMax });
+const getChannelSource = (id) => channelSourceCache.get(id, () => getYoutube().getChannel(id));
+
 export function getChannelVideos(id, defaults = {}, limit = MAX_CHANNEL_VIDEOS) {
   return channelVideosCache.get(`${id}:${limit}`, async () => {
     try {
-      const channel = await getYoutube().getChannel(id);
+      const channel = await getChannelSource(id);
       return await collectChannelVideos(await channel.getVideos(), { ...defaults, artistId: id }, limit);
     } catch (error) {
       console.warn(`[artist] sin vídeos de canal para ${id}: ${error.message}`);
       return [];
+    }
+  });
+}
+
+// --- Perfil de canal (como la página de canal de Limusic): suscriptores, avatar y listas de reproducción ---
+const channelProfileCache = createAsyncTtlCache({ ttlMs: config.browseCacheTtlMs, maxSize: config.requestCacheMax });
+
+/** "422 subscribers" entre los datos de la cabecera del canal ("@Q2000_", "422 subscribers", "311 videos"). */
+export function channelSubscribers(channel) {
+  const parts = (channel?.header?.content?.metadata?.metadata_rows || [])
+    .flatMap((row) => row.metadata_parts || [])
+    .map((part) => plainText(part.text).trim());
+  return parts.find((text) => /subscri|suscri/i.test(text)) || '';
+}
+
+/** Tarjeta de lista del canal (LockupView de la pestaña "Playlists"). */
+export function mapChannelPlaylist(item) {
+  const id = item?.content_id || item?.id;
+  if (!id || (item.content_type && item.content_type !== 'PLAYLIST')) return null;
+  const badges = (item.content_image?.primary_thumbnail?.overlays || []).flatMap((overlay) => overlay.badges || []);
+  const count = badges.map((badge) => plainText(badge.text)).find((text) => /\d/.test(text)) || '';
+  return {
+    id,
+    title: plainText(item.metadata?.title) || plainText(item.title) || 'Lista',
+    subtitle: count.replace(/videos?/i, (word) => (/s$/i.test(word) ? 'vídeos' : 'vídeo')),
+    thumbnail: pickThumbnail(item.content_image?.primary_thumbnail?.image ?? item.thumbnails ?? item.thumbnail) || '',
+  };
+}
+
+/** Tarjeta de lista de un carrusel de la página de YouTube Music (MusicTwoRowItem). */
+export function mapCarouselPlaylist(item) {
+  return {
+    id: item.id,
+    title: plainText(item.title) || 'Lista',
+    subtitle: plainText(item.subtitle).replace(/^\s*Playlist\s*•\s*/i, '').replace(/\s*•\s*/g, ' · '),
+    thumbnail: pickThumbnail(item.thumbnail ?? item.thumbnails) || '',
+  };
+}
+
+/** Carruseles de listas de la página de YouTube Music ("Playlists", "Featured on"...), con su título original. */
+export function createPlaylistShelves(sections) {
+  return (sections || [])
+    .filter((section) => section.type === 'MusicCarouselShelf')
+    .map((section) => ({
+      title: section.header?.title?.text || 'Playlists',
+      items: (section.contents || []).filter((item) => item.item_type === 'playlist' && item.id).map(mapCarouselPlaylist),
+    }))
+    .filter((shelf) => shelf.items.length > 0);
+}
+
+/** Vídeos de los carruseles de la página de YouTube Music (sin duración: la tarjeta no la trae). */
+export function createVideoPreview(sections, defaults) {
+  const videos = new Map();
+  for (const section of sections || []) {
+    if (section.type !== 'MusicCarouselShelf') continue;
+    for (const item of section.contents || []) {
+      if (item.item_type === 'video' && item.id && !videos.has(item.id)) videos.set(item.id, { ...mapSong(item, defaults), album: 'Vídeos' });
+    }
+  }
+  return [...videos.values()];
+}
+
+export function getChannelProfile(id) {
+  return channelProfileCache.get(id, async () => {
+    try {
+      const channel = await getChannelSource(id);
+      const avatar = pickThumbnail(channel.header?.content?.image?.avatar?.image ?? channel.metadata?.avatar);
+      let playlists = [];
+      if (channel.has_playlists) {
+        const feed = await channel.getPlaylists().catch(() => null);
+        playlists = (feed?.playlists || []).map(mapChannelPlaylist).filter(Boolean);
+      }
+      return { avatar: avatar ? avatar.replace(/=s\d+/, '=s800') : '', subscribers: channelSubscribers(channel), playlists };
+    } catch (error) {
+      console.warn(`[artist] sin perfil de canal para ${id}: ${error.message}`);
+      return { avatar: '', subscribers: '', playlists: [] };
     }
   });
 }
@@ -309,19 +389,39 @@ async function loadArtistPage(id) {
       return mapSong(item, { artist: name, artistId: id, album: album?.name, albumId: album?.id, thumbnail });
     });
   const shelves = createReleasePreview(sections, { id, name });
-  // Canal sin música en YouTube Music: se muestran sus vídeos más recientes (la lista completa, en "Ver todas").
+  let playlists = createPlaylistShelves(sections);
+  let videos = createVideoPreview(sections, { artist: name, artistId: id, thumbnail });
+  let kind = 'artist';
+  let subtitle = '';
+  let portrait = thumbnail || pickThumbnail(header?.foreground_thumbnail);
+  // Canal sin música en YouTube Music: se muestran sus vídeos más recientes (la lista completa, en "Ver todas"),
+  // sus suscriptores, su avatar y todas sus listas de reproducción, como hace la página de canal de Limusic.
   if (!topSongs.length && !shelves.length) {
-    topSongs = await getChannelVideos(id, { artist: name, thumbnail }, 8);
+    kind = 'channel';
+    const [channelVideos, profile] = await Promise.all([
+      getChannelVideos(id, { artist: name, thumbnail: portrait }, 8),
+      getChannelProfile(id),
+    ]);
+    // Los del canal traen duración; si el canal falla quedan los del carrusel de YouTube Music.
+    topSongs = channelVideos.length ? channelVideos : videos.slice(0, 8);
+    videos = [];
+    subtitle = profile.subscribers;
+    portrait = portrait || profile.avatar;
+    if (profile.playlists.length) playlists = [{ title: 'Playlists', items: profile.playlists }];
   }
 
   return {
     page: {
       id,
       name,
+      kind,
+      subtitle,
       description: header?.description?.text || '',
-      thumbnail,
+      thumbnail: portrait,
+      videos,
+      playlists,
       // Foto inmediata para la cabecera; el agregador aporta el resto
-      images: [media.header].filter(Boolean),
+      images: [portrait].filter(Boolean),
       imagesComplete: false,
       releasesComplete: false,
       songDetailsComplete: false,

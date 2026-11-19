@@ -32,6 +32,7 @@ import { translateShelfTitle } from './shelfTitles.js'
 import useHomeLayout from './useHomeLayout.js'
 import SongList from '../discovery/SongList.jsx'
 import { adaptAlbum, adaptArtist, adaptBrowseItem, adaptReleases, adaptSong } from './lib/adapters.js'
+import { localizeAudience } from './searchModel.js'
 
 const HomeLayoutPanel = lazy(() => import('./HomeLayoutPanel.jsx'))
 
@@ -513,14 +514,18 @@ function OfficialLibraryView({ controller }) {
 const enlargeArtistImage = (url) => (typeof url === 'string' ? url.replace(/=w\d+-h\d+/, '=w1080-h1080').replace(/=s\d+/, '=s1080') : url)
 
 function ArtistDetail({ controller }) {
-  const { browse, likedArtistIds, likedSongIds, openAlbum, openArtistSongs, player, playSongs, renderSongActions, toggleArtistFavorite, toggleSongFavorite } = controller
+  const { browse, likedArtistIds, likedSongIds, openAlbum, openArtistSongs, openPlaylist, player, playSongs, renderSongActions, toggleArtistFavorite, toggleSongFavorite } = controller
   const sourceSongs = browse.view.data.topSongs
+  // Canal de YouTube sin música oficial (como en Limusic): sus vídeos hacen de canciones y se muestran sus listas.
+  const isChannel = browse.view.data.kind === 'channel'
+  const sourceVideos = browse.view.data.videos ?? EMPTY_SONGS
+  const playlistShelves = browse.view.data.playlists
   const artistDefaults = { artist: browse.view.data.name, artistId: browse.view.data.id }
   // El fondo del encabezado rota por las portadas de sus álbumes (nítidas); la foto del artista, casi siempre pequeña, solo se usa si no hay lanzamientos.
   const releases = adaptReleases(browse.view.data.shelves)
   const covers = [...new Set(releases.map((release) => release.artwork).filter(Boolean))].slice(0, 8).map(enlargeArtistImage)
   const artistPhotos = browse.view.data.images?.map((image) => enlargeArtistImage(image.url ?? image)).filter(Boolean)
-  return <ArtistView artist={{ artistId: browse.view.data.id, artwork: covers[0] ?? enlargeArtistImage(browse.view.data.thumbnail), images: covers.length ? covers : artistPhotos, title: browse.view.data.name }} likedArtistIds={likedArtistIds} likedSongIds={likedSongIds} onAlbumSelect={openAlbum} onBack={controller.goBack} onPlaybackToggle={player.togglePlay} onReleasePlay={(release) => openAlbum(release.id)} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleArtistFavorite={toggleArtistFavorite} onToggleFavorite={toggleSongFavorite} onViewAllSongs={() => openArtistSongs(browse.view.data.id)} releases={releases} renderSongActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} songs={sourceSongs.map((song, index) => adaptSong(song, index, artistDefaults))} />
+  return <ArtistView artist={{ artistId: browse.view.data.id, artwork: covers[0] ?? enlargeArtistImage(browse.view.data.thumbnail), images: covers.length ? covers : artistPhotos, kind: isChannel ? 'channel' : 'artist', subtitle: localizeAudience(browse.view.data.subtitle), title: browse.view.data.name }} likedArtistIds={likedArtistIds} likedSongIds={likedSongIds} onAlbumSelect={openAlbum} onBack={controller.goBack} onPlaybackToggle={player.togglePlay} onReleasePlay={(release) => openAlbum(release.id)} onSongSelect={(songId) => playSongs(sourceSongs, songId)} onToggleArtistFavorite={toggleArtistFavorite} onToggleFavorite={toggleSongFavorite} onPlaylistSelect={openPlaylist} onVideoSelect={(videoId) => playSongs(sourceVideos, videoId)} onViewAllSongs={() => openArtistSongs(browse.view.data.id)} playlistShelves={playlistShelves} releases={releases} videos={sourceVideos} renderSongActions={renderSongActions} selectedSongId={player.currentSong?.id} selectedSongPlaying={player.isPlaying} songs={sourceSongs.map((song, index) => adaptSong(song, index, artistDefaults))} />
 }
 
 function ArtistSongsDetail({ controller }) {

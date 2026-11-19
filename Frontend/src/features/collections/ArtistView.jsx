@@ -82,6 +82,17 @@ function ArtistSongRow({ likedSongIds, onAddToPlaylist, onAlbumSelect, onPlay, o
   )
 }
 
+// Títulos de los carruseles tal como los envía YouTube Music (en inglés) → español.
+function shelfTitle(title) {
+  if (/^playlists$/i.test(title)) return 'Listas de reproducción'
+  if (/^featured on$/i.test(title)) return 'Aparece en'
+  const by = /^playlists by (.+)$/i.exec(title)
+  return by ? `Listas de ${by[1]}` : title
+}
+
+const toPlaylistCard = (item) => ({ artwork: item.thumbnail, id: item.id, meta: item.subtitle, title: item.title })
+const toVideoCard = (video) => ({ artwork: video.thumbnail ?? video.artwork, id: video.id, meta: video.artist, title: video.title })
+
 function ArtistView({
   artist,
   likedArtistIds,
@@ -90,8 +101,12 @@ function ArtistView({
   onAlbumSelect,
   onBack,
   onPlaybackToggle,
+  onPlaylistSelect,
   onSongSelect,
+  onVideoSelect,
   onViewAllSongs,
+  playlistShelves,
+  videos,
   onToggleFavorite,
   onToggleArtistFavorite,
   renderSongActions,
@@ -154,6 +169,11 @@ function ArtistView({
     { items: epItems, title: 'EPs' },
     { items: singleItems, title: 'Singles' },
   ].filter((group) => group.items.length > 0)
+  // Un canal de YouTube sin música oficial: sus vídeos hacen de canciones y bajo el nombre van sus suscriptores.
+  const isChannel = artist.kind === 'channel'
+  const releaseSummary = `${albumItems.length} ${albumItems.length === 1 ? 'álbum' : 'álbumes'} · ${epItems.length} ${epItems.length === 1 ? 'EP' : 'EPs'}`
+  const videoItems = useMemo(() => (videos ?? []).map(toVideoCard), [videos])
+  const playlistGroups = useMemo(() => (playlistShelves ?? []).map((shelf) => ({ items: shelf.items.map(toPlaylistCard), title: shelfTitle(shelf.title) })), [playlistShelves])
 
   return (
     <article className="artist-profile" aria-labelledby="artist-profile-title">
@@ -190,7 +210,7 @@ function ArtistView({
           >
             {artist.title}
           </h1>
-          <p>{albumItems.length} {albumItems.length === 1 ? 'álbum' : 'álbumes'} · {epItems.length} {epItems.length === 1 ? 'EP' : 'EPs'}</p>
+          <p>{isChannel ? (artist.subtitle || 'Canal de YouTube') : releaseSummary}</p>
           <div className="artist-profile__hero-actions">
             <button className="artist-profile__play" type="button" disabled={!artistSongs.length} onClick={playArtist}>
               {artistIsPlaying ? <Pause fill="currentColor" aria-hidden="true" /> : <Play fill="currentColor" aria-hidden="true" />}
@@ -242,10 +262,10 @@ function ArtistView({
         {featuredSongs.length > 0 && (
           <section className="sl-shelf" aria-labelledby="artist-songs-title">
             <ShelfHeading
-              action={onViewAllSongs ? <button className="sl-see-all" type="button" onClick={onViewAllSongs}>Ver todas las canciones</button> : undefined}
+              action={onViewAllSongs ? <button className="sl-see-all" type="button" onClick={onViewAllSongs}>{isChannel ? 'Ver todos los vídeos' : 'Ver todas las canciones'}</button> : undefined}
               id="artist-songs-title"
               kind="songs"
-              title="Canciones más escuchadas"
+              title={isChannel ? 'Vídeos' : 'Canciones más escuchadas'}
             />
             <ol className="sl-songs">
               {featuredSongs.map((song) => (
@@ -272,6 +292,21 @@ function ArtistView({
             items={group.items}
             key={group.title}
             onSelect={onAlbumSelect}
+            title={group.title}
+          />
+        ))}
+
+        {videoItems.length > 0 && onVideoSelect && (
+          <HomeRail fitColumns icon={<SectionIcon kind="rail" />} items={videoItems} onSelect={onVideoSelect} title="Vídeos" />
+        )}
+
+        {onPlaylistSelect && playlistGroups.map((group) => (
+          <HomeRail
+            fitColumns
+            icon={<SectionIcon kind="rail" />}
+            items={group.items}
+            key={`playlists-${group.title}`}
+            onSelect={onPlaylistSelect}
             title={group.title}
           />
         ))}

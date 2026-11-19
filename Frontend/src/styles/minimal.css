@@ -1107,6 +1107,12 @@
   }
 }
 
+/* Con poco contenido (un canal con 8 vídeos y nada más) la cuadrícula repartía la altura sobrante entre las filas y
+   las canciones quedaban separadas por huecos enormes. El contenido se apila arriba, tenga lo que tenga. */
+.music-app .artist-profile__content { align-content: start; }
+.music-app .artist-profile__content .sl-shelf,
+.music-app .artist-profile__content .sl-songs { align-content: start; }
+
 /* Canciones del artista: una por fila y acciones extra solo al pasar el cursor,
    para que el título tenga sitio incluso con el reproductor abierto. */
 @media (min-width: 821px) {
