@@ -13,4 +13,14 @@ function mountJsonParsers(app, { defaultLimit = '32kb', playlistsLimit = '2mb' }
   app.use(express.json({ limit: defaultLimit }))
 }
 
-module.exports = { mountJsonParsers }
+/**
+ * Un cuerpo por encima del límite lo rechaza body-parser con status 413 (`entity.too.large`). El manejador general de
+ * errores de server.js lo convertía en un 500 genérico; esta función da la respuesta correcta para ese caso y devuelve
+ * null si el error es otro.
+ */
+function bodyLimitResponse(error) {
+  if (error?.type !== 'entity.too.large' && error?.status !== 413) return null
+  return { body: { message: 'La solicitud es demasiado grande.' }, status: 413 }
+}
+
+module.exports = { bodyLimitResponse, mountJsonParsers }

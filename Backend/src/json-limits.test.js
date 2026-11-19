@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
 const express = require('express')
-const { mountJsonParsers } = require('./json-limits')
+const { bodyLimitResponse, mountJsonParsers } = require('./json-limits')
 
 test('el cuerpo JSON admite 2 MB solo en /api/playlists y 32 kB en el resto', async () => {
   const app = express()
@@ -10,7 +10,12 @@ test('el cuerpo JSON admite 2 MB solo en /api/playlists y 32 kB en el resto', as
   app.post('/api/playlists', echo)
   app.patch('/api/playlists/:id', echo)
   app.post('/api/otra-ruta', echo)
-  app.use((error, _req, res, _next) => res.status(error.status ?? 500).json({ error: error.type ?? 'error' }))
+  // Mismo manejador que server.js: un cuerpo demasiado grande es 413, no 500.
+  app.use((error, _req, res, _next) => {
+    const tooLarge = bodyLimitResponse(error)
+    if (tooLarge) return res.status(tooLarge.status).json(tooLarge.body)
+    return res.status(500).json({ error: 'error' })
+  })
   const server = app.listen(0)
   const base = `http://127.0.0.1:${server.address().port}`
   const send = (path, size, method = 'POST') => fetch(base + path, {
@@ -29,4 +34,12 @@ test('el cuerpo JSON admite 2 MB solo en /api/playlists y 32 kB en el resto', as
   } finally {
     await new Promise((resolve) => server.close(resolve))
   }
+})
+
+test('bodyLimitResponse solo reconoce los errores de tamaño de cuerpo', () => {
+  assert.deepEqual(bodyLimitResponse({ type: 'entity.too.large', status: 413 }), { body: { message: 'La solicitud es demasiado grande.' }, status: 413 })
+  assert.equal(bodyLimitResponse({ status: 413 })?.status, 413)
+  assert.equal(bodyLimitResponse({ type: 'entity.parse.failed', status: 400 }), null)
+  assert.equal(bodyLimitResponse(new Error('otro')), null)
+  assert.equal(bodyLimitResponse(undefined), null)
 })

@@ -36,7 +36,7 @@ const { checkPrismaHealth, closePrisma, connectPrisma } = require('./src/prisma'
 const { YOUTUBE_USER_PATHS } = require('./src/youtube/authPaths')
 const { artistCacheHeaders } = require('./src/cache-headers')
 const { serverTiming } = require('./src/server-timing')
-const { mountJsonParsers } = require('./src/json-limits')
+const { bodyLimitResponse, mountJsonParsers } = require('./src/json-limits')
 
 const app = express()
 let server
@@ -205,6 +205,9 @@ async function start() {
   })
 
   app.use((error, _req, res, _next) => {
+    // Cuerpo por encima del límite (32 kB; 2 MB en /api/playlists): 413, no un 500 genérico.
+    const tooLarge = bodyLimitResponse(error)
+    if (tooLarge) return res.status(tooLarge.status).json(tooLarge.body)
     console.error(error)
     if (error?.type === 'entity.parse.failed' || error?.status === 400) {
       return res.status(400).json({ message: 'La solicitud no tiene un formato valido.' })
