@@ -87,6 +87,85 @@ export function selectArtistSongDetails(items, topSongIds, defaults) {
     .map((item) => mapSong(item, defaults));
 }
 
+// Canales de YouTube sin música oficial (p. ej. @Q2000_): la página de YouTube Music no trae canciones ni álbumes, pero el
+// canal sí tiene vídeos. Se listan como pistas (solo se reproduce el audio; la portada es la miniatura del vídeo).
+const MAX_CHANNEL_VIDEOS = 600;
+const channelVideosCache = createAsyncTtlCache({ ttlMs: config.browseCacheTtlMs, maxSize: config.requestCacheMax });
+
+// YouTube entrega los vídeos del canal con dos formas: `Video` (id, duration, thumbnails) y `LockupView` (content_id,
+// la duración en una insignia de la miniatura y el título en metadata). Se normalizan las dos.
+function parseClock(text) {
+  if (typeof text !== 'string' || !/^\d+(:\d{1,2}){1,2}$/.test(text.trim())) return 0;
+  return text.trim().split(':').map(Number).reduce((total, part) => (total * 60) + part, 0);
+}
+
+function normalizeChannelVideo(video) {
+  if (video.content_id || video.content_type) {
+    if (video.content_type && video.content_type !== 'VIDEO') return null;
+    const badges = (video.content_image?.overlays || []).flatMap((overlay) => overlay.badges || []);
+    const text = badges.map((badge) => badge.text).find((value) => parseClock(value)) || '';
+    return {
+      id: video.content_id,
+      title: plainText(video.metadata?.title) || '',
+      duration: text,
+      durationSeconds: parseClock(text),
+      thumbnail: pickThumbnail(video.content_image?.image) || '',
+    };
+  }
+  const seconds = Number(video.duration?.seconds) || 0;
+  return {
+    id: video.video_id || video.id,
+    title: plainText(video.title) || '',
+    duration: plainText(video.duration?.text),
+    durationSeconds: seconds,
+    thumbnail: pickThumbnail(video.thumbnails ?? video.thumbnail) || '',
+    author: video.author,
+  };
+}
+
+export function mapChannelVideo(video, defaults = {}) {
+  const item = normalizeChannelVideo(video);
+  if (!item?.id || !item.durationSeconds) return null;
+  return {
+    id: item.id,
+    title: item.title || 'Vídeo sin título',
+    artist: plainText(item.author?.name) || plainText(defaults.artist) || 'Artista desconocido',
+    artistId: defaults.artistId || item.author?.id || null,
+    album: 'Vídeos',
+    albumId: null,
+    duration: item.duration || '--:--',
+    durationSeconds: item.durationSeconds,
+    thumbnail: item.thumbnail || defaults.thumbnail || '',
+  };
+}
+/** Recorre las páginas de la pestaña "Vídeos" del canal (sin Shorts ni directos sin duración) hasta `limit`. */
+export async function collectChannelVideos(feed, defaults, limit = MAX_CHANNEL_VIDEOS) {
+  const videos = new Map();
+  let page = feed;
+  while (page && videos.size < limit) {
+    for (const item of page.videos || []) {
+      const song = mapChannelVideo(item, defaults);
+      if (!song || videos.has(song.id)) continue;
+      videos.set(song.id, song);
+      if (videos.size >= limit) break;
+    }
+    page = page.has_continuation && videos.size < limit ? await page.getContinuation() : null;
+  }
+  return [...videos.values()];
+}
+
+export function getChannelVideos(id, defaults = {}, limit = MAX_CHANNEL_VIDEOS) {
+  return channelVideosCache.get(`${id}:${limit}`, async () => {
+    try {
+      const channel = await getYoutube().getChannel(id);
+      return await collectChannelVideos(await channel.getVideos(), { ...defaults, artistId: id }, limit);
+    } catch (error) {
+      console.warn(`[artist] sin vídeos de canal para ${id}: ${error.message}`);
+      return [];
+    }
+  });
+}
+
 /**
  * Imágenes del artista disponibles en la página de YouTube Music (sin llamadas extra):
  *  - header: cabecera panorámica de YouTube Music
@@ -202,7 +281,7 @@ export async function getArtistSongs(id) {
     const section = (artist.sections || []).find((item) => item.type === 'MusicShelf');
     const playlistId = section?.endpoint?.payload?.browseId;
     if (!playlistId) {
-      return { id, name, songs: [] };
+      return { id, name, songs: await getChannelVideos(id, { artist: name, thumbnail: pickThumbnail(artist.header?.thumbnail ?? artist.header?.foreground_thumbnail) }) };
     }
     const playlist = await youtube.music.getPlaylist(playlistId);
     const songs = await collectArtistSongs(playlist, {
@@ -223,13 +302,17 @@ async function loadArtistPage(id) {
 
   const sections = artist.sections || [];
   const songSection = sections.find((section) => section.type === 'MusicShelf');
-  const topSongs = (songSection?.contents || [])
+  let topSongs = (songSection?.contents || [])
     .filter((item) => item.id && (item.item_type === 'song' || item.item_type === 'video'))
     .map((item) => {
       const album = findSongAlbum(item);
       return mapSong(item, { artist: name, artistId: id, album: album?.name, albumId: album?.id, thumbnail });
     });
   const shelves = createReleasePreview(sections, { id, name });
+  // Canal sin música en YouTube Music: se muestran sus vídeos más recientes (la lista completa, en "Ver todas").
+  if (!topSongs.length && !shelves.length) {
+    topSongs = await getChannelVideos(id, { artist: name, thumbnail }, 8);
+  }
 
   return {
     page: {

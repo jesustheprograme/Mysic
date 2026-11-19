@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { collectArtistSongs, createReleasePreview, expandReleaseShelf, findSongAlbum, mergeReleaseItems, selectArtistSongDetails } from './artist.mjs';
+import { collectArtistSongs, collectChannelVideos, createReleasePreview, expandReleaseShelf, findSongAlbum, mergeReleaseItems, selectArtistSongDetails } from './artist.mjs';
 
 test('combina la vista previa y la discografía completa sin duplicar lanzamientos', () => {
   const preview = [{ id: 'album-1', title: 'Uno' }, { id: 'album-2', title: 'Dos' }];
@@ -115,3 +115,22 @@ test('completa solo las canciones destacadas con su duración real', () => {
   assert.equal(songs[0].durationSeconds, 201);
 });
 
+test('lista los vídeos completos de un canal sin música: recorre páginas, descarta Shorts y repetidos', async () => {
+  const video = (id, seconds) => ({ video_id: id, title: { text: `Vídeo ${id}` }, duration: seconds ? { seconds, text: `0:${seconds}` } : undefined, thumbnails: [{ url: `https://i.ytimg.com/vi/${id}/hq.jpg` }] })
+  const second = { videos: [video('c', 30), video('a', 10)], has_continuation: false }
+  const first = { videos: [video('a', 10), video('b', 0), video('x', 20)], has_continuation: true, getContinuation: async () => second }
+  const songs = await collectChannelVideos(first, { artist: 'Q2000', artistId: 'UC1' })
+  assert.deepEqual(songs.map((song) => song.id), ['a', 'x', 'c'])
+  assert.equal(songs[0].artistId, 'UC1')
+  assert.equal(songs[0].artist, 'Q2000')
+  assert.equal(songs[0].durationSeconds, 10)
+  assert.equal(songs[0].thumbnail, 'https://i.ytimg.com/vi/a/hq.jpg')
+  assert.equal((await collectChannelVideos(first, { artistId: 'UC1' }, 2)).length, 2, 'respeta el límite')
+})
+
+test('entiende el formato LockupView de los vídeos de canal (duración en la insignia de la miniatura)', async () => {
+  const lockup = (id, clock, type = 'VIDEO') => ({ content_id: id, content_type: type, metadata: { title: { text: `T ${id}` } }, content_image: { image: [{ url: `https://i.ytimg.com/vi/${id}/hq720.jpg` }], overlays: [{ badges: [{ text: clock }] }] } })
+  const songs = await collectChannelVideos({ videos: [lockup('p', '3:54'), lockup('q', '1:02:03'), lockup('r', '4:00', 'PLAYLIST'), lockup('s', 'EN VIVO')] }, { artist: 'Q2000', artistId: 'UC1' })
+  assert.deepEqual(songs.map((song) => [song.id, song.durationSeconds, song.duration]), [['p', 234, '3:54'], ['q', 3723, '1:02:03']])
+  assert.equal(songs[0].title, 'T p')
+})
