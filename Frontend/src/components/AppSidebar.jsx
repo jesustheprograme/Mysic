@@ -74,6 +74,7 @@ function AppSidebar({
   onMobileClose,
   onYoutubeNavigate,
   playlists = [],
+  showLegacy = false,
   // Playlists y Me gusta de la cuenta de YouTube Music (se vinculan solos) y cuál de ellos está abierto.
   youtubeActive = null,
   youtubeLibrary = EMPTY_LIBRARY_SUMMARY,
@@ -139,6 +140,9 @@ function AppSidebar({
         <nav className="app-sidebar__navigation" aria-label="Navegación principal">
           {mainNavigationItems.map(renderItem)}
 
+          {/* Grupo del Mysic antiguo: solo lo ve su dueño (features/discovery/legacyAccess.js). */}
+          {showLegacy && (
+          <>
           <button
             className={`app-sidebar__group-toggle${groupVisible ? ' app-sidebar__group-toggle--open' : ''}`}
             type="button"
@@ -169,6 +173,8 @@ function AppSidebar({
             {!collapsed && <p className="app-sidebar__label">Tu música</p>}
             {libraryNavigationItems.map(renderItem)}
           </div>
+          </>
+          )}
         </nav>
 
         {!collapsed && (
@@ -193,24 +199,8 @@ function AppSidebar({
               </button>
             </div>
           )}
-          {youtubeLibrary.playlists.map((playlist) => (
-            <div
-              className={`app-sidebar__playlist${activeSection === 'youtube' && youtubeActive?.type === 'playlist' && youtubeActive.id === playlist.id ? ' app-sidebar__playlist--active' : ''}`}
-              key={`yt-${playlist.id}`}
-            >
-              <button className="app-sidebar__playlist-main" type="button" title={playlist.title} onClick={() => onYoutubeNavigate?.({ id: playlist.id, type: 'playlist' })}>
-                {playlist.thumbnail ? (
-                  <img loading="lazy" decoding="async" className="app-sidebar__playlist-art" src={sizedImage(playlist.thumbnail, 34)} alt="" width="34" height="34" />
-                ) : (
-                  <span className="app-sidebar__playlist-art" aria-hidden="true" />
-                )}
-                <span className="app-sidebar__playlist-copy">
-                  <strong>{playlist.title}</strong>
-                  <small>{countText(playlist.count)}</small>
-                </span>
-              </button>
-            </div>
-          ))}
+          {/* Primero las playlists de Mysic (las creadas aquí y las importadas de un enlace, las fijadas arriba) y
+              después las de la biblioteca de YouTube Music. */}
           {playlists.map((playlist) => (
               <div
                 className={`app-sidebar__playlist${activePlaylistId === playlist.id ? ' app-sidebar__playlist--active' : ''}`}
@@ -265,6 +255,24 @@ function AppSidebar({
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
+          ))}
+          {youtubeLibrary.playlists.map((playlist) => (
+            <div
+              className={`app-sidebar__playlist${activeSection === 'youtube' && youtubeActive?.type === 'playlist' && youtubeActive.id === playlist.id ? ' app-sidebar__playlist--active' : ''}`}
+              key={`yt-${playlist.id}`}
+            >
+              <button className="app-sidebar__playlist-main" type="button" title={playlist.title} onClick={() => onYoutubeNavigate?.({ id: playlist.id, type: 'playlist' })}>
+                {playlist.thumbnail ? (
+                  <img loading="lazy" decoding="async" className="app-sidebar__playlist-art" src={sizedImage(playlist.thumbnail, 34)} alt="" width="34" height="34" />
+                ) : (
+                  <span className="app-sidebar__playlist-art" aria-hidden="true" />
+                )}
+                <span className="app-sidebar__playlist-copy">
+                  <strong>{playlist.title}</strong>
+                  <small>{countText(playlist.count)}</small>
+                </span>
+              </button>
+            </div>
           ))}
           </div>
           </div>

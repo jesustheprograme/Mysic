@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { cleanTitle, isSpotifyLink, parseYtLink, trackQuery } from './ytLink.js'
+import { cleanTitle, isSpotifyLink, parseYtLink, spotifyPlaylistDetails, trackQuery } from './ytLink.js'
 
 test('reconoce los enlaces de YouTube y YouTube Music que se pegan', () => {
   assert.deepEqual(parseYtLink('https://music.youtube.com/watch?v=abc123&list=RDAMVMabc123'), { kind: 'song', id: 'abc123' })
@@ -40,4 +40,23 @@ test('cleanTitle quita los sufijos de edicion que rompen la busqueda y respeta e
   assert.equal(cleanTitle('Mi - Cancion'), 'Mi - Cancion')
   assert.equal(cleanTitle(''), '')
   assert.equal(trackQuery({ title: 'Panama - 2015 Remaster', artists: ['Van Halen'] }), 'Panama Van Halen')
+})
+
+test('spotifyPlaylistDetails: la playlist de Mysic que nace de una de Spotify', () => {
+  const songs = [
+    { id: 'aaaaaaaaaaa', title: 'Uno', artist: 'A', artistId: 'UC1', album: 'Disco', albumId: 'MPRE1', duration: '3:10', thumbnail: 'uno.jpg' },
+    { id: 'bbbbbbbbbbb', title: 'Dos' },
+    { id: 'aaaaaaaaaaa', title: 'Uno (repetida)' },
+    null,
+  ]
+  const details = spotifyPlaylistDetails({ name: '  Mi lista  ', owner: 'jose' }, songs)
+  assert.equal(details.title, 'Mi lista')
+  assert.equal(details.description, 'Importada de Spotify · jose')
+  assert.equal(details.artwork, 'uno.jpg')
+  assert.deepEqual(details.tracks.map((track) => track.id), ['aaaaaaaaaaa', 'bbbbbbbbbbb'], 'sin repetidas y en orden')
+  assert.deepEqual(details.tracks[0], { id: 'aaaaaaaaaaa', title: 'Uno', artist: 'A', artistId: 'UC1', album: 'Disco', albumId: 'MPRE1', duration: '3:10', durationSeconds: 190, thumbnail: 'uno.jpg', source: 'youtube' })
+  assert.equal(details.tracks[1].source, 'youtube', 'el servidor las guarda como canciones de YouTube')
+  // El servidor admite 80 caracteres de título; sin nombre ni dueño hay valores por defecto.
+  assert.equal(spotifyPlaylistDetails({ name: 'x'.repeat(200) }, songs).title.length, 80)
+  assert.deepEqual(spotifyPlaylistDetails({}, []), { title: 'Playlist de Spotify', description: 'Importada de Spotify', artwork: null, tracks: [] })
 })

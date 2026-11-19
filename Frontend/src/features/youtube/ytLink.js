@@ -1,5 +1,6 @@
 // Enlaces pegados -> lo que Mysic puede abrir. Lógica pura (sin React ni red).
 // Referencia: ytlink.ts de limusic (GPL-3.0, solo como guía de los casos que cubre).
+import { normalizeYoutubePlaylistSong } from './lib/playlistSong.js'
 
 /** `{ kind: 'song' | 'playlist' | 'album' | 'artist', id }` o null si no es un enlace de YouTube / YouTube Music conocido. */
 export function parseYtLink(input) {
@@ -48,6 +49,27 @@ export function cleanTitle(title) {
   text = text.replace(/\s+-\s+([^-]*)$/, (match, suffix) => (EDITION.test(suffix) ? '' : match))
   text = text.replace(/\s*[([]([^()[\]]*)[)\]]/g, (match, inner) => (EDITION.test(inner) ? '' : match))
   return text.trim()
+}
+
+/**
+ * Datos de la playlist de Mysic que nace de una playlist de Spotify: título (el servidor admite 80 caracteres), una
+ * descripción que dice de dónde viene (sirve además para reconocerla al volver a importar el mismo enlace), portada y
+ * las canciones encontradas en YouTube Music, sin repetidas y en el orden de la lista.
+ */
+export function spotifyPlaylistDetails({ name, owner }, songs) {
+  const seen = new Set()
+  const tracks = []
+  for (const song of songs ?? []) {
+    if (!song?.id || seen.has(song.id)) continue
+    seen.add(song.id)
+    tracks.push(normalizeYoutubePlaylistSong(song))
+  }
+  return {
+    title: (String(name ?? '').trim() || 'Playlist de Spotify').slice(0, 80),
+    description: owner ? `Importada de Spotify · ${owner}` : 'Importada de Spotify',
+    artwork: tracks.find((track) => track.thumbnail)?.thumbnail || null,
+    tracks,
+  }
 }
 
 /** Texto de búsqueda de una pista de Spotify en YouTube Music: "título artista principal". */

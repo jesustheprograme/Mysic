@@ -32,7 +32,7 @@ import YoutubeCatalogContent from './YoutubeCatalogContent.jsx'
 import { setAccountMenu } from './accountMenuBridge.js'
 import { shuffled } from './queueOps.js'
 import { showToast } from './toast.js'
-import { trackQuery } from './ytLink.js'
+import { spotifyPlaylistDetails, trackQuery } from './ytLink.js'
 import { AUTOPLAY_EVENT, freshSongs, needsTopUp, readAutoplay } from './autoplay.js'
 import ToastHost from './ToastHost.jsx'
 
@@ -66,6 +66,7 @@ function YoutubeView({
   downloads,
   likedSongIds,
   onAddToPlaylist,
+  onImportPlaylist,
   onPlaybackOwnerClaim,
   onPlaybackStateChange,
   onPlayerCollapseToggle,
@@ -496,7 +497,12 @@ function YoutubeView({
     }
     if (!found.length) return notFound()
     playFrom(found, 0)
-    showToast(`Sonando ${found.length} de ${tracks.length} canciones de «${name}»`)
+    // Como Limusic: además de sonar, queda guardada como playlist de Mysic (aparece la primera en la barra lateral).
+    // Antes solo se llenaba la cola y la lista se perdía al poner otra cosa.
+    const imported = await onImportPlaylist?.(spotifyPlaylistDetails({ name, owner }, found))
+    showToast(imported
+      ? `Playlist «${name}» ${imported.updated ? 'actualizada' : 'creada'}: ${found.length} de ${tracks.length} canciones`
+      : `Sonando ${found.length} de ${tracks.length} canciones de «${name}» (no se pudo guardar la playlist)`)
   }
 
   // Acción de cada fila de canción: solo el ✓ de las que ya están en una playlist tuya (como limusic). Radio, descarga

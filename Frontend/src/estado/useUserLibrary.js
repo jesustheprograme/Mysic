@@ -164,13 +164,14 @@ export default function useUserLibrary({ libraryLoading, librarySongs, user }) {
     try {
       const playlist = await playlistsApi.create({
         title: details.title.trim() || 'Playlist sin título',
-        description: details.description.trim(),
+        description: (details.description ?? '').trim(),
         artwork: details.artwork ?? librarySongs[0]?.artwork ?? null,
         artworkPublicId: details.artworkPublicId ?? null,
         pinned: Boolean(details.pinned),
         songIds: [],
         externalSongs: [],
-        tracks: [],
+        // Una playlist importada (enlace de Spotify) nace ya con sus canciones.
+        tracks: Array.isArray(details.tracks) ? details.tracks : [],
       })
       setPlaylists((current) => [playlist, ...current])
       setPlaylistsError('')

@@ -25,6 +25,7 @@ import {
 import { openMiniPlayerWindow } from '../mini-player/openMiniPlayerWindow.tsx'
 import { catalogApi } from '../../lib/api.js'
 import { canImportMusic } from '../music-import/musicImportAccess.js'
+import { canSeeLegacyMysic, sectionAllowed } from './legacyAccess.js'
 import useLocalDownloads from '../offline/useLocalDownloads.js'
 import { useDownloads } from '../youtube/hooks/useDownloads.js'
 import { useYoutubeFavorites } from '../youtube/hooks/useYoutubeFavorites.js'
@@ -259,7 +260,7 @@ function useMiniPlayerCommandListener({ onNext, onPrevious, onSelect }) {
 }
 
 function useDiscoveryNavigation({
-  activeSection, autoSpotlightBlockedRef, mayImportMusic, setActiveAlbumId, setActiveArtistId,
+  activeSection, autoSpotlightBlockedRef, mayImportMusic, maySeeLegacy, setActiveAlbumId, setActiveArtistId,
   setActivePlaylistId, setActiveSection, setYoutubeVisited,
 }) {
   function pushHash(nextHash, fallbackHash) {
@@ -276,7 +277,7 @@ function useDiscoveryNavigation({
   }
 
   function navigateTo(section) {
-    if (section === 'import' && !mayImportMusic) return
+    if (!sectionAllowed(section, { legacy: maySeeLegacy, importMusic: mayImportMusic })) return
     const nextHash = sectionHashes[section]
     if (!nextHash) return
     autoSpotlightBlockedRef.current = true
@@ -406,10 +407,12 @@ function useDiscoveryPage({
   user,
 }) {
   const mayImportMusic = canImportMusic(user)
+  // Las secciones del Mysic antiguo solo las ve su dueño (ver legacyAccess.js); a los demás se les lleva al Inicio.
+  const maySeeLegacy = canSeeLegacyMysic(user)
   const [activeSection, setActiveSection] = useState(() => {
     restoreLastRoute()
     const requestedSection = getSectionFromHash()
-    return requestedSection === 'import' && !mayImportMusic ? DEFAULT_SECTION : requestedSection
+    return sectionAllowed(requestedSection, { legacy: maySeeLegacy, importMusic: mayImportMusic }) ? requestedSection : DEFAULT_SECTION
   })
   // YouTube Music se monta la primera vez que se visita y ya no se desmonta (la música sigue al cambiar de sección)
   const [youtubeVisited, setYoutubeVisited] = useState(activeSection === 'youtube')
@@ -555,8 +558,9 @@ function useDiscoveryPage({
   useEffect(() => {
     function syncSectionFromHash() {
       const requestedSection = getSectionFromHash()
-      const nextSection = requestedSection === 'import' && !mayImportMusic ? DEFAULT_SECTION : requestedSection
-      if (requestedSection === 'import' && !mayImportMusic) {
+      const allowed = sectionAllowed(requestedSection, { legacy: maySeeLegacy, importMusic: mayImportMusic })
+      const nextSection = allowed ? requestedSection : DEFAULT_SECTION
+      if (!allowed) {
         window.history.replaceState(window.history.state, '', sectionHashes[DEFAULT_SECTION])
       }
       if (nextSection !== 'home') autoSpotlightBlockedRef.current = true
@@ -576,7 +580,7 @@ function useDiscoveryPage({
       window.removeEventListener('hashchange', syncSectionFromHash)
       window.removeEventListener('popstate', syncSectionFromHash)
     }
-  }, [mayImportMusic])
+  }, [mayImportMusic, maySeeLegacy])
 
   useLayoutEffect(() => {
     const content = contentRef.current
@@ -727,6 +731,7 @@ function useDiscoveryPage({
     activeSection,
     autoSpotlightBlockedRef,
     mayImportMusic,
+    maySeeLegacy,
     setActiveAlbumId,
     setActiveArtistId,
     setActivePlaylistId,
@@ -950,6 +955,7 @@ function useDiscoveryPage({
         activePlaylistId={activePlaylistId}
         activeSection={activeSection}
         canImportMusic={mayImportMusic}
+        showLegacy={maySeeLegacy}
         collapsed={sidebarCollapsed}
         mobileOpen={mobileMenuOpen}
         onCreatePlaylist={() => {
@@ -1207,6 +1213,16 @@ function useDiscoveryPage({
                 favoriteStoragePrefix={youtubeFavoriteStoragePrefix}
                 likedSongIds={youtubeSongFavorites.ids}
                 onAddToPlaylist={setPlaylistPickerSong}
+                onImportPlaylist={async ({ artwork, description, title, tracks }) => {
+                  // Playlist de un enlace (Spotify): queda como playlist de Mysic, fijada para salir la primera de la
+                  // barra lateral, y se abre. Si ya se había importado (mismo título y origen), se actualiza.
+                  const existing = playlists.find((playlist) => playlist.title === title && playlist.description === description)
+                  const playlistId = existing
+                    ? ((await onUpdatePlaylist(existing.id, { pinned: true, tracks })) ? existing.id : null)
+                    : await createPlaylist({ artwork, description, pinned: true, title, tracks })
+                  if (playlistId) navigateToPlaylist(playlistId)
+                  return playlistId ? { id: playlistId, updated: Boolean(existing) } : null
+                }}
                 onPlaybackOwnerClaim={({ preserveContext = false } = {}) => {
                   if (!preserveContext) setDiscoveryMix([])
                   setYoutubePlayerVisible(true)
